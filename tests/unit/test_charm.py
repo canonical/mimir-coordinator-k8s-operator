@@ -5,9 +5,7 @@
 
 import unittest
 
-import ops.testing
 from charm import MimirCoordinatorK8SOperatorCharm
-from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.testing import Harness
 
 

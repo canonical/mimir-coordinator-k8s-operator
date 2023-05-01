@@ -1,4 +1,3 @@
 ops
 pydantic
-git+https://github.com/canonical/interface-tester-pytest@main
-
+git+https://github.com/PietroPasotti/charm-relation-interfaces@mimir_worker

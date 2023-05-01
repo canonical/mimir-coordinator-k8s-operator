@@ -14,6 +14,7 @@ https://discourse.charmhub.io/t/4208
 
 import logging
 
+from interfaces.mimir_worker.v0.schema import ProviderSchema
 from ops.charm import CharmBase
 from ops.main import main
 
@@ -29,6 +30,13 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
+        ProviderSchema(
+            app={
+                "hash_ring": '["bla"]',
+                "config": '{"key":"value"}',
+                "s3_config": '{"url":"dd", "endpoint":"dd", "secret_key":"", "access_key":"", "insecure":"false"}',
+            }
+        )
 
     def _on_config_changed(self, event):
         """Handle changed configuration.
