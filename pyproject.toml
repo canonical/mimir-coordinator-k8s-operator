@@ -37,3 +37,8 @@ per-file-ignores = {"tests/*" = ["D100","D101","D102","D103","D104"]}
 
 [tool.ruff.mccabe]
 max-complexity = 10
+
+[tool.pyright]
+include = ["src"]
+pythonVersion = "3.8"
+pythonPlatform = "Linux"
