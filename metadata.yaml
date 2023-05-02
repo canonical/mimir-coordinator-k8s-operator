@@ -7,6 +7,16 @@ summary: Mimir coordinator
 description: |
     Mimir coordinator.
 
+containers:
+  nginx:
+    resource: nginx-image
+
+resources:
+  nginx-image:
+    type: oci-image
+    description: OCI image for nginx
+    upstream-source: ubuntu/nginx:1.18-22.04_beta
+
 requires:
   mimir-worker:
     interface: mimir_worker
