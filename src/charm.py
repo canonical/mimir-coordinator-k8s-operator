@@ -13,6 +13,7 @@ https://discourse.charmhub.io/t/4208
 """
 
 import logging
+from typing import List
 
 from interfaces.mimir_worker.v0.schema import ProviderSchema
 from ops.charm import CharmBase
@@ -22,6 +23,11 @@ from ops.main import main
 logger = logging.getLogger(__name__)
 
 VALID_LOG_LEVELS = ["info", "debug", "warning", "error", "critical"]
+
+
+def is_coherent(roles: List[str]):
+    """Return True if the roles list makes up a coherent mimir deployment."""
+    return False
 
 
 class MimirCoordinatorK8SOperatorCharm(CharmBase):
