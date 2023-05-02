@@ -19,15 +19,12 @@ from interfaces.mimir_worker.v0.schema import ProviderSchema
 from ops.charm import CharmBase
 from ops.main import main
 
+from mimir_coordinator import MimirCoordinator
+
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
 
 VALID_LOG_LEVELS = ["info", "debug", "warning", "error", "critical"]
-
-
-def is_coherent(roles: List[str]):
-    """Return True if the roles list makes up a coherent mimir deployment."""
-    return False
 
 
 class MimirCoordinatorK8SOperatorCharm(CharmBase):
@@ -36,13 +33,16 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
-        ProviderSchema(
-            app={
-                "hash_ring": '["bla"]',
-                "config": '{"key":"value"}',
-                "s3_config": '{"url":"dd", "endpoint":"dd", "secret_key":"", "access_key":"", "insecure":"false"}',
-            }
+
+        # food for thought: make MimirCoordinator ops-unaware and accept a
+        # List[MimirRole].
+        self.coordinator = MimirCoordinator(
+            relations=self.mimir_worker_relations
         )
+
+    @property
+    def mimir_worker_relations(self):
+        return self.model.relations['mimir_worker']
 
     def _on_config_changed(self, event):
         """Handle changed configuration.
@@ -52,7 +52,7 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
 
         Learn more about config at https://juju.is/docs/sdk/config
         """
-        pass
+        self.coordinator.dump_config(self.model.config)
 
 
 if __name__ == "__main__":  # pragma: nocover
