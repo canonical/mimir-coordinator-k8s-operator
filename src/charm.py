@@ -11,7 +11,7 @@ develop a new k8s charm using the Operator Framework:
 
 https://discourse.charmhub.io/t/4208
 """
-
+import json
 import logging
 from typing import List
 
@@ -39,6 +39,17 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         self.coordinator = MimirCoordinator(
             relations=self.mimir_worker_relations
         )
+    @property
+    def _s3_storage(self) -> str:
+        # if not self.model.relations['s3']:
+        #     return {}
+        return json.dumps({
+            "url": "foo",
+             "endpoint": "bar",
+             "access_key": "bar",
+             "insecure": False,
+             "secret_key": "x12"})
+
 
     @property
     def mimir_worker_relations(self):
@@ -52,7 +63,18 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
 
         Learn more about config at https://juju.is/docs/sdk/config
         """
-        self.coordinator.dump_config(self.model.config)
+        hash_ring = []
+
+        for relation in self.mimir_worker_relations:
+            for remote_unit in relation.units:
+                # todo: figure out under what circumstances this would not be routable
+                unit_ip = relation.data[remote_unit]['private-address']
+                hash_ring.append(unit_ip)
+
+        for relation in self.mimir_worker_relations:
+            relation.data[self.app]['config'] = json.dumps(dict(self.model.config))
+            relation.data[self.app]['hash_ring'] = hash_ring
+            relation.data[self.app]['s3_storage'] = self._s3_storage
 
 
 if __name__ == "__main__":  # pragma: nocover

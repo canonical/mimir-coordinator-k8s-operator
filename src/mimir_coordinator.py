@@ -5,7 +5,7 @@ from typing import List, Optional, Dict
 
 import pydantic
 from interfaces.mimir_worker.v0.schema import MimirRole, RequirerSchema
-from ops import Relation, ModelError, Unit
+from ops import Relation, ModelError, Unit, ConfigData
 
 logger = logging.getLogger(__name__)
 
@@ -87,5 +87,3 @@ class MimirCoordinator:
                              exc_info=True)
                 return False
         return True
-
-    def dump_config(self, cfg: Dict[str,str]):
