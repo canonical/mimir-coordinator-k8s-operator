@@ -10,8 +10,53 @@ description: |
 requires:
   mimir-worker:
     interface: mimir_worker
+    description: |
+      Coordinator forwards operations data to the workers:
+      - s3 storage information
+      
+      Workers forward their role(s) to the coordinator.
 
   s3:
     interface: s3
     limit: 1
+    description: |
+      The coordinator obtains storage info on behalf of the workers, and
+      forwards all workers the storage details over mimir-worker.
 
+  send-remote-write:
+    interface: prometheus_remote_write
+    description: |
+      Forward workers' rules to the ruler.
+
+  logging-consumer:
+    interface: loki_push_api
+    description: |
+      Forward workers' built-in logging rules to the ruler.
+
+  grafana-dashboards-consumer:
+    interface: grafana_dashboard
+    description: |
+      Forward workers' built-in dashboards to grafana.
+
+  ingress:
+    interface: ingress_per_unit
+    limit: 1
+
+provides:
+  grafana-dashboards-provider:
+    interface: grafana_dashboard
+    description: |
+      Collect built-in dashboards from the worker units.
+
+  logging-provider:
+    interface: loki_push_api
+    description: |
+      Collect built-in logging rules from the worker units.
+
+  receive-remote-write:
+    interface: prometheus_remote_write
+    description: |
+      Collect built-in alerting/recording rules from the worker units.
+
+  tracing:
+    interface: tracing
