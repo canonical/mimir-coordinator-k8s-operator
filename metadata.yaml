@@ -41,7 +41,7 @@ requires:
       Forward workers' built-in dashboards to grafana.
 
   ingress:
-    interface: ingress_per_unit
+    interface: ingress
     limit: 1
 
 provides:
