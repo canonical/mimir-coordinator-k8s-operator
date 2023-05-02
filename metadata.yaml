@@ -1,7 +1,9 @@
 name: mimir-coordinator-k8s
 assumes:
   - k8s-api
- 
+
+docs: https://discourse.charmhub.io/t/mimir-coordinator-index/10531
+
 summary: Mimir coordinator
 
 description: |

@@ -13,7 +13,6 @@ https://discourse.charmhub.io/t/4208
 """
 import json
 import logging
-from typing import List
 
 from interfaces.mimir_worker.v0.schema import ProviderSchema
 from ops.charm import CharmBase
@@ -49,7 +48,6 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
              "access_key": "bar",
              "insecure": False,
              "secret_key": "x12"})
-
 
     @property
     def mimir_worker_relations(self):
