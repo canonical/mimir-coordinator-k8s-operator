@@ -27,7 +27,7 @@ requires:
       - s3 storage information
       - memberlist
       - loki, tempo endpoints (?)
-      
+
       Workers forward their role(s) to the coordinator.
 
   s3:

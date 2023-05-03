@@ -14,11 +14,10 @@ https://discourse.charmhub.io/t/4208
 import json
 import logging
 
-from interfaces.mimir_worker.v0.schema import ProviderSchema
+from mimir_coordinator import MimirCoordinator
 from ops.charm import CharmBase
 from ops.main import main
-
-from mimir_coordinator import MimirCoordinator
+from ops.model import ActiveStatus
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
@@ -32,26 +31,31 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
+        self.framework.observe(self.on.mimir_worker_relation_joined, self._on_config_changed)
+        self.framework.observe(self.on.nginx_pebble_ready, self._on_pebble_ready)
 
         # food for thought: make MimirCoordinator ops-unaware and accept a
         # List[MimirRole].
-        self.coordinator = MimirCoordinator(
-            relations=self.mimir_worker_relations
-        )
+        self.coordinator = MimirCoordinator(relations=self.mimir_worker_relations)
+
     @property
     def _s3_storage(self) -> str:
         # if not self.model.relations['s3']:
         #     return {}
-        return json.dumps({
-            "url": "foo",
-             "endpoint": "bar",
-             "access_key": "bar",
-             "insecure": False,
-             "secret_key": "x12"})
+        return json.dumps(
+            {
+                "url": "foo",
+                "endpoint": "bar",
+                "access_key": "bar",
+                "insecure": False,
+                "secret_key": "x12",
+            }
+        )
 
     @property
     def mimir_worker_relations(self):
-        return self.model.relations['mimir_worker']
+        """Return mimir worker relations."""
+        return self.model.relations.get("mimir_worker", [])
 
     def _on_config_changed(self, event):
         """Handle changed configuration.
@@ -66,13 +70,16 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         for relation in self.mimir_worker_relations:
             for remote_unit in relation.units:
                 # todo: figure out under what circumstances this would not be routable
-                unit_ip = relation.data[remote_unit]['private-address']
+                unit_ip = relation.data[remote_unit]["private-address"]
                 hash_ring.append(unit_ip)
 
         for relation in self.mimir_worker_relations:
-            relation.data[self.app]['config'] = json.dumps(dict(self.model.config))
-            relation.data[self.app]['hash_ring'] = hash_ring
-            relation.data[self.app]['s3_storage'] = self._s3_storage
+            relation.data[self.app]["config"] = json.dumps(dict(self.model.config))
+            relation.data[self.app]["hash_ring"] = hash_ring
+            relation.data[self.app]["s3_storage"] = self._s3_storage
+
+    def _on_pebble_ready(self, _):
+        self.unit.status = ActiveStatus()
 
 
 if __name__ == "__main__":  # pragma: nocover
