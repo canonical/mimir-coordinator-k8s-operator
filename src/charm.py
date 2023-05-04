@@ -17,6 +17,7 @@ import logging
 from interfaces.mimir_worker.v0.schema import ProviderSchema
 from ops.charm import CharmBase
 from ops.main import main
+from ops.model import ActiveStatus
 
 from mimir_coordinator import MimirCoordinator
 
@@ -38,6 +39,10 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         self.coordinator = MimirCoordinator(
             relations=self.mimir_worker_relations
         )
+
+        # FIXME set status on correct occasion
+        self.unit.status = ActiveStatus()
+
     @property
     def _s3_storage(self) -> str:
         # if not self.model.relations['s3']:
