@@ -12,23 +12,61 @@ description: |
 containers:
   nginx:
     resource: nginx-image
+  agent:
+    resource: agent-image
+    mounts:
+      - storage: data
+        location: /tmp/agent/data
+
+storage:
+  data:
+    type: filesystem
 
 resources:
   nginx-image:
     type: oci-image
     description: OCI image for nginx
     upstream-source: ubuntu/nginx:1.18-22.04_beta
+  agent-image:
+    type: oci-image
+    upstream-source: ghcr.io/canonical/grafana-agent:latest
+    description: OCI image for Grafana Agent
 
 requires:
-  mimir-worker:
+  # On the same mimir_worker interface, the coordinator will accept one relation to a worker per each Mimir component.
+  # The relation(s) determine the role(s) the worker will assume.
+  # Each Mimir worker can take on multiple roles; however, there can be no role replication among workers related to the
+  # same coordinator, which is why we force `limit: 1`.
+  mimir-compactor:
     interface: mimir_worker
-    description: |
-      Coordinator forwards operations data to the workers:
-      - s3 storage information
-      - memberlist
-      - loki, tempo endpoints (?)
-      
-      Workers forward their role(s) to the coordinator.
+    limit: 1
+  mimir-distributor:
+    interface: mimir_worker
+    limit: 1
+  mimir-ingester:
+    interface: mimir_worker
+    limit: 1
+  mimir-querier:
+    interface: mimir_worker
+    limit: 1
+  mimir-query-frontend:
+    interface: mimir_worker
+    limit: 1
+  mimir-store-gateway:
+    interface: mimir_worker
+    limit: 1
+  mimir-alertmanager:
+    interface: mimir_worker
+    limit: 1
+  mimir-ruler:
+    interface: mimir_worker
+    limit: 1
+  mimir-overrides-exporter:
+    interface: mimir_worker
+    limit: 1
+  mimir-query-scheduler:
+    interface: mimir_worker
+    limit: 1
 
   s3:
     interface: s3
@@ -55,22 +93,11 @@ requires:
   ingress:
     interface: ingress
     limit: 1
+    description: |
+      Ingress-per-app, to load-balance across multiple units of the coordinator.
 
 provides:
-  grafana-dashboards-provider:
-    interface: grafana_dashboard
-    description: |
-      Collect built-in dashboards from the worker units.
-
-  logging-provider:
-    interface: loki_push_api
-    description: |
-      Collect built-in logging rules from the worker units.
-
-  receive-remote-write:
-    interface: prometheus_remote_write
-    description: |
-      Collect built-in alerting/recording rules from the worker units.
-
   tracing:
     interface: tracing
+    description: |
+      Send traces to tempo.
