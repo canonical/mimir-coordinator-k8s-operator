@@ -55,7 +55,7 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
     @property
     def mimir_worker_relations(self):
         """Return mimir worker relations."""
-        return self.model.relations.get("mimir_worker", [])
+        return self.model.relations.get("mimir-worker", [])
 
     def _on_config_changed(self, event):
         """Handle changed configuration.
@@ -75,7 +75,7 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
 
         for relation in self.mimir_worker_relations:
             relation.data[self.app]["config"] = json.dumps(dict(self.model.config))
-            relation.data[self.app]["hash_ring"] = hash_ring
+            relation.data[self.app]["hash_ring"] = json.dumps(hash_ring)
             relation.data[self.app]["s3_storage"] = self._s3_storage
 
     def _on_pebble_ready(self, _):
