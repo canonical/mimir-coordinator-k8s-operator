@@ -85,11 +85,6 @@ requires:
     description: |
       Forward workers' built-in logging rules to the ruler.
 
-  grafana-dashboards-consumer:
-    interface: grafana_dashboard
-    description: |
-      Forward workers' built-in dashboards to grafana.
-
   ingress:
     interface: ingress
     limit: 1
@@ -97,6 +92,11 @@ requires:
       Ingress-per-app, to load-balance across multiple units of the coordinator.
 
 provides:
+  grafana-dashboards-provider:
+    interface: grafana_dashboard
+    description: |
+      Forward workers' built-in dashboards to grafana.
+
   tracing:
     interface: tracing
     description: |

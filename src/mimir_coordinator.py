@@ -11,7 +11,7 @@ from typing import List, Optional
 
 import pydantic
 from interfaces.mimir_worker.v0.schema import MimirRole, RequirerSchema
-from ops import ModelError, Relation, Unit
+from ops.model import ModelError, Relation, Unit
 
 logger = logging.getLogger(__name__)
 
@@ -60,9 +60,9 @@ class MimirCoordinator:
     def is_recommended(self) -> bool:
         """Return True if is a subset of the minimal deployment."""
         roles = self.roles()
-        return roles and set(roles).issubset(MINIMAL_DEPLOYMENT)
+        return bool(roles) and set(roles).issubset(MINIMAL_DEPLOYMENT)
 
-    def roles(self) -> Counter[str]:
+    def roles(self) -> Counter:
         """Gather the roles from the mimir_worker relations and count them."""
         roles = Counter()
 

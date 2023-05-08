@@ -4,21 +4,18 @@
 
 import logging
 from pathlib import Path
+from textwrap import dedent
 from types import SimpleNamespace
 
 import pytest
 import yaml
+from helpers import deploy_literal_bundle
 from pytest_operator.plugin import OpsTest
 
 logger = logging.getLogger(__name__)
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
-mc = SimpleNamespace(
-    name=METADATA["name"],
-    resources={
-        k: METADATA["resources"][k]["upstream-source"] for k in ["nginx-image", "agent-image"]
-    },
-)
+mc = SimpleNamespace(name="mc")
 
 
 @pytest.mark.abort_on_fail
@@ -27,6 +24,41 @@ async def test_build_and_deploy(ops_test: OpsTest):
     # Build and deploy charm from local source folder
     charm = await ops_test.build_charm(".")
 
+    test_bundle = dedent(
+        f"""
+        ---
+        bundle: kubernetes
+        name: test-charm
+        applications:
+          {mc.name}:
+            charm: {charm}
+            trust: true
+            resources:
+              nginx-image: {METADATA["resources"]["nginx-image"]["upstream-source"]}
+              agent-image: {METADATA["resources"]["agent-image"]["upstream-source"]}
+          loki:
+            charm: loki-k8s
+            trust: true
+            channel: edge
+          prometheus:
+            charm: prometheus-k8s
+            trust: true
+            channel: edge
+          grafana:
+            charm: grafana-k8s
+            trust: true
+            channel: edge
+
+        relations:
+        - [mc:logging-consumer, loki:logging]
+        - [mc:send-remote-write, prom:receive-remote-write]
+        - [mc:grafana-dashboards-provider, grafana:grafana-dashboard]
+    """
+    )
+
     # Deploy the charm and wait for active/idle status
-    await ops_test.model.deploy(charm, resources=mc.resources, application_name=mc.name)
-    await ops_test.model.wait_for_idle(status="active", timeout=1000, idle_period=30)
+    await deploy_literal_bundle(ops_test, test_bundle)  # See appendix below
+    await ops_test.model.wait_for_idle(
+        status="active", raise_on_error=False, timeout=600, idle_period=30
+    )
+    await ops_test.model.wait_for_idle(status="active")
