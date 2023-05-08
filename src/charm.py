@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
-# Copyright 2023 Ubuntu
+# Copyright 2023 Canonical
 # See LICENSE file for licensing details.
-#
-# Learn more at: https://juju.is/docs/sdk
 
 """Charm the service.
 
@@ -13,13 +11,12 @@ https://discourse.charmhub.io/t/4208
 """
 import json
 import logging
-
-from interfaces.mimir_worker.v0.schema import ProviderSchema
-from ops.charm import CharmBase
-from ops.main import main
-from ops.model import ActiveStatus
+from typing import List
 
 from mimir_coordinator import MimirCoordinator
+from ops.charm import CharmBase
+from ops.main import main
+from ops.model import ActiveStatus, Relation
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
@@ -36,9 +33,7 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
 
         # food for thought: make MimirCoordinator ops-unaware and accept a
         # List[MimirRole].
-        self.coordinator = MimirCoordinator(
-            relations=self.mimir_worker_relations
-        )
+        self.coordinator = MimirCoordinator(relations=self.mimir_worker_relations)
 
         # FIXME set status on correct occasion
         self.unit.status = ActiveStatus()
@@ -56,8 +51,9 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         }
 
     @property
-    def mimir_worker_relations(self):
-        return self.model.relations.get('mimir_worker', [])
+    def mimir_worker_relations(self) -> List[Relation]:
+        """Returns the list of worker relations."""
+        return self.model.relations.get("mimir_worker", [])
 
     def _on_config_changed(self, event):
         """Handle changed configuration.
@@ -72,13 +68,13 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         for relation in self.mimir_worker_relations:
             for remote_unit in relation.units:
                 # todo: figure out under what circumstances this would not be routable
-                unit_ip = relation.data[remote_unit]['private-address']
+                unit_ip = relation.data[remote_unit]["private-address"]
                 hash_ring.append(unit_ip)
 
         for relation in self.mimir_worker_relations:
-            relation.data[self.app]['config'] = json.dumps(dict(self.model.config))
-            relation.data[self.app]['hash_ring'] = json.dumps(hash_ring)
-            relation.data[self.app]['s3_storage'] = json.dumps(self._s3_storage)
+            relation.data[self.app]["config"] = json.dumps(dict(self.model.config))
+            relation.data[self.app]["hash_ring"] = json.dumps(hash_ring)
+            relation.data[self.app]["s3_storage"] = json.dumps(self._s3_storage)
 
 
 if __name__ == "__main__":  # pragma: nocover
