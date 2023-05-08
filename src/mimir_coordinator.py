@@ -72,7 +72,7 @@ class MimirCoordinator:
                 continue
 
             try:
-                raw_roles = json.loads(relation.data[relation.app]["roles"])
+                raw_roles = json.loads(relation.data[relation.app]["roles"])  # type: ignore
             except (KeyError, ModelError):
                 logger.error(f"Could not load roles from relation {relation!r}", exc_info=True)
                 continue
@@ -87,7 +87,7 @@ class MimirCoordinator:
         for unit in units_to_check:
             try:
                 schema().validate(
-                    {"app": relation.data[relation.app], "unit": relation.data[unit]}
+                    {"app": relation.data[relation.app], "unit": relation.data[unit]}  # type: ignore
                 )
             except (pydantic.ValidationError, ModelError, KeyError):
                 logger.error(f"relation data invalid: {relation.data}", exc_info=True)
