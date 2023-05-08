@@ -51,7 +51,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
 
         relations:
         - [mc:logging-consumer, loki:logging]
-        - [mc:send-remote-write, prom:receive-remote-write]
+        - [mc:send-remote-write, prometheus:receive-remote-write]
         - [mc:grafana-dashboards-provider, grafana:grafana-dashboard]
     """
     )

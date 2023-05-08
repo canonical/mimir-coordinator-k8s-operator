@@ -21,8 +21,6 @@ from ops.model import ActiveStatus, Relation
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
 
-VALID_LOG_LEVELS = ["info", "debug", "warning", "error", "critical"]
-
 
 class MimirCoordinatorK8SOperatorCharm(CharmBase):
     """Charm the service."""
