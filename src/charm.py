@@ -44,19 +44,20 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         self.unit.status = ActiveStatus()
 
     @property
-    def _s3_storage(self) -> str:
+    def _s3_storage(self) -> dict:
         # if not self.model.relations['s3']:
         #     return {}
-        return json.dumps({
+        return {
             "url": "foo",
-             "endpoint": "bar",
-             "access_key": "bar",
-             "insecure": False,
-             "secret_key": "x12"})
+            "endpoint": "bar",
+            "access_key": "bar",
+            "insecure": False,
+            "secret_key": "x12",
+        }
 
     @property
     def mimir_worker_relations(self):
-        return self.model.relations['mimir_worker']
+        return self.model.relations.get('mimir_worker', [])
 
     def _on_config_changed(self, event):
         """Handle changed configuration.
@@ -76,8 +77,8 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
 
         for relation in self.mimir_worker_relations:
             relation.data[self.app]['config'] = json.dumps(dict(self.model.config))
-            relation.data[self.app]['hash_ring'] = hash_ring
-            relation.data[self.app]['s3_storage'] = self._s3_storage
+            relation.data[self.app]['hash_ring'] = json.dumps(hash_ring)
+            relation.data[self.app]['s3_storage'] = json.dumps(self._s3_storage)
 
 
 if __name__ == "__main__":  # pragma: nocover
