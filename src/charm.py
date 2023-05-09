@@ -13,6 +13,9 @@ import json
 import logging
 from typing import List
 
+from charms.prometheus_k8s.v0.prometheus_remote_write import (
+    PrometheusRemoteWriteConsumer,
+)
 from mimir_coordinator import MimirCoordinator
 from ops.charm import CharmBase
 from ops.main import main
@@ -29,9 +32,22 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         super().__init__(*args)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
 
+        self.framework.observe(
+            self.on.mimir_ingester_relation_changed, self._on_ingester_changed  # pyright: ignore
+        )
+        self.framework.observe(
+            self.on.mimir_ruler_relation_joined, self._on_ruler_joined  # pyright: ignore
+        )
+
         # food for thought: make MimirCoordinator ops-unaware and accept a
         # List[MimirRole].
         self.coordinator = MimirCoordinator(relations=self.mimir_worker_relations)
+
+        self.remote_write_consumer = PrometheusRemoteWriteConsumer(self)
+        self.framework.observe(
+            self.remote_write_consumer.on.endpoints_changed,  # pyright: ignore
+            self._remote_write_endpoints_changed,
+        )
 
         # FIXME set status on correct occasion
         self.unit.status = ActiveStatus()
@@ -73,6 +89,18 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
             relation.data[self.app]["config"] = json.dumps(dict(self.model.config))
             relation.data[self.app]["hash_ring"] = json.dumps(hash_ring)
             relation.data[self.app]["s3_storage"] = json.dumps(self._s3_storage)
+
+    def _remote_write_endpoints_changed(self, _):
+        # TODO Update grafana-agent config file with the new external prometheus's endpoint
+        pass
+
+    def _on_ingester_changed(self, _):
+        # TODO Update grafana-agent config file with the new ingester's endpoint
+        pass
+
+    def _on_ruler_joined(self, _):
+        # TODO Update relation data with the rule files (metrics + logs)
+        pass
 
 
 if __name__ == "__main__":  # pragma: nocover
