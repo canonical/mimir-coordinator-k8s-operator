@@ -13,6 +13,7 @@ import json
 import logging
 from typing import List
 
+from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.prometheus_k8s.v0.prometheus_remote_write import (
     PrometheusRemoteWriteConsumer,
 )
@@ -47,6 +48,10 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         self.framework.observe(
             self.remote_write_consumer.on.endpoints_changed,  # pyright: ignore
             self._remote_write_endpoints_changed,
+        )
+
+        self.grafana_dashboard_provider = GrafanaDashboardProvider(
+            self, relation_name="grafana-dashboards-provider"
         )
 
         # FIXME set status on correct occasion
