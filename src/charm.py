@@ -14,6 +14,7 @@ import logging
 from typing import List
 
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
+from charms.loki_k8s.v0.loki_push_api import LokiPushApiConsumer
 from charms.prometheus_k8s.v0.prometheus_remote_write import (
     PrometheusRemoteWriteConsumer,
 )
@@ -52,6 +53,16 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
 
         self.grafana_dashboard_provider = GrafanaDashboardProvider(
             self, relation_name="grafana-dashboards-provider"
+        )
+
+        self.loki_consumer = LokiPushApiConsumer(self, relation_name="logging-consumer")
+        self.framework.observe(
+            self.loki_consumer.on.loki_push_api_endpoint_joined,  # pyright: ignore
+            self._on_loki_relation_changed,
+        )
+        self.framework.observe(
+            self.loki_consumer.on.loki_push_api_endpoint_departed,  # pyright: ignore
+            self._on_loki_relation_changed,
         )
 
         # FIXME set status on correct occasion
@@ -105,6 +116,10 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
 
     def _on_ruler_joined(self, _):
         # TODO Update relation data with the rule files (metrics + logs)
+        pass
+
+    def _on_loki_relation_changed(self, _):
+        # TODO Update rules relation with the new list of Loki push-api endpoints
         pass
 
 

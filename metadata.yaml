@@ -78,12 +78,17 @@ requires:
   send-remote-write:
     interface: prometheus_remote_write
     description: |
-      Forward workers' rules to the ruler.
+      Forward workers' metrics and rules to the external prometheus
+      (the coordinator, not the worker, owns all rule files).
+      Obtain rule files to later send them to the mimir rules over another relation.
 
   logging-consumer:
     interface: loki_push_api
     description: |
-      Forward workers' built-in logging rules to the ruler.
+      Forward workers' built-in logging rules to the external Loki
+      (the coordinator, not the worker, owns all rule files).
+      Obtain rules and Loki's API endpoint to later send them to the mimir ruler over another
+      relation.
 
   ingress:
     interface: ingress
@@ -95,7 +100,8 @@ provides:
   grafana-dashboards-provider:
     interface: grafana_dashboard
     description: |
-      Forward workers' built-in dashboards to grafana.
+      Forward workers' built-in dashboards to grafana
+      (the coordinator, not the worker, owns all dashboards).
 
   tracing:
     interface: tracing
