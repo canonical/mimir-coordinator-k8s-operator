@@ -35,11 +35,12 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         self.framework.observe(self.on.config_changed, self._on_config_changed)
 
         self.framework.observe(
-            self.on.mimir_ingester_relation_changed, self._on_ingester_changed  # pyright: ignore
-        )
-        self.framework.observe(
             self.on.mimir_ruler_relation_joined, self._on_ruler_joined  # pyright: ignore
         )
+
+        # TODO: On any worker relation-joined/departed, need to updade grafana agent's scrape
+        #  targets with the new memberlist.
+        #  (Remote write would still be the same nginx-proxied endpoint.)
 
         # food for thought: make MimirCoordinator ops-unaware and accept a
         # List[MimirRole].
@@ -108,10 +109,6 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
 
     def _remote_write_endpoints_changed(self, _):
         # TODO Update grafana-agent config file with the new external prometheus's endpoint
-        pass
-
-    def _on_ingester_changed(self, _):
-        # TODO Update grafana-agent config file with the new ingester's endpoint
         pass
 
     def _on_ruler_joined(self, _):
