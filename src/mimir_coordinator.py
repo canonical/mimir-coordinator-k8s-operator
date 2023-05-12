@@ -69,7 +69,6 @@ class MimirCoordinator:
         for relation in self.relations:
             if not self._relation_data_valid(relation):
                 logger.error("Invalid relation data in %s", relation)
-`` 
                 continue
 
             try:
