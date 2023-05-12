@@ -313,7 +313,7 @@ groups:
     for: 30m
     labels:
       severity: warning
-  - alert: MimirRolloutStuck
+  - alert: MimirRolloutStuck2
     annotations:
       message: |
         The {{ $labels.rollout_group }} rollout is stuck in {{ $labels.cluster }}/{{ $labels.namespace }}.
@@ -882,7 +882,7 @@ groups:
     for: 15m
     labels:
       severity: critical
-  - alert: MimirCompactorHasNotUploadedBlocks
+  - alert: MimirCompactorHasNotUploadedBlocks2
     annotations:
       message: Mimir Compactor {{ $labels.pod }} in {{ $labels.cluster }}/{{ $labels.namespace
         }} has not uploaded any block in the last 24 hours.
