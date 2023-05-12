@@ -36,18 +36,22 @@ async def test_build_and_deploy(ops_test: OpsTest):
             resources:
               nginx-image: {METADATA["resources"]["nginx-image"]["upstream-source"]}
               agent-image: {METADATA["resources"]["agent-image"]["upstream-source"]}
+            scale: 1
           loki:
             charm: loki-k8s
             trust: true
             channel: edge
+            scale: 1
           prometheus:
             charm: prometheus-k8s
             trust: true
             channel: edge
+            scale: 1
           grafana:
             charm: grafana-k8s
             trust: true
             channel: edge
+            scale: 1
 
         relations:
         - [mc:logging-consumer, loki:logging]
