@@ -71,7 +71,11 @@ class MimirCoordinator:
         I.E. If all required roles are assigned, and each role has the recommended amount of units.
         """
         roles = self.roles()
-        return roles >= RECOMMENDED_DEPLOYMENT  # pyright: ignore
+        # python>=3.11 would support roles >= RECOMMENDED_DEPLOYMENT
+        for role, min_n in RECOMMENDED_DEPLOYMENT.items():
+            if roles.get(role, 0) < min_n:
+                return False
+        return True
 
     def roles(self) -> typing.Counter[MimirRole]:
         """Gather the roles from the mimir_worker relations and count them."""
