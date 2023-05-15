@@ -4,8 +4,8 @@
 
 """Mimir coordinator."""
 
-import json
 import logging
+import typing
 from collections import Counter
 from typing import List, Optional
 
@@ -22,6 +22,7 @@ MINIMAL_DEPLOYMENT = {
     MimirRole.ingester: 1,
     MimirRole.querier: 1,
     MimirRole.query_frontend: 1,
+    MimirRole.query_scheduler: 1,
     MimirRole.store_gateway: 1,
     # we add:
     MimirRole.ruler: 1,
@@ -31,19 +32,26 @@ MINIMAL_DEPLOYMENT = {
 deployment to be considered consistent (otherwise we set blocked). On top of what mimir itself lists as required,
 we add alertmanager."""
 
-RECOMMENDED_DEPLOYMENT = {
-    MimirRole.ingester: 3,
-    MimirRole.querier: 2,
-    MimirRole.query_scheduler: 2,
-    MimirRole.alertmanager: 1,
-    MimirRole.query_frontend: 1,
-    MimirRole.ruler: 1,
-    MimirRole.store_gateway: 1,
-    MimirRole.compactor: 1,
-    MimirRole.distributor: 1,
-}
+RECOMMENDED_DEPLOYMENT = Counter(
+    {
+        MimirRole.ingester: 3,
+        MimirRole.querier: 2,
+        MimirRole.query_scheduler: 2,
+        MimirRole.alertmanager: 1,
+        MimirRole.query_frontend: 1,
+        MimirRole.ruler: 1,
+        MimirRole.store_gateway: 1,
+        MimirRole.compactor: 1,
+        MimirRole.distributor: 1,
+    }
+)
 """The set of roles that need to be allocated for the
 deployment to be considered robust according to the official recommendations/guidelines."""
+
+
+def _endpoint_to_role(endpoint: str) -> MimirRole:
+    stripped = endpoint[6:]
+    return MimirRole(stripped.replace("-", "_"))
 
 
 class MimirCoordinator:
@@ -55,14 +63,21 @@ class MimirCoordinator:
     def is_coherent(self):
         """Return True if the roles list makes up a coherent mimir deployment."""
         roles = self.roles()
-        return roles and set(roles).issubset(MINIMAL_DEPLOYMENT)
+        return set(roles).issuperset(MINIMAL_DEPLOYMENT)
 
     def is_recommended(self) -> bool:
-        """Return True if is a subset of the minimal deployment."""
-        roles = self.roles()
-        return bool(roles) and set(roles).issubset(MINIMAL_DEPLOYMENT)
+        """Return True if is a superset of the minimal deployment.
 
-    def roles(self) -> Counter:
+        I.E. If all required roles are assigned, and each role has the recommended amount of units.
+        """
+        roles = self.roles()
+        # python>=3.11 would support roles >= RECOMMENDED_DEPLOYMENT
+        for role, min_n in RECOMMENDED_DEPLOYMENT.items():
+            if roles.get(role, 0) < min_n:
+                return False
+        return True
+
+    def roles(self) -> typing.Counter[MimirRole]:
         """Gather the roles from the mimir_worker relations and count them."""
         roles = Counter()
 
@@ -72,12 +87,12 @@ class MimirCoordinator:
                 continue
 
             try:
-                raw_roles = json.loads(relation.data[relation.app]["roles"])  # type: ignore
-            except (KeyError, ModelError):
-                logger.error(f"Could not load roles from relation {relation!r}", exc_info=True)
+                role = _endpoint_to_role(relation.name)
+            except ValueError:
+                logger.info(f"Not a mimir-*role* relation: {relation.name}")
                 continue
-            roles.update(raw_roles)
 
+            roles[role] += len(relation.units)
         return roles
 
     def _relation_data_valid(self, relation: Relation, unit: Optional[Unit] = None) -> bool:

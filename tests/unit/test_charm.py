@@ -16,5 +16,5 @@ class TestCharm(unittest.TestCase):
         self.addCleanup(self.harness.cleanup)
         self.harness.begin_with_initial_hooks()
 
-    def test_dummy(self):
+    def test_simple(self):
         self.assertIsInstance(self.harness.charm.unit.status, ActiveStatus)
