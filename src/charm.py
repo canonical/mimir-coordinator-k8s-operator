@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
-# Copyright 2023 Ubuntu
+# Copyright 2023 Canonical
 # See LICENSE file for licensing details.
-#
-# Learn more at: https://juju.is/docs/sdk
 
 """Charm the service.
 
@@ -13,17 +11,20 @@ https://discourse.charmhub.io/t/4208
 """
 import json
 import logging
+from typing import List
 
-from interfaces.mimir_worker.v0.schema import ProviderSchema
+from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
+from charms.loki_k8s.v0.loki_push_api import LokiPushApiConsumer
+from charms.prometheus_k8s.v0.prometheus_remote_write import (
+    PrometheusRemoteWriteConsumer,
+)
+from mimir_coordinator import MimirCoordinator
 from ops.charm import CharmBase
 from ops.main import main
-
-from mimir_coordinator import MimirCoordinator
+from ops.model import ActiveStatus, Relation
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
-
-VALID_LOG_LEVELS = ["info", "debug", "warning", "error", "critical"]
 
 
 class MimirCoordinatorK8SOperatorCharm(CharmBase):
@@ -33,25 +34,57 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         super().__init__(*args)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
 
+        self.framework.observe(
+            self.on.mimir_ruler_relation_joined, self._on_ruler_joined  # pyright: ignore
+        )
+
+        # TODO: On any worker relation-joined/departed, need to updade grafana agent's scrape
+        #  targets with the new memberlist.
+        #  (Remote write would still be the same nginx-proxied endpoint.)
+
         # food for thought: make MimirCoordinator ops-unaware and accept a
         # List[MimirRole].
-        self.coordinator = MimirCoordinator(
-            relations=self.mimir_worker_relations
+        self.coordinator = MimirCoordinator(relations=self.mimir_worker_relations)
+
+        self.remote_write_consumer = PrometheusRemoteWriteConsumer(self)
+        self.framework.observe(
+            self.remote_write_consumer.on.endpoints_changed,  # pyright: ignore
+            self._remote_write_endpoints_changed,
         )
-    @property
-    def _s3_storage(self) -> str:
-        # if not self.model.relations['s3']:
-        #     return {}
-        return json.dumps({
-            "url": "foo",
-             "endpoint": "bar",
-             "access_key": "bar",
-             "insecure": False,
-             "secret_key": "x12"})
+
+        self.grafana_dashboard_provider = GrafanaDashboardProvider(
+            self, relation_name="grafana-dashboards-provider"
+        )
+
+        self.loki_consumer = LokiPushApiConsumer(self, relation_name="logging-consumer")
+        self.framework.observe(
+            self.loki_consumer.on.loki_push_api_endpoint_joined,  # pyright: ignore
+            self._on_loki_relation_changed,
+        )
+        self.framework.observe(
+            self.loki_consumer.on.loki_push_api_endpoint_departed,  # pyright: ignore
+            self._on_loki_relation_changed,
+        )
+
+        # FIXME set status on correct occasion
+        self.unit.status = ActiveStatus()
 
     @property
-    def mimir_worker_relations(self):
-        return self.model.relations['mimir_worker']
+    def _s3_storage(self) -> dict:
+        # if not self.model.relations['s3']:
+        #     return {}
+        return {
+            "url": "foo",
+            "endpoint": "bar",
+            "access_key": "bar",
+            "insecure": False,
+            "secret_key": "x12",
+        }
+
+    @property
+    def mimir_worker_relations(self) -> List[Relation]:
+        """Returns the list of worker relations."""
+        return self.model.relations.get("mimir_worker", [])
 
     def _on_config_changed(self, event):
         """Handle changed configuration.
@@ -66,13 +99,25 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         for relation in self.mimir_worker_relations:
             for remote_unit in relation.units:
                 # todo: figure out under what circumstances this would not be routable
-                unit_ip = relation.data[remote_unit]['private-address']
+                unit_ip = relation.data[remote_unit]["private-address"]
                 hash_ring.append(unit_ip)
 
         for relation in self.mimir_worker_relations:
-            relation.data[self.app]['config'] = json.dumps(dict(self.model.config))
-            relation.data[self.app]['hash_ring'] = hash_ring
-            relation.data[self.app]['s3_storage'] = self._s3_storage
+            relation.data[self.app]["config"] = json.dumps(dict(self.model.config))
+            relation.data[self.app]["hash_ring"] = json.dumps(hash_ring)
+            relation.data[self.app]["s3_storage"] = json.dumps(self._s3_storage)
+
+    def _remote_write_endpoints_changed(self, _):
+        # TODO Update grafana-agent config file with the new external prometheus's endpoint
+        pass
+
+    def _on_ruler_joined(self, _):
+        # TODO Update relation data with the rule files (metrics + logs)
+        pass
+
+    def _on_loki_relation_changed(self, _):
+        # TODO Update rules relation with the new list of Loki push-api endpoints
+        pass
 
 
 if __name__ == "__main__":  # pragma: nocover
