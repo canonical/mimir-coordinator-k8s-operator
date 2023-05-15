@@ -5,6 +5,7 @@
 """Mimir coordinator."""
 
 import logging
+import typing
 from collections import Counter
 from typing import List, Optional
 
@@ -70,9 +71,9 @@ class MimirCoordinator:
         I.E. If all required roles are assigned, and each role has the recommended amount of units.
         """
         roles = self.roles()
-        return roles >= RECOMMENDED_DEPLOYMENT
+        return roles >= RECOMMENDED_DEPLOYMENT  # pyright: ignore
 
-    def roles(self) -> Counter:
+    def roles(self) -> typing.Counter[MimirRole]:
         """Gather the roles from the mimir_worker relations and count them."""
         roles = Counter()
 
