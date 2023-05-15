@@ -4,7 +4,6 @@
 
 """Mimir coordinator."""
 
-import json
 import logging
 from collections import Counter
 from typing import List, Optional
@@ -33,15 +32,17 @@ deployment to be considered consistent (otherwise we set blocked). On top of wha
 we add alertmanager."""
 
 RECOMMENDED_DEPLOYMENT = Counter(
-    {MimirRole.ingester: 3,
-     MimirRole.querier: 2,
-     MimirRole.query_scheduler: 2,
-     MimirRole.alertmanager: 1,
-     MimirRole.query_frontend: 1,
-     MimirRole.ruler: 1,
-     MimirRole.store_gateway: 1,
-     MimirRole.compactor: 1,
-     MimirRole.distributor: 1, }
+    {
+        MimirRole.ingester: 3,
+        MimirRole.querier: 2,
+        MimirRole.query_scheduler: 2,
+        MimirRole.alertmanager: 1,
+        MimirRole.query_frontend: 1,
+        MimirRole.ruler: 1,
+        MimirRole.store_gateway: 1,
+        MimirRole.compactor: 1,
+        MimirRole.distributor: 1,
+    }
 )
 """The set of roles that need to be allocated for the
 deployment to be considered robust according to the official recommendations/guidelines."""
@@ -49,7 +50,7 @@ deployment to be considered robust according to the official recommendations/gui
 
 def _endpoint_to_role(endpoint: str) -> MimirRole:
     stripped = endpoint[6:]
-    return MimirRole(stripped.replace('-', '_'))
+    return MimirRole(stripped.replace("-", "_"))
 
 
 class MimirCoordinator:
@@ -82,7 +83,7 @@ class MimirCoordinator:
 
             try:
                 role = _endpoint_to_role(relation.name)
-            except (ValueError):
+            except ValueError:
                 logger.info(f"Not a mimir-*role* relation: {relation.name}")
                 continue
 
