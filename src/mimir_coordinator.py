@@ -58,9 +58,11 @@ class MimirCoordinator:
         return roles and set(roles).issubset(MINIMAL_DEPLOYMENT)
 
     def is_recommended(self) -> bool:
-        """Return True if is a subset of the minimal deployment."""
+        """Return True if is a superset of the minimal deployment.
+
+        I.E. If all required roles are assigned."""
         roles = self.roles()
-        return bool(roles) and set(roles).issubset(MINIMAL_DEPLOYMENT)
+        return set(roles).issuperset(MINIMAL_DEPLOYMENT)
 
     def roles(self) -> Counter:
         """Gather the roles from the mimir_worker relations and count them."""
