@@ -50,8 +50,7 @@ deployment to be considered robust according to the official recommendations/gui
 
 
 def _endpoint_to_role(endpoint: str) -> MimirRole:
-    stripped = endpoint[6:]
-    return MimirRole(stripped.replace("-", "_"))
+    return MimirRole(endpoint.replace("-", "_"))
 
 
 class MimirCoordinator:

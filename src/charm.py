@@ -35,7 +35,7 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         self.framework.observe(self.on.config_changed, self._on_config_changed)
 
         self.framework.observe(
-            self.on.mimir_ruler_relation_joined, self._on_ruler_joined  # pyright: ignore
+            self.on.ruler_relation_joined, self._on_ruler_joined  # pyright: ignore
         )
 
         # TODO: On any worker relation-joined/departed, need to updade grafana agent's scrape
