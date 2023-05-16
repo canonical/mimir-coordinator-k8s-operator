@@ -33,38 +33,40 @@ resources:
     description: OCI image for Grafana Agent
 
 requires:
-  # On the same mimir_worker interface, the coordinator will accept one relation to a worker per each Mimir component.
+  # On the same mimir_worker interface, the coordinator will accept one relation to a worker per
+  # each Mimir component.
   # The relation(s) determine the role(s) the worker will assume.
-  # Each Mimir worker can take on multiple roles; however, there can be no role replication among workers related to the
-  # same coordinator, which is why we force `limit: 1`.
-  mimir-compactor:
+  # Each Mimir worker can take on multiple roles; however, there can be no role replication among
+  # workers related to the same coordinator, which is why we force `limit: 1`.
+  # Note: relation names exactly match Mimir roles.
+  compactor:
     interface: mimir_worker
     limit: 1
-  mimir-distributor:
+  distributor:
     interface: mimir_worker
     limit: 1
-  mimir-ingester:
+  ingester:
     interface: mimir_worker
     limit: 1
-  mimir-querier:
+  querier:
     interface: mimir_worker
     limit: 1
-  mimir-query-frontend:
+  query-frontend:
     interface: mimir_worker
     limit: 1
-  mimir-store-gateway:
+  store-gateway:
     interface: mimir_worker
     limit: 1
-  mimir-alertmanager:
+  alertmanager:
     interface: mimir_worker
     limit: 1
-  mimir-ruler:
+  ruler:
     interface: mimir_worker
     limit: 1
-  mimir-overrides-exporter:
+  overrides-exporter:
     interface: mimir_worker
     limit: 1
-  mimir-query-scheduler:
+  query-scheduler:
     interface: mimir_worker
     limit: 1
 

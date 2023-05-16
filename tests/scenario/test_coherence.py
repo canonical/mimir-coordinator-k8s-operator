@@ -13,7 +13,7 @@ from scenario import Context, Relation, State
 
 
 def _to_endpoint_name(role: MimirRole):
-    return "mimir-" + role.value.replace("_", "-")
+    return role.value.replace("_", "-")
 
 
 ALL_MIMIR_RELATION_NAMES = list(map(_to_endpoint_name, MimirRole))
