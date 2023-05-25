@@ -6,10 +6,10 @@
 import unittest
 from unittest.mock import patch
 
+from agent_workload import WorkloadManager
 from charm import MimirCoordinatorK8SOperatorCharm
 from ops.model import ActiveStatus
 from ops.testing import Harness
-from workload import WorkloadManager
 
 
 class TestCharm(unittest.TestCase):

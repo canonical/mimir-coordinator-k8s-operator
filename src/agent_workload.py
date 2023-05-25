@@ -1,4 +1,4 @@
-"""Workload manager for grafna agent."""
+"""Workload manager for grafana agent."""
 
 import logging
 import pathlib

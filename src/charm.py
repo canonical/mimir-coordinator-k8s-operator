@@ -13,8 +13,11 @@ import json
 import logging
 from typing import List
 
+from agent_config import Config
+from agent_workload import WorkloadManager
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v0.loki_push_api import LokiPushApiConsumer
+from charms.observability_libs.v0.juju_topology import JujuTopology
 from charms.prometheus_k8s.v0.prometheus_remote_write import (
     PrometheusRemoteWriteConsumer,
 )
@@ -22,7 +25,6 @@ from mimir_coordinator import MimirCoordinator
 from ops.charm import CharmBase
 from ops.main import main
 from ops.model import Relation
-from workload import WorkloadManager
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
@@ -33,12 +35,6 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
 
     def __init__(self, *args):
         super().__init__(*args)
-        self.grafana_agent_workload = WorkloadManager(
-            self,
-            container_name="agent",
-            config_getter=lambda: {},  # TODO
-            status_changed_callback=self._update_unit_status,
-        )
 
         self.framework.observe(self.on.config_changed, self._on_config_changed)
 
@@ -72,6 +68,24 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         self.framework.observe(
             self.loki_consumer.on.loki_push_api_endpoint_departed,  # pyright: ignore
             self._on_loki_relation_changed,
+        )
+
+        # TODO figure out what to do about potential code ordering problem
+        self.grafana_agent_config = Config(
+            topology=JujuTopology.from_charm(self),
+            scrape_configs=None,  # FIXME generate from memberlist
+            remote_write=self.remote_write_consumer.endpoints,
+            loki_endpoints=self.loki_consumer.loki_endpoints,
+            insecure_skip_verify=True,
+            http_listen_port=3500,
+            grpc_listen_port=3600,
+        )
+
+        self.grafana_agent_workload = WorkloadManager(
+            self,
+            container_name="agent",
+            config_getter=lambda: {},  # TODO
+            status_changed_callback=self._update_unit_status,
         )
 
     @property
