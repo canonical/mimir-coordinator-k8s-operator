@@ -34,11 +34,10 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
         self.grafana_agent_workload = WorkloadManager(
-            self, container_name="agent", config_getter=lambda: {}
-        )
-        self.framework.observe(
-            self.grafana_agent_workload.on.status_changed,  # pyright: ignore
-            self._update_unit_status,
+            self,
+            container_name="agent",
+            config_getter=lambda: {},  # TODO
+            status_changed_callback=self._update_unit_status,
         )
 
         self.framework.observe(self.on.config_changed, self._on_config_changed)

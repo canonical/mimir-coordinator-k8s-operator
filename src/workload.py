@@ -3,10 +3,10 @@
 import logging
 import pathlib
 import re
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Optional, Union
 
 import yaml
-from ops.framework import EventBase, EventSource, Object, ObjectEvents
+from ops.framework import Object
 from ops.model import ActiveStatus, StatusBase, UnknownStatus, WaitingStatus
 from ops.pebble import APIError, PathError
 from yaml.parser import ParserError
@@ -45,42 +45,24 @@ class Status:
         return self.config
 
 
-class StatusChanged(EventBase):
-    """Emitted when a component's status is changed."""
-
-    def __init__(self, handle, status):
-        super().__init__(handle)
-        self.status = status
-
-    def snapshot(self) -> Dict:
-        """Save status information."""
-        return {"name": self.status.name, "message": self.status.message}
-
-    def restore(self, snapshot) -> None:
-        """Restore status information."""
-        self.status = StatusBase.from_name(
-            snapshot["name"], snapshot["message"]  # pyright: ignore
-        )
-
-
-class WorkloadManagerEvents(ObjectEvents):
-    """Event descriptor for events emitted by `WorkloadManager`."""
-
-    status_changed = EventSource(StatusChanged)
-
-
 class WorkloadManager(Object):
     """Workload manager for grafana agent."""
 
     CONFIG_PATH = "/etc/grafana-agent.yaml"
-    on = WorkloadManagerEvents()  # pyright: ignore
 
-    def __init__(self, charm, *, container_name: str, config_getter: Callable[[], Any]):
+    def __init__(
+        self,
+        charm,
+        *,
+        container_name: str,
+        config_getter: Callable[[], Any],
+        status_changed_callback: Callable[[StatusBase], None],
+    ):
         # Must inherit from ops 'Object' to be able to register events.
         super().__init__(charm, f"{self.__class__.__name__}-{container_name}")
 
         # Property to facilitate centralized status update
-        self.status = Status(callback=self.on.status_changed.emit)  # pyright: ignore
+        self.status = Status(callback=status_changed_callback)  # pyright: ignore
 
         self._unit = charm.unit
 
@@ -187,7 +169,7 @@ class WorkloadManager(Object):
 
         if config == old_config:
             # Nothing changed, possibly new installation. Move on.
-            self.status.config = ActiveStatus("old=new")
+            self.status.config = ActiveStatus()
             return
 
         try:
@@ -197,4 +179,4 @@ class WorkloadManager(Object):
             self.status.config = WaitingStatus(str(e))
             return
 
-        self.status.config = ActiveStatus("all done")
+        self.status.config = ActiveStatus()
