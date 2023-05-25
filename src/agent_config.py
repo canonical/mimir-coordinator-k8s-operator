@@ -73,8 +73,12 @@ class Config:
         if not self.loki_endpoints:
             config["logs"] = {}
 
+        # TODO add a roundtrip check that the config is valid (dump then load), and set status
+        #  accordingly
+
         return config
 
+    @property
     def _instance_name(self) -> str:
         parts = [
             self._topology.model,

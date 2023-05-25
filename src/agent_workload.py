@@ -10,6 +10,7 @@ from ops.framework import Object
 from ops.model import ActiveStatus, StatusBase, UnknownStatus, WaitingStatus
 from ops.pebble import APIError, PathError
 from yaml.parser import ParserError
+from yaml.constructor import ConstructorError
 
 logger = logging.getLogger(__name__)
 
@@ -162,8 +163,10 @@ class WorkloadManager(Object):
         assert config is not None
 
         try:
-            old_config = yaml.safe_load(self.read_file(self.CONFIG_PATH))
-        except (FileNotFoundError, PathError, ParserError):
+            old_config = self.read_file(self.CONFIG_PATH)
+            logger.info("Old config: %s", old_config)
+            old_config = yaml.safe_load(old_config)
+        except (FileNotFoundError, PathError, ParserError, ConstructorError):
             # The file does not yet exist?
             old_config = None
 

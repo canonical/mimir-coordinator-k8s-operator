@@ -81,7 +81,7 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
                 insecure_skip_verify=True,
                 http_listen_port=3500,
                 grpc_listen_port=3600,
-            ).build,  # TODO figure out what to do about potential code ordering problem
+            ).build(),  # TODO figure out what to do about potential code ordering problem
             status_changed_callback=self._update_unit_status,
         )
 
