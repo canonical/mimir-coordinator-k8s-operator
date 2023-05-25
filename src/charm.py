@@ -70,21 +70,18 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
             self._on_loki_relation_changed,
         )
 
-        # TODO figure out what to do about potential code ordering problem
-        self.grafana_agent_config = Config(
-            topology=JujuTopology.from_charm(self),
-            scrape_configs=None,  # FIXME generate from memberlist
-            remote_write=self.remote_write_consumer.endpoints,
-            loki_endpoints=self.loki_consumer.loki_endpoints,
-            insecure_skip_verify=True,
-            http_listen_port=3500,
-            grpc_listen_port=3600,
-        )
-
         self.grafana_agent_workload = WorkloadManager(
             self,
             container_name="agent",
-            config_getter=lambda: {},  # TODO
+            config_getter=lambda: Config(
+                topology=JujuTopology.from_charm(self),
+                scrape_configs=None,  # FIXME generate from memberlist
+                remote_write=self.remote_write_consumer.endpoints,
+                loki_endpoints=self.loki_consumer.loki_endpoints,
+                insecure_skip_verify=True,
+                http_listen_port=3500,
+                grpc_listen_port=3600,
+            ).build,  # TODO figure out what to do about potential code ordering problem
             status_changed_callback=self._update_unit_status,
         )
 

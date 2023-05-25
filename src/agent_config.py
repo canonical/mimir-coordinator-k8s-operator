@@ -21,40 +21,45 @@ class Config:
         grpc_listen_port: int = 3600,
     ):
         self._topology = topology
+        self.scrape_configs = (scrape_configs or []).copy()
+        self.remote_write = (remote_write or []).copy()
+        self.loki_endpoints = (loki_endpoints or []).copy()
 
-        scrape_configs = (scrape_configs or []).copy()
-        remote_write = (remote_write or []).copy()
-        loki_endpoints = (loki_endpoints or []).copy()
-
-        for endpoint in remote_write + loki_endpoints:
+        for endpoint in self.remote_write + self.loki_endpoints:
             endpoint["tls_config"] = {"insecure_skip_verify": insecure_skip_verify}
 
-        self._config = {
+        self.positions_dir = f"{positions_dir.rstrip('/')}/grafana-agent-positions"
+        self.http_port = http_listen_port
+        self.grpc_port = grpc_listen_port
+
+    def build(self) -> dict:
+        """Build the full config dict."""
+        config = {
             "server": {"log_level": "info"},
-            "integrations": self._integrations_config(remote_write),
+            "integrations": self._integrations_config,
             "metrics": {
                 "wal_directory": "/tmp/agent/data",  # should match metadata
                 "configs": [
                     {
                         "name": "agent_scraper",
-                        "scrape_configs": scrape_configs,
-                        "remote_write": remote_write,
+                        "scrape_configs": self.scrape_configs,
+                        "remote_write": self.remote_write,
                     }
                 ],
             },
             "logs": {
-                "positions_directory": f"{positions_dir.rstrip('/')}/grafana-agent-positions",
+                "positions_directory": self.positions_dir,
                 "configs": [
                     {
                         "name": "push_api_server",
-                        "clients": loki_endpoints,
+                        "clients": self.loki_endpoints,
                         "scrape_configs": [
                             {
                                 "job_name": "loki",
                                 "loki_push_api": {
                                     "server": {
-                                        "http_listen_port": http_listen_port,
-                                        "grpc_listen_port": grpc_listen_port,
+                                        "http_listen_port": self.http_port,
+                                        "grpc_listen_port": self.grpc_port,
                                     },
                                 },
                             }
@@ -65,8 +70,10 @@ class Config:
         }
 
         # Seems like we cannot have an empty "configs" section. Delete it if no endpoints.
-        if not loki_endpoints:
-            self._config["logs"] = {}
+        if not self.loki_endpoints:
+            config["logs"] = {}
+
+        return config
 
     def _instance_name(self) -> str:
         parts = [
@@ -77,7 +84,8 @@ class Config:
         ]
         return "_".join(parts)  # TODO do we also need to `replace("/", "_")` ?
 
-    def _integrations_config(self, remote_write) -> dict:
+    @property
+    def _integrations_config(self) -> dict:
         """Return the integrations section of the config.
 
         Returns:
@@ -129,7 +137,7 @@ class Config:
                     },
                 ],
             },
-            "prometheus_remote_write": remote_write,
+            "prometheus_remote_write": self.remote_write,
             # TODO capture `_additional_integrations` logic for the machine charm
         }
         return conf
