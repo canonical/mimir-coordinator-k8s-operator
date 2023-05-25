@@ -13,15 +13,18 @@ import json
 import logging
 from typing import List
 
+from agent_config import Config
+from agent_workload import WorkloadManager
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v0.loki_push_api import LokiPushApiConsumer
+from charms.observability_libs.v0.juju_topology import JujuTopology
 from charms.prometheus_k8s.v0.prometheus_remote_write import (
     PrometheusRemoteWriteConsumer,
 )
 from mimir_coordinator import MimirCoordinator
 from ops.charm import CharmBase
 from ops.main import main
-from ops.model import ActiveStatus, Relation
+from ops.model import Relation
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
@@ -32,6 +35,7 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
 
     def __init__(self, *args):
         super().__init__(*args)
+
         self.framework.observe(self.on.config_changed, self._on_config_changed)
 
         self.framework.observe(
@@ -66,8 +70,20 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
             self._on_loki_relation_changed,
         )
 
-        # FIXME set status on correct occasion
-        self.unit.status = ActiveStatus()
+        self.grafana_agent_workload = WorkloadManager(
+            self,
+            container_name="agent",
+            config_getter=lambda: Config(
+                topology=JujuTopology.from_charm(self),
+                scrape_configs=None,  # FIXME generate from memberlist
+                remote_write=self.remote_write_consumer.endpoints,
+                loki_endpoints=self.loki_consumer.loki_endpoints,
+                insecure_skip_verify=True,
+                http_listen_port=3500,
+                grpc_listen_port=3600,
+            ).build(),  # TODO figure out what to do about potential code ordering problem
+            status_changed_callback=self._update_unit_status,
+        )
 
     @property
     def _s3_storage(self) -> dict:
@@ -86,14 +102,7 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         """Returns the list of worker relations."""
         return self.model.relations.get("mimir_worker", [])
 
-    def _on_config_changed(self, event):
-        """Handle changed configuration.
-
-        Change this example to suit your needs. If you don't need to handle config, you can remove
-        this method.
-
-        Learn more about config at https://juju.is/docs/sdk/config
-        """
+    def _on_config_changed(self, _):
         hash_ring = []
 
         for relation in self.mimir_worker_relations:
@@ -118,6 +127,9 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
     def _on_loki_relation_changed(self, _):
         # TODO Update rules relation with the new list of Loki push-api endpoints
         pass
+
+    def _update_unit_status(self, *_):
+        self.unit.status = self.grafana_agent_workload.status()
 
 
 if __name__ == "__main__":  # pragma: nocover
