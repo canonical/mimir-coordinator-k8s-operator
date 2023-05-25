@@ -1,30 +1,86 @@
-from typing import Optional, Callable, Union
-import re
-import yaml
+"""Workload manager for grafna agent."""
+
 import logging
 import pathlib
-from ops.pebble import PathError, APIError
-from dataclasses import dataclass
-from ops.model import BlockedStatus, WaitingStatus
+import re
+from typing import Any, Callable, Dict, Optional, Union
+
+import yaml
+from ops.framework import EventBase, EventSource, Object, ObjectEvents
+from ops.model import ActiveStatus, StatusBase, UnknownStatus, WaitingStatus
+from ops.pebble import APIError, PathError
 from yaml.parser import ParserError
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
 class Status:
-    """'Dumb struct' for helping with centralized status setting."""
+    """Helping with centralized status setting."""
 
-    # None = good; do not use ActiveStatus here.
-    update_config: Optional[Union[BlockedStatus, WaitingStatus]] = None
+    def __init__(self, callback: Callable[[StatusBase], None] = lambda _: None):
+        self._config: StatusBase = UnknownStatus()
+        self._callback = callback
+
+    def __call__(self) -> StatusBase:
+        """Return the 'total' status: a single status that sums/represents all statuses."""
+        return self._combined()
+
+    @property
+    def config(self):
+        """Status for the grafana agent config file."""
+        return self._config
+
+    @config.setter
+    def config(self, value: StatusBase):
+        self._config = value
+        # When status is updated, it is likely desirable to have some kind of side effect.
+        self._side_effect()
+
+    def _side_effect(self):
+        logger.debug("Status updated to: %s", self._combined())
+        self._callback(self._combined())
+
+    def _combined(self) -> StatusBase:
+        # Currently there's only one status component, so the combined status is just it.
+        return self.config
 
 
-class WorkloadManager:
+class StatusChanged(EventBase):
+    """Emitted when a component's status is changed."""
+
+    def __init__(self, handle, status):
+        super().__init__(handle)
+        self.status = status
+
+    def snapshot(self) -> Dict:
+        """Save status information."""
+        return {"name": self.status.name, "message": self.status.message}
+
+    def restore(self, snapshot) -> None:
+        """Restore status information."""
+        self.status = StatusBase.from_name(
+            snapshot["name"], snapshot["message"]  # pyright: ignore
+        )
+
+
+class WorkloadManagerEvents(ObjectEvents):
+    """Event descriptor for events emitted by `WorkloadManager`."""
+
+    status_changed = EventSource(StatusChanged)
+
+
+class WorkloadManager(Object):
+    """Workload manager for grafana agent."""
+
     CONFIG_PATH = "/etc/grafana-agent.yaml"
+    on = WorkloadManagerEvents()  # pyright: ignore
 
-    def __init__(self, charm, container_name: str, config_getter: Callable[[], ...]):
+    def __init__(self, charm, *, container_name: str, config_getter: Callable[[], Any]):
+        # Must inherit from ops 'Object' to be able to register events.
+        super().__init__(charm, f"{self.__class__.__name__}-{container_name}")
+
         # Property to facilitate centralized status update
-        self.status = Status()
+        self.status = Status(callback=self.on.status_changed.emit)  # pyright: ignore
 
         self._unit = charm.unit
 
@@ -48,8 +104,8 @@ class WorkloadManager:
         """
         return f"-config.file={self.CONFIG_PATH}"
 
-    def _on_pebble_ready(self):
-        self.write_file(self.CONFIG_PATH, yaml.dump(self._render_config()))
+    def _on_pebble_ready(self, _):
+        self._update_config()
 
         pebble_layer = {
             "summary": "agent layer",
@@ -73,9 +129,8 @@ class WorkloadManager:
                 "Cannot set workload version at this time: could not get grafana-agent version."
             )
 
-        # self._update_status()
-
     def is_ready(self):
+        """Is ready."""
         return self._container.can_connect()
 
     @property
@@ -118,7 +173,7 @@ class WorkloadManager:
     def _update_config(self) -> None:
         if not self.is_ready:
             # Workload is not yet available so no need to update config
-            self.status.update_config = WaitingStatus("Workload is not yet available")
+            self.status.config = WaitingStatus("Workload is not yet available")
             return
 
         config = self._render_config()  # TODO: Must not be None
@@ -132,14 +187,14 @@ class WorkloadManager:
 
         if config == old_config:
             # Nothing changed, possibly new installation. Move on.
-            self.status.update_config = None
+            self.status.config = ActiveStatus("old=new")
             return
 
         try:
             self.write_file(self.CONFIG_PATH, yaml.dump(config))
-            self.restart()  # to pick up the new config
         except APIError as e:
             logger.warning(str(e))
-            self.status.update_config = WaitingStatus(str(e))
+            self.status.config = WaitingStatus(str(e))
+            return
 
-        self.status.update_config = None
+        self.status.config = ActiveStatus("all done")
