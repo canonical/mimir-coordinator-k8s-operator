@@ -9,8 +9,8 @@ import yaml
 from ops.framework import Object
 from ops.model import ActiveStatus, StatusBase, UnknownStatus, WaitingStatus
 from ops.pebble import APIError, PathError
-from yaml.parser import ParserError
 from yaml.constructor import ConstructorError
+from yaml.parser import ParserError
 
 logger = logging.getLogger(__name__)
 

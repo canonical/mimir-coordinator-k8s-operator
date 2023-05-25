@@ -4,6 +4,7 @@
 # Learn more about testing at: https://juju.is/docs/sdk/testing
 
 import unittest
+import uuid
 from unittest.mock import patch
 
 from agent_workload import WorkloadManager
@@ -20,6 +21,7 @@ class TestCharm(unittest.TestCase):
 
         self.harness = Harness(MimirCoordinatorK8SOperatorCharm)
         self.addCleanup(self.harness.cleanup)
+        self.harness.set_model_info(name="testing", uuid=str(uuid.uuid4()))
         self.harness.set_leader(True)
         self.harness.add_storage("data", attach=True)
         self.harness.begin_with_initial_hooks()
