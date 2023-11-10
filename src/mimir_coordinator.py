@@ -10,7 +10,7 @@ from collections import Counter
 from typing import List, Optional
 
 import pydantic
-from interfaces.mimir_worker.v0.schema import MimirRole, RequirerSchema
+from interfaces.mimir_cluster.v0.schema import MimirRole, RequirerSchema
 from ops.model import ModelError, Relation, Unit
 
 logger = logging.getLogger(__name__)
@@ -49,8 +49,9 @@ RECOMMENDED_DEPLOYMENT = Counter(
 deployment to be considered robust according to the official recommendations/guidelines."""
 
 
-def _endpoint_to_role(endpoint: str) -> MimirRole:
-    return MimirRole(endpoint.replace("-", "_"))
+def _relation_to_role(relation: Relation) -> MimirRole:
+    # TODO: extract the role from the relation
+    return MimirRole(relation.role) # FIXME
 
 
 class MimirCoordinator:
@@ -77,7 +78,7 @@ class MimirCoordinator:
         return True
 
     def roles(self) -> typing.Counter[MimirRole]:
-        """Gather the roles from the mimir_worker relations and count them."""
+        """Gather the roles from the mimir_cluster relations and count them."""
         roles = Counter()
 
         for relation in self.relations:
@@ -86,8 +87,10 @@ class MimirCoordinator:
                 continue
 
             try:
-                role = _endpoint_to_role(relation.name)
+                role = _relation_to_role(relation) # TODO: get the role from relation data
+
             except ValueError:
+                # TODO: not an actual role: should probably warn
                 logger.info(f"Not a mimir-*role* relation: {relation.name}")
                 continue
 
