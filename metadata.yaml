@@ -35,6 +35,9 @@ resources:
 requires:
   mimir-cluster:
     interface: mimir_cluster
+    description: |
+      The coordinator sends the Mimir configuration to the workers, obtaining
+      the roles they are configured to take on and their addressing information.
 
   s3:
     interface: s3
