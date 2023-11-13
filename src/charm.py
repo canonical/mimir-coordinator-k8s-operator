@@ -21,7 +21,7 @@ from charms.prometheus_k8s.v0.prometheus_remote_write import (
 from mimir_coordinator import MimirCoordinator
 from ops.charm import CharmBase
 from ops.main import main
-from ops.model import ActiveStatus, Relation
+from ops.model import ActiveStatus, BlockedStatus, Relation
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
@@ -106,6 +106,13 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
             relation.data[self.app]["config"] = json.dumps(dict(self.model.config))
             relation.data[self.app]["hash_ring"] = json.dumps(hash_ring)
             relation.data[self.app]["s3_storage"] = json.dumps(self._s3_storage)
+
+    def _on_mimir_cluster_joined(self, _):
+        # TODO check if other things are needed here
+        if not self.coordinator.is_coherent():
+            self.unit.status = BlockedStatus("You are lacking some necessary Mimir roles")
+        else:
+            self.unit.status = ActiveStatus()
 
     def _remote_write_endpoints_changed(self, _):
         # TODO Update grafana-agent config file with the new external prometheus's endpoint

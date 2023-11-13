@@ -51,7 +51,7 @@ deployment to be considered robust according to the official recommendations/gui
 
 def _relation_to_role(relation: Relation) -> MimirRole:
     # TODO: extract the role from the relation
-    return MimirRole(relation.role) # FIXME
+    return MimirRole("whatever-role") # FIXME
 
 
 class MimirCoordinator:
