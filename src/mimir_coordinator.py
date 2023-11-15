@@ -77,7 +77,6 @@ class MimirCoordinator:
                 return False
         return True
 
-
     # todo move to a new mimir_cluster.MimirClusterProvider class
     def roles(self) -> typing.Counter[MimirRole]:
         """Gather the roles from the mimir_cluster relations and count them."""

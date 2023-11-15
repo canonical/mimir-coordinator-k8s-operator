@@ -10,8 +10,9 @@ import json
 import logging
 from collections import Counter
 from enum import Enum
-from typing import Dict, List, MutableMapping, Union
+from typing import Any, Dict, Literal, List, MutableMapping, Union
 from typing import Optional
+from urllib.parse import urlparse
 
 import pydantic
 from ops import Object
@@ -22,7 +23,7 @@ log = logging.getLogger("mimir_cluster")
 LIBID = "9818a8d44028454a94c6c3a01f4316d2"
 
 LIBAPI = 0
-LIBPATCH = 0
+LIBPATCH = 1
 
 BUILTIN_JUJU_KEYS = {"ingress-address", "private-address", "egress-subnets"}
 
@@ -141,7 +142,7 @@ class S3Config(pydantic.BaseModel):
 class MyProviderAppDataBag(DatabagModel):
     hash_ring: Json[List[str]]
     s3_config: Json[S3Config]
-    config: Json[Dict[str, str]]
+    mimir_config: Json[Dict[str, Any]]
 
 
 class ProviderSchema(DataBagSchema):
@@ -157,6 +158,9 @@ class JujuTopology(pydantic.BaseModel):
 
 class MyRequirerUnitDataBag(DatabagModel):
     juju_topology: Json[JujuTopology]
+    hostname: str
+    port: Optional[int]
+    scheme: str
 
 
 class MyRequirerAppDataBag(DatabagModel):
@@ -169,51 +173,88 @@ class RequirerSchema(DataBagSchema):
     app: MyRequirerAppDataBag
 
 
-
 class MimirClusterProvider(Object):
-    def __init__(self, parent, key: Optional[str]):
+    def __init__(self, parent, key: Optional[str], s3_config: S3Config, mimir_config: Dict[str, Any]):
         super().__init__(parent, key)
+        self.s3_config = s3_config
+        self.mimir_config = mimir_config
 
-    def populate_databags(self):
+    def populate_databags(self) -> None:
+        """Publish the application databag for the requirer to read."""
         databag_model = MyProviderAppDataBag(
-            hash_ring={"foo": "bar"},
-            s3_config=10,
-            config="some config",
+            hash_ring=self.gather_addresses(),
+            s3_config=self.s3_config,
+            mimir_config=self.mimir_config,
         )
-
         relation = self.model.get_relation("mimir_cluster")
-        app_databag = relation.data[self.model.app]
-        databag_model.dump(app_databag)  # write to local app databag
+        if relation:
+            app_databag = relation.data[self.model.app]
+            databag_model.dump(app_databag)  # write to local app databag
 
     def gather_roles(self) -> Dict[MimirRole, int]:
         """Go through the worker's app databags and sum the available roles."""
-        data = Counter()
+        data = {}
         for relation in self.model.relations["mimir_cluster"]:
-            data.update(MyRequirerAppDataBag.load(relation.data[relation.app]))
-        return {MimirRole(role): role_n for role, role_n in data.items()}
+            if relation.app:
+                worker_roles: Dict[MimirRole, int] = MyRequirerAppDataBag.load(relation.data[relation.app]).roles
+                for role, role_n in worker_roles.items():
+                    if role not in data:
+                        data[role] = 0
+                    data[role] += role_n
+            
+        return data
+
+    def gather_addresses(self) -> List[str]:
+        """Go through the worker's unit databags to collect all the addresses."""
+        data = []
+        for relation in self.model.relations["mimir_cluster"]:
+            for worker_unit in relation.units:
+                worker_data = MyRequirerUnitDataBag.load(relation.data[worker_unit])
+                unit_address = f"{worker_data.scheme}://{worker_data.hostname}:{worker_data.port}"
+                data.append(unit_address)
+
+        return data
 
 
 class MimirClusterRequirer(Object):
-    def __init__(self, parent, key: Optional[str]):
+    def __init__(self, parent, key: Optional[str], juju_topology: JujuTopology, address: str):
         super().__init__(parent, key)
+        self.juju_topology = juju_topology
+        self.address = address
 
-    def publish_address_to_unit_databag(self, *address):
-        # TODO luca homework: add address info to unit databag
-        pass
-
+    def publish_address_to_unit_databag(self, address: str):
+        parsed_url = urlparse(address)
+        databag_model = MyRequirerUnitDataBag(
+            juju_topology=self.juju_topology,
+            hostname=parsed_url.netloc,
+            port=parsed_url.port,
+            scheme=parsed_url.scheme,
+        )
+        relation = self.model.get_relation("mimir_cluster")
+        if relation:
+            unit_databag = relation.data[self.model.unit]
+            databag_model.dump(unit_databag)
+            
     def publish_roles(self, roles: Dict[MimirRole, int]):
         relation = self.model.get_relation("mimir_cluster")
-        db = MyRequirerAppDataBag(roles={role.value: role_n for role, role_n in roles.items()})
-        db.dump(relation.data[self.model.app])
+        if relation:
+            databag_model = MyRequirerAppDataBag(roles=roles)
+            databag_model.dump(relation.data[self.model.app])
 
-    def get_configs(self):
-        relation = self.model.get_relation("mimir_cluster")
+    def get_mimir_config(self) -> Dict[str, Any]:
+        data = {}
+        for relation in self.model.relations["mimir_cluster"]: # only one coordinator for now
+            if relation.app:
+                coordinator_databag = MyProviderAppDataBag.load(relation.data[relation.app])
+                data = coordinator_databag.mimir_config
 
-        # read from remote app databag
-        provider_data = MyProviderAppDataBag.load(relation.data[relation.app])
+        return data
 
-        # TODO do whatever with these
-        hash_ring = provider_data.hash_ring
-        s3 = provider_data.s3_config
-        config = provider_data.config
+    def get_s3_config(self) -> Optional[S3Config]:
+        data = None
+        for relation in self.model.relations["mimir_cluster"]: # only one coordinator for now
+            if relation.app:
+                coordinator_databag = MyProviderAppDataBag.load(relation.data[relation.app])
+                data = coordinator_databag.s3_config
 
+        return data

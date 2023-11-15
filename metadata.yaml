@@ -33,12 +33,6 @@ resources:
     description: OCI image for Grafana Agent
 
 requires:
-  mimir-cluster:
-    interface: mimir_cluster
-    description: |
-      The coordinator sends the Mimir configuration to the workers, obtaining
-      the roles they are configured to take on and their addressing information.
-
   s3:
     interface: s3
     limit: 1
@@ -68,6 +62,12 @@ requires:
       Ingress-per-app, to load-balance across multiple units of the coordinator.
 
 provides:
+  mimir-cluster:
+    interface: mimir_cluster
+    description: |
+      The coordinator sends the Mimir configuration to the workers, obtaining
+      the roles they are configured to take on and their addressing information.
+
   grafana-dashboards-provider:
     interface: grafana_dashboard
     description: |
