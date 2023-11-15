@@ -34,10 +34,6 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         super().__init__(*args)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
 
-        self.framework.observe(
-            self.on.ruler_relation_joined, self._on_ruler_joined  # pyright: ignore
-        )
-
         # TODO: On any worker relation-joined/departed, need to updade grafana agent's scrape
         #  targets with the new memberlist.
         #  (Remote write would still be the same nginx-proxied endpoint.)
@@ -116,10 +112,6 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
 
     def _remote_write_endpoints_changed(self, _):
         # TODO Update grafana-agent config file with the new external prometheus's endpoint
-        pass
-
-    def _on_ruler_joined(self, _):
-        # TODO Update relation data with the rule files (metrics + logs)
         pass
 
     def _on_loki_relation_changed(self, _):

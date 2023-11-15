@@ -10,7 +10,7 @@ from collections import Counter
 from typing import List, Optional
 
 import pydantic
-from interfaces.mimir_cluster.v0.schema import MimirRole, RequirerSchema
+from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirRole, RequirerSchema
 from ops.model import ModelError, Relation, Unit
 
 logger = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ deployment to be considered robust according to the official recommendations/gui
 
 def _relation_to_role(relation: Relation) -> MimirRole:
     # TODO: extract the role from the relation
-    return MimirRole("whatever-role") # FIXME
+    return MimirRole("whatever-role")  # FIXME
 
 
 class MimirCoordinator:
@@ -77,6 +77,8 @@ class MimirCoordinator:
                 return False
         return True
 
+
+    # todo move to a new mimir_cluster.MimirClusterProvider class
     def roles(self) -> typing.Counter[MimirRole]:
         """Gather the roles from the mimir_cluster relations and count them."""
         roles = Counter()
@@ -87,7 +89,7 @@ class MimirCoordinator:
                 continue
 
             try:
-                role = _relation_to_role(relation) # TODO: get the role from relation data
+                role = _relation_to_role(relation)  # TODO: get the role from relation data
 
             except ValueError:
                 # TODO: not an actual role: should probably warn

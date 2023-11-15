@@ -31,8 +31,7 @@ ALL_MIMIR_RELATION_NAMES = list(map(_to_endpoint_name, MimirRole))
 )
 def test_coherent(roles, expected):
     relations = [
-        Relation(endpoint=_to_endpoint_name(role), remote_unit_ids=list(range(n_units)))
-        for role, n_units in roles.items()
+        Relation(endpoint="mimir-cluster", remote_app_data={"roles": ";".join(roles.keys())})
     ] + [Relation(endpoint="send-remote-write", remote_app_name="prom")]
     state = State(relations=relations)
     ctx = Context(charm_type=MimirCoordinatorK8SOperatorCharm)
