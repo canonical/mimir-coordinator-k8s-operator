@@ -11,10 +11,11 @@ https://discourse.charmhub.io/t/4208
 """
 import json
 import logging
-from typing import List
+from typing import Any, Dict, List
 
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v0.loki_push_api import LokiPushApiConsumer
+from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirClusterProvider
 from charms.prometheus_k8s.v0.prometheus_remote_write import (
     PrometheusRemoteWriteConsumer,
 )
@@ -40,7 +41,14 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
 
         # food for thought: make MimirCoordinator ops-unaware and accept a
         # List[MimirRole].
-        self.coordinator = MimirCoordinator(relations=self.mimir_worker_relations)
+        mimir_config: Dict[str, Any] = json.loads(self.model.config["mimir_config"])
+        self.cluster_provider = MimirClusterProvider(self, mimir_config=mimir_config)
+        self.coordinator = MimirCoordinator(cluster_provider=self.cluster_provider)
+
+        self.framework.observe(
+            self.on.mimir_cluster_relation_changed,  # pyright: ignore
+            self._on_mimir_cluster_changed,
+        )
 
         self.remote_write_consumer = PrometheusRemoteWriteConsumer(self)
         self.framework.observe(
@@ -103,11 +111,13 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
             relation.data[self.app]["hash_ring"] = json.dumps(hash_ring)
             relation.data[self.app]["s3_storage"] = json.dumps(self._s3_storage)
 
-    def _on_mimir_cluster_joined(self, _):
+    def _on_mimir_cluster_changed(self, _):
         # TODO check if other things are needed here
         if not self.coordinator.is_coherent():
             self.unit.status = BlockedStatus("You are lacking some necessary Mimir roles")
         else:
+            if not self.coordinator.is_recommended():
+                logger.warn("You are below the recommended deployment requirement.")
             self.unit.status = ActiveStatus()
 
     def _remote_write_endpoints_changed(self, _):

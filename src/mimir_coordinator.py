@@ -7,10 +7,10 @@
 import logging
 import typing
 from collections import Counter
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import pydantic
-from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirRole, RequirerSchema
+from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirRole, MimirClusterProvider
 from ops.model import ModelError, Relation, Unit
 
 logger = logging.getLogger(__name__)
@@ -49,20 +49,15 @@ RECOMMENDED_DEPLOYMENT = Counter(
 deployment to be considered robust according to the official recommendations/guidelines."""
 
 
-def _relation_to_role(relation: Relation) -> MimirRole:
-    # TODO: extract the role from the relation
-    return MimirRole("whatever-role")  # FIXME
-
-
 class MimirCoordinator:
     """Mimir coordinator."""
 
-    def __init__(self, relations: List[Relation]):
-        self.relations = relations
+    def __init__(self, cluster_provider: MimirClusterProvider):
+        self._cluster_provider = cluster_provider
 
     def is_coherent(self):
         """Return True if the roles list makes up a coherent mimir deployment."""
-        roles = self.roles()
+        roles: Dict[MimirRole, int] = self._cluster_provider.gather_roles()
         return set(roles).issuperset(MINIMAL_DEPLOYMENT)
 
     def is_recommended(self) -> bool:
@@ -70,44 +65,9 @@ class MimirCoordinator:
 
         I.E. If all required roles are assigned, and each role has the recommended amount of units.
         """
-        roles = self.roles()
+        roles: Dict[MimirRole, int] = self._cluster_provider.gather_roles()
         # python>=3.11 would support roles >= RECOMMENDED_DEPLOYMENT
         for role, min_n in RECOMMENDED_DEPLOYMENT.items():
             if roles.get(role, 0) < min_n:
-                return False
-        return True
-
-    # todo move to a new mimir_cluster.MimirClusterProvider class
-    def roles(self) -> typing.Counter[MimirRole]:
-        """Gather the roles from the mimir_cluster relations and count them."""
-        roles = Counter()
-
-        for relation in self.relations:
-            if not self._relation_data_valid(relation):
-                logger.error("Invalid relation data in %s", relation)
-                continue
-
-            try:
-                role = _relation_to_role(relation)  # TODO: get the role from relation data
-
-            except ValueError:
-                # TODO: not an actual role: should probably warn
-                logger.info(f"Not a mimir-*role* relation: {relation.name}")
-                continue
-
-            roles[role] += len(relation.units)
-        return roles
-
-    def _relation_data_valid(self, relation: Relation, unit: Optional[Unit] = None) -> bool:
-        """Check that the relation data is valid."""
-        schema = RequirerSchema
-        units_to_check = [unit] if unit else relation.units
-        for unit in units_to_check:
-            try:
-                schema().validate(
-                    {"app": relation.data[relation.app], "unit": relation.data[unit]}  # type: ignore
-                )
-            except (pydantic.ValidationError, ModelError, KeyError):
-                logger.error(f"relation data invalid: {relation.data}", exc_info=True)
                 return False
         return True

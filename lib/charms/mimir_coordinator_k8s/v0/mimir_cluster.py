@@ -8,9 +8,8 @@ TODO: see https://github.com/canonical/charm-relation-interfaces/issues/121
 """
 import json
 import logging
-from collections import Counter
 from enum import Enum
-from typing import Any, Dict, Literal, List, MutableMapping, Union
+from typing import Any, Dict, List, MutableMapping
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -141,7 +140,7 @@ class S3Config(pydantic.BaseModel):
 
 class MyProviderAppDataBag(DatabagModel):
     hash_ring: Json[List[str]]
-    s3_config: Json[S3Config]
+    s3_config: Json[Optional[S3Config]]
     mimir_config: Json[Dict[str, Any]]
 
 
@@ -174,8 +173,9 @@ class RequirerSchema(DataBagSchema):
 
 
 class MimirClusterProvider(Object):
-    def __init__(self, parent, key: Optional[str], s3_config: S3Config, mimir_config: Dict[str, Any]):
-        super().__init__(parent, key)
+    def __init__(self, charm, mimir_config: Dict[str, Any], key: Optional[str] = None, s3_config: Optional[S3Config] = None):
+        super().__init__(charm, key)
+        self._charm = charm
         self.s3_config = s3_config
         self.mimir_config = mimir_config
 
@@ -217,8 +217,9 @@ class MimirClusterProvider(Object):
 
 
 class MimirClusterRequirer(Object):
-    def __init__(self, parent, key: Optional[str], juju_topology: JujuTopology, address: str):
-        super().__init__(parent, key)
+    def __init__(self, charm, key: Optional[str], juju_topology: JujuTopology, address: str):
+        super().__init__(charm, key)
+        self._charm = charm
         self.juju_topology = juju_topology
         self.address = address
 
