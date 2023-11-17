@@ -16,7 +16,7 @@ from urllib.parse import urlparse
 
 import ops
 import pydantic
-from ops import Object
+from ops import Object, ObjectEvents, EventSource
 from pydantic import BaseModel
 
 log = logging.getLogger("mimir_cluster")
@@ -142,6 +142,9 @@ class MimirRole(str, Enum):
 
 class MimirClusterProviderAppData(DatabagModel):
     mimir_config: Dict[str, Any]
+    # todo: validate with
+    #  https://grafana.com/docs/mimir/latest/configure/about-configurations/#:~:text=Validate%20a%20configuration,or%20in%20a%20CI%20environment.
+    #  caveat: only the requirer node can do it
 
 
 class ProviderSchema(DataBagSchema):
@@ -214,7 +217,38 @@ class MimirClusterProvider(Object):
         return data
 
 
+class ConfigReceivedEvent(ops.EventBase):
+    """Event emitted when the "mimir-cluster" provider has shared a new mimir config."""
+    config: Dict[str, Any]
+    """The mimir config."""
+
+    def __init__(self, handle: ops.framework.Handle, config: Dict[str, Any]):
+        super().__init__(handle)
+        self.config = config
+
+    def snapshot(self) -> Dict[str, Any]:
+        """Used by the framework to serialize the event to disk.
+
+        Not meant to be called by charm code.
+        """
+        return {'config': json.dumps(self.config)}
+
+    def restore(self, snapshot: Dict[str, Any]):
+        """Used by the framework to deserialize the event from disk.
+
+        Not meant to be called by charm code.
+        """
+        self.relation = json.loads(snapshot['config'])
+
+
+class MimirClusterRequirerEvents(ObjectEvents):
+    """Events emitted by the MimirClusterRequirer "mimir-cluster" endpoint wrapper."""
+    config_received = EventSource(ConfigReceivedEvent)
+
+
 class MimirClusterRequirer(Object):
+    on = MimirClusterRequirerEvents()
+
     def __init__(self, charm: ops.CharmBase, address: Optional[str] = None, key: Optional[str] = None,
                  endpoint: str = DEFAULT_ENDPOINT_NAME):
         super().__init__(charm, key or endpoint)
@@ -227,6 +261,15 @@ class MimirClusterRequirer(Object):
         relation = self.model.get_relation(endpoint)
         # filter out common unhappy relation states
         self.relation: Optional[ops.Relation] = relation if relation and relation.app and relation.data else None
+
+        self.framework.observe(self._charm.on[endpoint].relation_changed,
+                               self._on_mimir_cluster_relation_changed)
+
+    def _on_mimir_cluster_relation_changed(self, _):
+        # to prevent the event from firing if the relation is in an unhealthy state (breaking...)
+        if self.relation:
+            new_config = self.get_mimir_config()
+            self.on.config_received.emit(new_config)
 
     def publish_unit_address(self, url: str):
         """Publish this unit's URL via the unit databag."""

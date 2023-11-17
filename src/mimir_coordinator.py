@@ -5,13 +5,10 @@
 """Mimir coordinator."""
 
 import logging
-import typing
 from collections import Counter
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
-import pydantic
 from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirRole, MimirClusterProvider
-from ops.model import ModelError, Relation, Unit
 
 logger = logging.getLogger(__name__)
 
@@ -52,10 +49,17 @@ deployment to be considered robust according to the official recommendations/gui
 class MimirCoordinator:
     """Mimir coordinator."""
 
-    def __init__(self, cluster_provider: MimirClusterProvider):
-        self._cluster_provider = cluster_provider
+    def __init__(self, cluster_provider: MimirClusterProvider,
 
-    def is_coherent(self):
+                 # todo: use and import tls requirer obj
+                 tls_requirer: Any = None,
+                 # todo: use and import s3 requirer obj
+                 s3_requirer: Any = None):
+        self._cluster_provider = cluster_provider
+        self._s3_requirer = s3_requirer
+        self._tls_requirer = tls_requirer
+
+    def is_coherent(self) -> bool:
         """Return True if the roles list makes up a coherent mimir deployment."""
         roles: Dict[MimirRole, int] = self._cluster_provider.gather_roles()
         return set(roles).issuperset(MINIMAL_DEPLOYMENT)
@@ -71,3 +75,37 @@ class MimirCoordinator:
             if roles.get(role, 0) < min_n:
                 return False
         return True
+
+    def build_config(self, _charm_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate shared config file for mimir.
+
+        Reference: https://grafana.com/docs/mimir/latest/configure/
+        """
+        mimir_config = {
+            "common": {}
+        }
+
+        if self._s3_requirer:
+            s3_config = self._s3_requirer.s3_config
+            mimir_config['common']['storage'] = {
+                "backend": "s3",
+                "s3": {
+                    "region": s3_config.region,  # eg. 'us-west'
+                    "bucket_name": s3_config.bucket_name  # eg: 'mimir'
+                }
+            }
+            mimir_config['blocks_storage'] = {
+                "s3": {"bucket_name": s3_config.blocks_bucket_name}  # e.g. 'mimir-blocks'
+            }
+
+        # memberlist config for gossip and hash ring
+        mimir_config['join_members'] = list(self._cluster_provider.gather_addresses())
+
+        # todo: TLS config for memberlist
+        if self._tls_requirer:
+            mimir_config['tls_enabled'] = True
+            mimir_config['tls_cert_path'] = ""
+            mimir_config['tls_key_path'] = ""
+            mimir_config['tls_ca_path'] = ""
+
+        return mimir_config

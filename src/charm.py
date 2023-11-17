@@ -33,6 +33,7 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
 
     def __init__(self, *args):
         super().__init__(*args)
+        self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
 
         # TODO: On any worker relation-joined/departed, need to updade grafana agent's scrape
@@ -40,7 +41,9 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         #  (Remote write would still be the same nginx-proxied endpoint.)
 
         self.cluster_provider = MimirClusterProvider(self)
-        self.coordinator = MimirCoordinator(cluster_provider=self.cluster_provider)
+        self.coordinator = MimirCoordinator(
+            cluster_provider=self.cluster_provider
+        )
 
         self.framework.observe(
             self.on.mimir_cluster_relation_changed,  # pyright: ignore
@@ -67,8 +70,6 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
             self._on_loki_relation_changed,
         )
 
-        # FIXME set status on correct occasion
-        self.unit.status = ActiveStatus()
 
     @property
     def _s3_storage(self) -> dict:
@@ -87,26 +88,22 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         """Returns the list of worker relations."""
         return self.model.relations.get("mimir_worker", [])
 
+    def _on_start(self, event):
+        """Handle start event."""
+        self.unit.status = ActiveStatus()
+
     def _on_config_changed(self, event):
-        """Handle changed configuration.
+        """Handle changed configuration."""
+        self.publish_config()
 
-        Change this example to suit your needs. If you don't need to handle config, you can remove
-        this method.
+    def _gather_ring(self):
+        """Gather all member's addresses"""
+        return self.cluster_provider.gather_addresses()
 
-        Learn more about config at https://juju.is/docs/sdk/config
-        """
-        hash_ring = []
-
-        for relation in self.mimir_worker_relations:
-            for remote_unit in relation.units:
-                # todo: figure out under what circumstances this would not be routable
-                unit_ip = relation.data[remote_unit]["private-address"]
-                hash_ring.append(unit_ip)
-
-        for relation in self.mimir_worker_relations:
-            relation.data[self.app]["config"] = json.dumps(dict(self.model.config))
-            relation.data[self.app]["hash_ring"] = json.dumps(hash_ring)
-            relation.data[self.app]["s3_storage"] = json.dumps(self._s3_storage)
+    def publish_config(self):
+        """Generate config file and publish to all workers."""
+        mimir_config = self.coordinator.build_config(dict(self.config))
+        self.cluster_provider.publish_configs(mimir_config)
 
     def _on_mimir_cluster_changed(self, _):
         # TODO check if other things are needed here
@@ -114,7 +111,7 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
             self.unit.status = BlockedStatus("You are lacking some necessary Mimir roles")
         else:
             if not self.coordinator.is_recommended():
-                logger.warn("You are below the recommended deployment requirement.")
+                logger.warning("You are below the recommended deployment requirement.")
             self.unit.status = ActiveStatus()
 
     def _remote_write_endpoints_changed(self, _):

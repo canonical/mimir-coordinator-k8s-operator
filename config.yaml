@@ -1,10 +1,2 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
-
-options:
-  config_file:
-    type: string
-    default: ""
-    description: >
-      Mimir configuration file (yaml). Refer to 
-      https://grafana.com/docs/mimir/latest/references/configuration-parameters/ for full details.
