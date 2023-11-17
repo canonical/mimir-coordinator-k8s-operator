@@ -39,10 +39,7 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         #  targets with the new memberlist.
         #  (Remote write would still be the same nginx-proxied endpoint.)
 
-        # food for thought: make MimirCoordinator ops-unaware and accept a
-        # List[MimirRole].
-        mimir_config: Dict[str, Any] = json.loads(self.model.config["mimir_config"])
-        self.cluster_provider = MimirClusterProvider(self, mimir_config=mimir_config)
+        self.cluster_provider = MimirClusterProvider(self)
         self.coordinator = MimirCoordinator(cluster_provider=self.cluster_provider)
 
         self.framework.observe(
