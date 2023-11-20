@@ -352,7 +352,11 @@ class MimirClusterRequirer(Object):
         data = {}
         relation = self.relation
         if relation:
-            databag = relation.data[relation.app]  # type: ignore # all checks are done in __init__
-            coordinator_databag = MimirClusterProviderAppData.load(databag)
-            data = coordinator_databag.mimir_config
+            try:
+                databag = relation.data[relation.app]  # type: ignore # all checks are done in __init__
+                coordinator_databag = MimirClusterProviderAppData.load(databag)
+                data = coordinator_databag.mimir_config
+            except DataValidationError as e:
+                log.error(f"invalid databag contents: {e}", exc_info=True)
+                return {}
         return data
