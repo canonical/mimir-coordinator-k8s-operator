@@ -8,15 +8,14 @@ TODO: see https://github.com/canonical/charm-relation-interfaces/issues/121
 """
 import json
 import logging
-import socket
 from enum import Enum
-from typing import Any, Dict, MutableMapping, Set
+from typing import Any, Dict, MutableMapping, Set, List, Iterable
 from typing import Optional
 from urllib.parse import urlparse
 
 import ops
 import pydantic
-from ops import Object, ObjectEvents, EventSource
+from ops import Object, ObjectEvents, EventSource, RelationCreatedEvent
 from pydantic import BaseModel, ConfigDict
 
 log = logging.getLogger("mimir_cluster")
@@ -164,7 +163,7 @@ class MimirClusterRequirerUnitData(DatabagModel):
 
 
 class MimirClusterRequirerAppData(DatabagModel):
-    roles: Dict[MimirRole, int]
+    roles: List[MimirRole]
 
 
 class RequirerSchema(DataBagSchema):
@@ -198,8 +197,12 @@ class MimirClusterProvider(Object):
         for relation in self._relations:
             if relation.app:
                 remote_app_databag = relation.data[relation.app]
-                worker_roles: Dict[MimirRole, int] = MimirClusterRequirerAppData.load(remote_app_databag).roles
-                for role, role_n in worker_roles.items():
+                worker_roles: List[MimirRole] = MimirClusterRequirerAppData.load(remote_app_databag).roles
+
+                # the number of units with each role is the number of remote units
+                role_n = len(relation.units)  # exclude this unit
+
+                for role in worker_roles:
                     if role not in data:
                         data[role] = 0
                     data[role] += role_n
@@ -215,6 +218,13 @@ class MimirClusterProvider(Object):
                 data.add(unit_address)
 
         return data
+
+
+class MimirClusterRemovedEvent(ops.EventBase):
+    """Event emitted when the relation with the "mimir-cluster" provider has been severed.
+
+    Or when the relation data has been wiped.
+    """
 
 
 class ConfigReceivedEvent(ops.EventBase):
@@ -244,12 +254,14 @@ class ConfigReceivedEvent(ops.EventBase):
 class MimirClusterRequirerEvents(ObjectEvents):
     """Events emitted by the MimirClusterRequirer "mimir-cluster" endpoint wrapper."""
     config_received = EventSource(ConfigReceivedEvent)
+    created = EventSource(RelationCreatedEvent)
+    removed = EventSource(MimirClusterRemovedEvent)
 
 
 class MimirClusterRequirer(Object):
     on = MimirClusterRequirerEvents()  # type: ignore
 
-    def __init__(self, charm: ops.CharmBase, address: Optional[str] = None, key: Optional[str] = None,
+    def __init__(self, charm: ops.CharmBase, key: Optional[str] = None,
                  endpoint: str = DEFAULT_ENDPOINT_NAME):
         super().__init__(charm, key or endpoint)
         self._charm = charm
@@ -257,19 +269,55 @@ class MimirClusterRequirer(Object):
             "unit": self.model.unit.name,
             "model": self.model.name
         }
-        self.address = address or socket.getfqdn()
         relation = self.model.get_relation(endpoint)
         # filter out common unhappy relation states
         self.relation: Optional[ops.Relation] = relation if relation and relation.app and relation.data else None
 
         self.framework.observe(self._charm.on[endpoint].relation_changed,
                                self._on_mimir_cluster_relation_changed)
+        self.framework.observe(self._charm.on[endpoint].relation_created,
+                               self._on_mimir_cluster_relation_created)
+        self.framework.observe(self._charm.on[endpoint].relation_broken,
+                               self._on_mimir_cluster_relation_broken)
+
+    def _on_mimir_cluster_relation_broken(self, e):
+        self.on.removed.emit()
+
+    def _on_mimir_cluster_relation_created(self, e):
+        self.on.created.emit(relation=e.relation, app=e.app, unit=e.unit)
 
     def _on_mimir_cluster_relation_changed(self, _):
         # to prevent the event from firing if the relation is in an unhealthy state (breaking...)
         if self.relation:
             new_config = self.get_mimir_config()
-            self.on.config_received.emit(new_config)
+            if new_config:
+                self.on.config_received.emit(new_config)
+
+            # if we have published our data, but we receive an empty/invalid config,
+            # then the remote end must have removed it.
+            elif self.is_published():
+                self.on.removed.emit()
+
+    def is_published(self):
+        """Verify that the local side has done all they need to do.
+
+        - unit address is published
+        - roles are published
+        """
+        relation = self.relation
+        if not relation:
+            return False
+
+        unit_data = relation.data[self._charm.unit]
+        app_data = relation.data[self._charm.app]
+
+        try:
+            (MimirClusterRequirerUnitData.load(unit_data) and
+             MimirClusterRequirerAppData.load(app_data))
+        except DataValidationError as e:
+            log.error(f"invalid databag contents: {e}", exc_info=True)
+            return False
+        return True
 
     def publish_unit_address(self, url: str):
         """Publish this unit's URL via the unit databag."""
@@ -288,14 +336,15 @@ class MimirClusterRequirer(Object):
             unit_databag = relation.data[self.model.unit]  # type: ignore # all checks are done in __init__
             databag_model.dump(unit_databag)
 
-    def publish_app_roles(self, roles: Dict[MimirRole, int]):
+    def publish_app_roles(self, roles: Iterable[MimirRole]):
         """Publish this application's roles via the application databag."""
         if not self._charm.unit.is_leader():
             raise DatabagAccessPermissionError("only the leader unit can publish roles.")
 
         relation = self.relation
         if relation:
-            databag_model = MimirClusterRequirerAppData(roles=roles)
+            deduplicated_roles = list(set(roles))
+            databag_model = MimirClusterRequirerAppData(roles=deduplicated_roles)
             databag_model.dump(relation.data[self.model.app])
 
     def get_mimir_config(self) -> Dict[str, Any]:

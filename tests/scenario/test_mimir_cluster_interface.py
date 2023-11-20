@@ -32,19 +32,19 @@ class MyCharm(ops.CharmBase):
     "workers_roles, expected",
     (
         (
-            ({MimirRole.overrides_exporter: 1}, {MimirRole.overrides_exporter: 1}),
+            (({MimirRole.overrides_exporter}, 1), ({MimirRole.overrides_exporter}, 1)),
             ({MimirRole.overrides_exporter: 2}),
         ),
         (
-            ({MimirRole.query_frontend: 1}, {MimirRole.overrides_exporter: 1}),
+            (({MimirRole.query_frontend}, 1), ({MimirRole.overrides_exporter}, 1)),
             ({MimirRole.overrides_exporter: 1, MimirRole.query_frontend: 1}),
         ),
-        (({MimirRole.querier: 2}, {MimirRole.querier: 1}), ({MimirRole.querier: 3})),
+        ((({MimirRole.querier}, 2), ({MimirRole.querier}, 1)), ({MimirRole.querier: 3})),
         (
             (
-                {MimirRole.alertmanager: 2},
-                {MimirRole.alertmanager: 2},
-                {MimirRole.alertmanager: 1, MimirRole.querier: 1},
+                ({MimirRole.alertmanager}, 2),
+                ({MimirRole.alertmanager}, 2),
+                ({MimirRole.alertmanager, MimirRole.querier}, 1),
             ),
             ({MimirRole.alertmanager: 5, MimirRole.querier: 1}),
         ),
@@ -52,9 +52,11 @@ class MyCharm(ops.CharmBase):
 )
 def test_role_collection(workers_roles, expected):
     relations = []
-    for worker_roles in workers_roles:
+    for worker_roles, scale in workers_roles:
         data = MimirClusterRequirerAppData(roles=worker_roles).dump()
-        relations.append(Relation("mimir-cluster-provide", remote_app_data=data))
+        relations.append(Relation("mimir-cluster-provide",
+                                  remote_app_data=data,
+                                  remote_units_data={i: {} for i in range(scale)}))
 
     state = State(relations=relations)
 

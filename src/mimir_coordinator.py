@@ -50,12 +50,12 @@ class MimirCoordinator:
     """Mimir coordinator."""
 
     def __init__(
-        self,
-        cluster_provider: MimirClusterProvider,
-        # TODO: use and import tls requirer obj
-        tls_requirer: Any = None,
-        # TODO: use and import s3 requirer obj
-        s3_requirer: Any = None,
+            self,
+            cluster_provider: MimirClusterProvider,
+            # TODO: use and import tls requirer obj
+            tls_requirer: Any = None,
+            # TODO: use and import s3 requirer obj
+            s3_requirer: Any = None,
     ):
         self._cluster_provider = cluster_provider
         self._s3_requirer = s3_requirer  # type: ignore
@@ -83,7 +83,21 @@ class MimirCoordinator:
 
         Reference: https://grafana.com/docs/mimir/latest/configure/
         """
-        mimir_config: Dict[str, Any] = {"common": {}}
+
+        mimir_config: Dict[str, Any] = {
+            "common": {},
+            "alertmanager": {
+                "data_dir": str(self._root_data_dir / "data-alertmanager"),
+            },
+            "compactor": {
+                "data_dir": str(self._root_data_dir / "data-compactor"),
+            },
+            "blocks_storage": {
+                "bucket_store": {
+                    "sync_dir": str(self._root_data_dir / "tsdb-sync"),
+                },
+            },
+        }
 
         if self._s3_requirer:
             s3_config = self._s3_requirer.s3_config
