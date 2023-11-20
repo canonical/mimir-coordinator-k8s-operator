@@ -17,7 +17,7 @@ from urllib.parse import urlparse
 import ops
 import pydantic
 from ops import Object, ObjectEvents, EventSource
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 log = logging.getLogger("mimir_cluster")
 LIBID = "9818a8d44028454a94c6c3a01f4316d2"
@@ -43,20 +43,20 @@ class DatabagAccessPermissionError(MimirClusterError):
 
 class DatabagModel(BaseModel):
     """Base databag model."""
-
-    class Config:
-        """Pydantic config."""
-
-        allow_population_by_field_name = True
-        """Allow instantiating this class by field name (instead of forcing alias)."""
-
-    _NEST_UNDER = None
+    model_config = ConfigDict(
+        # Allow instantiating this class by field name (instead of forcing alias).
+        populate_by_name=True,
+        # Custom config key: whether to nest the whole datastructure (as json)
+        # under a field or spread it out at the toplevel.
+        _NEST_UNDER=None)
+    """Pydantic config."""
 
     @classmethod
     def load(cls, databag: MutableMapping):
         """Load this model from a Juju databag."""
-        if cls._NEST_UNDER:
-            return cls.parse_obj(json.loads(databag[cls._NEST_UNDER]))
+        nest_under = cls.model_config.get('_NEST_UNDER')
+        if nest_under:
+            return cls.parse_obj(json.loads(databag[nest_under]))
 
         try:
             data = {k: json.loads(v) for k, v in databag.items() if k not in BUILTIN_JUJU_KEYS}
@@ -83,12 +83,12 @@ class DatabagModel(BaseModel):
 
         if databag is None:
             databag = {}
+        nest_under = self.model_config.get('_NEST_UNDER')
+        if nest_under:
+            databag[nest_under] = self.json()
 
-        if self._NEST_UNDER:
-            databag[self._NEST_UNDER] = self.json()
-
-        dct = self.dict()
-        for key, field in self.__fields__.items():  # type: ignore
+        dct = self.model_dump()
+        for key, field in self.model_fields.items():  # type: ignore
             value = dct[key]
             databag[field.alias or key] = json.dumps(value)
 
