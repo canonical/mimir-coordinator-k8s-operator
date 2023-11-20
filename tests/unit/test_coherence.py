@@ -1,7 +1,6 @@
 from unittest.mock import MagicMock
 
 import pytest as pytest
-
 from mimir_coordinator import (
     MINIMAL_DEPLOYMENT,
     RECOMMENDED_DEPLOYMENT,
@@ -20,11 +19,11 @@ ALL_MIMIR_RELATION_NAMES = list(map(_to_endpoint_name, MimirRole))
 @pytest.mark.parametrize(
     "roles, expected",
     (
-            ({MimirRole.ruler: 1}, False),
-            ({MimirRole.distributor: 1}, False),
-            ({MimirRole.distributor: 1, MimirRole.ingester: 1}, False),
-            (MINIMAL_DEPLOYMENT, True),
-            (RECOMMENDED_DEPLOYMENT, True),
+        ({MimirRole.ruler: 1}, False),
+        ({MimirRole.distributor: 1}, False),
+        ({MimirRole.distributor: 1, MimirRole.ingester: 1}, False),
+        (MINIMAL_DEPLOYMENT, True),
+        (RECOMMENDED_DEPLOYMENT, True),
     ),
 )
 def test_coherent(roles, expected):
@@ -37,11 +36,11 @@ def test_coherent(roles, expected):
 @pytest.mark.parametrize(
     "roles, expected",
     (
-            ({MimirRole.ruler: 1}, False),
-            ({MimirRole.distributor: 1}, False),
-            ({MimirRole.distributor: 1, MimirRole.ingester: 1}, False),
-            (MINIMAL_DEPLOYMENT, False),
-            (RECOMMENDED_DEPLOYMENT, True),
+        ({MimirRole.ruler: 1}, False),
+        ({MimirRole.distributor: 1}, False),
+        ({MimirRole.distributor: 1, MimirRole.ingester: 1}, False),
+        (MINIMAL_DEPLOYMENT, False),
+        (RECOMMENDED_DEPLOYMENT, True),
     ),
 )
 def test_recommended(roles, expected):

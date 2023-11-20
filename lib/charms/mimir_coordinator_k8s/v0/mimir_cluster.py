@@ -48,7 +48,7 @@ class DatabagModel(BaseModel):
         populate_by_name=True,
         # Custom config key: whether to nest the whole datastructure (as json)
         # under a field or spread it out at the toplevel.
-        _NEST_UNDER=None)
+        _NEST_UNDER=None)  # type: ignore
     """Pydantic config."""
 
     @classmethod
@@ -247,7 +247,7 @@ class MimirClusterRequirerEvents(ObjectEvents):
 
 
 class MimirClusterRequirer(Object):
-    on = MimirClusterRequirerEvents()
+    on = MimirClusterRequirerEvents()  # type: ignore
 
     def __init__(self, charm: ops.CharmBase, address: Optional[str] = None, key: Optional[str] = None,
                  endpoint: str = DEFAULT_ENDPOINT_NAME):
@@ -280,12 +280,12 @@ class MimirClusterRequirer(Object):
             raise ValueError(f"{url} is an invalid url") from e
 
         databag_model = MimirClusterRequirerUnitData(
-            juju_topology=self.juju_topology,
+            juju_topology=self.juju_topology,  # type: ignore
             address=url,
         )
         relation = self.relation
         if relation:
-            unit_databag = relation.data[self.model.unit]
+            unit_databag = relation.data[self.model.unit]  # type: ignore # all checks are done in __init__
             databag_model.dump(unit_databag)
 
     def publish_app_roles(self, roles: Dict[MimirRole, int]):
@@ -303,6 +303,7 @@ class MimirClusterRequirer(Object):
         data = {}
         relation = self.relation
         if relation:
-            coordinator_databag = MimirClusterProviderAppData.load(relation.data[relation.app])
+            databag = relation.data[relation.app]  # type: ignore # all checks are done in __init__
+            coordinator_databag = MimirClusterProviderAppData.load(databag)
             data = coordinator_databag.mimir_config
         return data

@@ -9,9 +9,8 @@ develop a new k8s charm using the Operator Framework:
 
 https://discourse.charmhub.io/t/4208
 """
-import json
 import logging
-from typing import Any, Dict, List
+from typing import List
 
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v0.loki_push_api import LokiPushApiConsumer
@@ -41,9 +40,7 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         #  (Remote write would still be the same nginx-proxied endpoint.)
 
         self.cluster_provider = MimirClusterProvider(self)
-        self.coordinator = MimirCoordinator(
-            cluster_provider=self.cluster_provider
-        )
+        self.coordinator = MimirCoordinator(cluster_provider=self.cluster_provider)
 
         self.framework.observe(
             self.on.mimir_cluster_relation_changed,  # pyright: ignore
@@ -69,7 +66,6 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
             self.loki_consumer.on.loki_push_api_endpoint_departed,  # pyright: ignore
             self._on_loki_relation_changed,
         )
-
 
     @property
     def _s3_storage(self) -> dict:
@@ -97,7 +93,7 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         self.publish_config()
 
     def _gather_ring(self):
-        """Gather all member's addresses"""
+        """Gather all member's addresses."""
         return self.cluster_provider.gather_addresses()
 
     def publish_config(self):
