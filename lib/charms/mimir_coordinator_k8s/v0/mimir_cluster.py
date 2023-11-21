@@ -197,7 +197,11 @@ class MimirClusterProvider(Object):
         for relation in self._relations:
             if relation.app:
                 remote_app_databag = relation.data[relation.app]
-                worker_roles: List[MimirRole] = MimirClusterRequirerAppData.load(remote_app_databag).roles
+                try:
+                    worker_roles: List[MimirRole] = MimirClusterRequirerAppData.load(remote_app_databag).roles
+                except DataValidationError as e:
+                    log.error(f"invalid databag contents: {e}")
+                    worker_roles = []
 
                 # the number of units with each role is the number of remote units
                 role_n = len(relation.units)  # exclude this unit
@@ -213,9 +217,13 @@ class MimirClusterProvider(Object):
         data = set()
         for relation in self._relations:
             for worker_unit in relation.units:
-                worker_data = MimirClusterRequirerUnitData.load(relation.data[worker_unit])
-                unit_address = worker_data.address
-                data.add(unit_address)
+                try:
+                    worker_data = MimirClusterRequirerUnitData.load(relation.data[worker_unit])
+                    unit_address = worker_data.address
+                    data.add(unit_address)
+                except DataValidationError as e:
+                    log.error(f"invalid databag contents: {e}")
+                    continue
 
         return data
 
@@ -315,7 +323,7 @@ class MimirClusterRequirer(Object):
             (MimirClusterRequirerUnitData.load(unit_data) and
              MimirClusterRequirerAppData.load(app_data))
         except DataValidationError as e:
-            log.error(f"invalid databag contents: {e}", exc_info=True)
+            log.error(f"invalid databag contents: {e}")
             return False
         return True
 
@@ -357,6 +365,6 @@ class MimirClusterRequirer(Object):
                 coordinator_databag = MimirClusterProviderAppData.load(databag)
                 data = coordinator_databag.mimir_config
             except DataValidationError as e:
-                log.error(f"invalid databag contents: {e}", exc_info=True)
+                log.error(f"invalid databag contents: {e}")
                 return {}
         return data
