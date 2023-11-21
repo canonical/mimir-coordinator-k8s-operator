@@ -1,3 +1,8 @@
+# Copyright 2023 Canonical
+# See LICENSE file for licensing details.
+
+"""Helper module for interacting with the Mimir configuration."""
+
 from dataclasses import asdict
 from typing import List, Literal, Optional, Union
 
@@ -102,10 +107,11 @@ class CommonConfig:
     _StorageKey: _StorageBackend
 
     def __post_init__(self):
+        """Verify the backend variable typing is correct."""
         if not asdict(self).get("s3", "") and not asdict(self).get("s3", ""):
             raise InvalidConfigurationError("Common storage configuration must specify a type!")
         elif (asdict(self).get("filesystem", "") and not self.backend != "filesystem") or (
-                asdict(self).get("s3", "") and not self.backend != "s3"
+            asdict(self).get("s3", "") and not self.backend != "s3"
         ):
             raise InvalidConfigurationError(
                 "Mimir `backend` type must include a configuration block which matches that type"
