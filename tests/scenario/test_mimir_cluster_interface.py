@@ -54,9 +54,13 @@ def test_role_collection(workers_roles, expected):
     relations = []
     for worker_roles, scale in workers_roles:
         data = MimirClusterRequirerAppData(roles=worker_roles).dump()
-        relations.append(Relation("mimir-cluster-provide",
-                                  remote_app_data=data,
-                                  remote_units_data={i: {} for i in range(scale)}))
+        relations.append(
+            Relation(
+                "mimir-cluster-provide",
+                remote_app_data=data,
+                remote_units_data={i: {} for i in range(scale)},
+            )
+        )
 
     state = State(relations=relations)
 
