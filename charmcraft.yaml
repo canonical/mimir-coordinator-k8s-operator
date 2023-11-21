@@ -12,6 +12,6 @@ bases:
 
 parts:
   charm:
-    build-packages:
-    - git
+    charm-binary-python-packages:
+      - pydantic>2.0
 

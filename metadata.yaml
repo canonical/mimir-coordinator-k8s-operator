@@ -9,28 +9,23 @@ summary: Mimir coordinator
 description: |
     Mimir coordinator.
 
-containers:
-  nginx:
-    resource: nginx-image
-  agent:
-    resource: agent-image
-    mounts:
-      - storage: data
-        location: /tmp/agent/data
+#containers:
+#  nginx:
+#    resource: nginx-image
 
 storage:
   data:
     type: filesystem
 
-resources:
-  nginx-image:
-    type: oci-image
-    description: OCI image for nginx
-    upstream-source: ubuntu/nginx:1.18-22.04_beta
-  agent-image:
-    type: oci-image
-    upstream-source: ghcr.io/canonical/grafana-agent:latest
-    description: OCI image for Grafana Agent
+#resources:
+#  nginx-image:
+#    type: oci-image
+#    description: OCI image for nginx
+#    upstream-source: ubuntu/nginx:1.18-22.04_beta
+#  agent-image:
+#    type: oci-image
+#    upstream-source: ghcr.io/canonical/grafana-agent:latest
+#    description: OCI image for Grafana Agent
 
 requires:
   s3:
