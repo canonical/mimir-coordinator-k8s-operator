@@ -7,7 +7,7 @@
 import logging
 from collections import Counter
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Iterable
 
 from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirClusterProvider, MimirRole
 
@@ -51,13 +51,13 @@ class MimirCoordinator:
     """Mimir coordinator."""
 
     def __init__(
-        self,
-        cluster_provider: MimirClusterProvider,
-        # TODO: use and import tls requirer obj
-        tls_requirer: Any = None,
-        # TODO: use and import s3 requirer obj
-        s3_requirer: Any = None,
-        root_data_dir: Path = Path("/etc/mimir"),
+            self,
+            cluster_provider: MimirClusterProvider,
+            # TODO: use and import tls requirer obj
+            tls_requirer: Any = None,
+            # TODO: use and import s3 requirer obj
+            s3_requirer: Any = None,
+            root_data_dir: Path = Path("/etc/mimir"),
     ):
         self._cluster_provider = cluster_provider
         self._s3_requirer = s3_requirer  # type: ignore
@@ -66,7 +66,7 @@ class MimirCoordinator:
 
     def is_coherent(self) -> bool:
         """Return True if the roles list makes up a coherent mimir deployment."""
-        roles: Dict[MimirRole, int] = self._cluster_provider.gather_roles()
+        roles: Iterable[MimirRole] = self._cluster_provider.gather_roles().keys()
         return set(roles).issuperset(MINIMAL_DEPLOYMENT)
 
     def is_recommended(self) -> bool:
@@ -115,7 +115,7 @@ class MimirCoordinator:
             }
 
         # memberlist config for gossip and hash ring
-        mimir_config["join_members"] = list(self._cluster_provider.gather_addresses())
+        mimir_config['memberlist'] = {"join_members": list(self._cluster_provider.gather_addresses())}
 
         # todo: TLS config for memberlist
         if self._tls_requirer:

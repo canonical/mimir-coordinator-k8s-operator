@@ -126,17 +126,23 @@ class DataBagSchema(BaseModel):
 
 class MimirRole(str, Enum):
     """Mimir component role names."""
-    overrides_exporter = "overrides_exporter"
-    query_scheduler = "query_scheduler"
+    overrides_exporter = "overrides-exporter"
+    query_scheduler = "query-scheduler"
     flusher = "flusher"
-    query_frontend = "query_frontend"
+    query_frontend = "query-frontend"
     querier = "querier"
-    store_gateway = "store_gateway"
+    store_gateway = "store-gateway"
     ingester = "ingester"
     distributor = "distributor"
     ruler = "ruler"
     alertmanager = "alertmanager"
     compactor = "compactor"
+
+    # meta-roles
+    read = "read"
+    write = "write"
+    backend = "backend"
+    all = "all"
 
 
 class MimirClusterProviderAppData(DatabagModel):
@@ -170,6 +176,27 @@ class RequirerSchema(DataBagSchema):
     """The schema for the requirer side of this interface."""
     unit: MimirClusterRequirerUnitData
     app: MimirClusterRequirerAppData
+
+
+META_ROLES = {
+    MimirRole.read: (MimirRole.query_frontend, MimirRole.querier),
+    MimirRole.write: (MimirRole.distributor, MimirRole.ingester),
+    MimirRole.backend: (MimirRole.store_gateway, MimirRole.compactor,
+                        MimirRole.ruler, MimirRole.alertmanager,
+                        MimirRole.query_scheduler, MimirRole.overrides_exporter),
+    MimirRole.all: list(MimirRole)
+}
+
+
+def expand_roles(roles: Iterable[MimirRole]) -> Set[MimirRole]:
+    """Expand any meta roles to their 'atomic' equivalents."""
+    expanded_roles = set()
+    for role in roles:
+        if role in META_ROLES:
+            expanded_roles.update(META_ROLES[role])
+        else:
+            expanded_roles.add(role)
+    return expanded_roles
 
 
 class MimirClusterProvider(Object):
@@ -206,7 +233,7 @@ class MimirClusterProvider(Object):
                 # the number of units with each role is the number of remote units
                 role_n = len(relation.units)  # exclude this unit
 
-                for role in worker_roles:
+                for role in expand_roles(worker_roles):
                     if role not in data:
                         data[role] = 0
                     data[role] += role_n
