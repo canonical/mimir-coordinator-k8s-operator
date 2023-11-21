@@ -103,8 +103,11 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
     def _on_collect_status(self, event: CollectStatusEvent):
         """Handle start event."""
         if not self.coordinator.is_coherent():
-            event.add_status(BlockedStatus("Incoherent deployment: you are "
-                                           "lacking some required Mimir roles"))
+            event.add_status(
+                BlockedStatus(
+                    "Incoherent deployment: you are " "lacking some required Mimir roles"
+                )
+            )
 
         if self.coordinator.is_recommended():
             logger.warning("This deployment is below the recommended deployment requirement.")
