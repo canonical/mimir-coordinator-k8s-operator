@@ -145,6 +145,30 @@ class MimirRole(str, Enum):
     all = "all"
 
 
+META_ROLES = {
+    MimirRole.read: (MimirRole.query_frontend, MimirRole.querier),
+    MimirRole.write: (MimirRole.distributor, MimirRole.ingester),
+    MimirRole.backend: (MimirRole.store_gateway,
+                        MimirRole.compactor,
+                        MimirRole.ruler,
+                        MimirRole.alertmanager,
+                        MimirRole.query_scheduler,
+                        MimirRole.overrides_exporter),
+    MimirRole.all: list(MimirRole)
+}
+
+
+def expand_roles(roles: Iterable[MimirRole]) -> Set[MimirRole]:
+    """Expand any meta roles to their 'atomic' equivalents."""
+    expanded_roles = set()
+    for role in roles:
+        if role in META_ROLES:
+            expanded_roles.update(META_ROLES[role])
+        else:
+            expanded_roles.add(role)
+    return expanded_roles
+
+
 class MimirClusterProviderAppData(DatabagModel):
     mimir_config: Dict[str, Any]
     # todo: validate with
@@ -176,27 +200,6 @@ class RequirerSchema(DataBagSchema):
     """The schema for the requirer side of this interface."""
     unit: MimirClusterRequirerUnitData
     app: MimirClusterRequirerAppData
-
-
-META_ROLES = {
-    MimirRole.read: (MimirRole.query_frontend, MimirRole.querier),
-    MimirRole.write: (MimirRole.distributor, MimirRole.ingester),
-    MimirRole.backend: (MimirRole.store_gateway, MimirRole.compactor,
-                        MimirRole.ruler, MimirRole.alertmanager,
-                        MimirRole.query_scheduler, MimirRole.overrides_exporter),
-    MimirRole.all: list(MimirRole)
-}
-
-
-def expand_roles(roles: Iterable[MimirRole]) -> Set[MimirRole]:
-    """Expand any meta roles to their 'atomic' equivalents."""
-    expanded_roles = set()
-    for role in roles:
-        if role in META_ROLES:
-            expanded_roles.update(META_ROLES[role])
-        else:
-            expanded_roles.add(role)
-    return expanded_roles
 
 
 class MimirClusterProvider(Object):
