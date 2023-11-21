@@ -19,7 +19,7 @@ from charms.prometheus_k8s.v0.prometheus_remote_write import (
     PrometheusRemoteWriteConsumer,
 )
 from mimir_coordinator import MimirCoordinator
-from ops.charm import CharmBase
+from ops.charm import CharmBase, CollectStatusEvent
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, Relation
 
@@ -32,8 +32,8 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
 
     def __init__(self, *args):
         super().__init__(*args)
-        self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
+        self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
 
         # TODO: On any worker relation-joined/departed, need to updade grafana agent's scrape
         #  targets with the new memberlist.
@@ -84,17 +84,9 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         """Returns the list of worker relations."""
         return self.model.relations.get("mimir_worker", [])
 
-    def _on_start(self, event):
-        """Handle start event."""
-        self.unit.status = ActiveStatus()
-
     def _on_config_changed(self, event):
         """Handle changed configuration."""
         self.publish_config()
-
-    def _gather_ring(self):
-        """Gather all member's addresses."""
-        return self.cluster_provider.gather_addresses()
 
     def publish_config(self):
         """Generate config file and publish to all workers."""
@@ -102,13 +94,23 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         self.cluster_provider.publish_configs(mimir_config)
 
     def _on_mimir_cluster_changed(self, _):
-        # TODO check if other things are needed here
-        if not self.coordinator.is_coherent():
-            self.unit.status = BlockedStatus("You are lacking some necessary Mimir roles")
+        if self.coordinator.is_coherent():
+            logger.info("mimir deployment coherent: publishing configs")
+            self.publish_config()
         else:
-            if not self.coordinator.is_recommended():
-                logger.warning("You are below the recommended deployment requirement.")
-            self.unit.status = ActiveStatus()
+            logger.warning("this mimir deployment is incoherent")
+
+    def _on_collect_status(self, event: CollectStatusEvent):
+        """Handle start event."""
+        if not self.coordinator.is_coherent():
+            event.add_status(BlockedStatus("Incoherent deployment: you are "
+                                           "lacking some required Mimir roles"))
+
+        if self.coordinator.is_recommended():
+            logger.warning("This deployment is below the recommended deployment requirement.")
+            event.add_status(ActiveStatus("degraded"))
+        else:
+            event.add_status(ActiveStatus())
 
     def _remote_write_endpoints_changed(self, _):
         # TODO Update grafana-agent config file with the new external prometheus's endpoint
