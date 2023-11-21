@@ -381,7 +381,7 @@ class MimirClusterRequirer(Object):
 
         relation = self.relation
         if relation:
-            deduplicated_roles = list(set(roles))
+            deduplicated_roles = list(expand_roles(roles))
             databag_model = MimirClusterRequirerAppData(roles=deduplicated_roles)
             databag_model.dump(relation.data[self.model.app])
 
