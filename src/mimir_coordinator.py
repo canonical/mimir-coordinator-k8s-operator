@@ -51,13 +51,13 @@ class MimirCoordinator:
     """Mimir coordinator."""
 
     def __init__(
-            self,
-            cluster_provider: MimirClusterProvider,
-            # TODO: use and import tls requirer obj
-            tls_requirer: Any = None,
-            # TODO: use and import s3 requirer obj
-            s3_requirer: Any = None,
-            root_data_dir: Path = Path("/etc/mimir"),
+        self,
+        cluster_provider: MimirClusterProvider,
+        # TODO: use and import tls requirer obj
+        tls_requirer: Any = None,
+        # TODO: use and import s3 requirer obj
+        s3_requirer: Any = None,
+        root_data_dir: Path = Path("/etc/mimir"),
     ):
         self._cluster_provider = cluster_provider
         self._s3_requirer = s3_requirer  # type: ignore
@@ -115,7 +115,9 @@ class MimirCoordinator:
             }
 
         # memberlist config for gossip and hash ring
-        mimir_config['memberlist'] = {"join_members": list(self._cluster_provider.gather_addresses())}
+        mimir_config["memberlist"] = {
+            "join_members": list(self._cluster_provider.gather_addresses())
+        }
 
         # todo: TLS config for memberlist
         if self._tls_requirer:
