@@ -9,19 +9,19 @@ develop a new k8s charm using the Operator Framework:
 
 https://discourse.charmhub.io/t/4208
 """
-import json
 import logging
 from typing import List
 
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v0.loki_push_api import LokiPushApiConsumer
+from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirClusterProvider
 from charms.prometheus_k8s.v0.prometheus_remote_write import (
     PrometheusRemoteWriteConsumer,
 )
 from mimir_coordinator import MimirCoordinator
-from ops.charm import CharmBase
+from ops.charm import CharmBase, CollectStatusEvent
 from ops.main import main
-from ops.model import ActiveStatus, Relation
+from ops.model import ActiveStatus, BlockedStatus, Relation
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
@@ -33,18 +33,19 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
-
-        self.framework.observe(
-            self.on.ruler_relation_joined, self._on_ruler_joined  # pyright: ignore
-        )
+        self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
 
         # TODO: On any worker relation-joined/departed, need to updade grafana agent's scrape
         #  targets with the new memberlist.
         #  (Remote write would still be the same nginx-proxied endpoint.)
 
-        # food for thought: make MimirCoordinator ops-unaware and accept a
-        # List[MimirRole].
-        self.coordinator = MimirCoordinator(relations=self.mimir_worker_relations)
+        self.cluster_provider = MimirClusterProvider(self)
+        self.coordinator = MimirCoordinator(cluster_provider=self.cluster_provider)
+
+        self.framework.observe(
+            self.on.mimir_cluster_relation_changed,  # pyright: ignore
+            self._on_mimir_cluster_changed,
+        )
 
         self.remote_write_consumer = PrometheusRemoteWriteConsumer(self)
         self.framework.observe(
@@ -66,9 +67,6 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
             self._on_loki_relation_changed,
         )
 
-        # FIXME set status on correct occasion
-        self.unit.status = ActiveStatus()
-
     @property
     def _s3_storage(self) -> dict:
         # if not self.model.relations['s3']:
@@ -87,32 +85,38 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         return self.model.relations.get("mimir_worker", [])
 
     def _on_config_changed(self, event):
-        """Handle changed configuration.
+        """Handle changed configuration."""
+        self.publish_config()
 
-        Change this example to suit your needs. If you don't need to handle config, you can remove
-        this method.
+    def publish_config(self):
+        """Generate config file and publish to all workers."""
+        mimir_config = self.coordinator.build_config(dict(self.config))
+        self.cluster_provider.publish_configs(mimir_config)
 
-        Learn more about config at https://juju.is/docs/sdk/config
-        """
-        hash_ring = []
+    def _on_mimir_cluster_changed(self, _):
+        if self.coordinator.is_coherent():
+            logger.info("mimir deployment coherent: publishing configs")
+            self.publish_config()
+        else:
+            logger.warning("this mimir deployment is incoherent")
 
-        for relation in self.mimir_worker_relations:
-            for remote_unit in relation.units:
-                # todo: figure out under what circumstances this would not be routable
-                unit_ip = relation.data[remote_unit]["private-address"]
-                hash_ring.append(unit_ip)
+    def _on_collect_status(self, event: CollectStatusEvent):
+        """Handle start event."""
+        if not self.coordinator.is_coherent():
+            event.add_status(
+                BlockedStatus(
+                    "Incoherent deployment: you are " "lacking some required Mimir roles"
+                )
+            )
 
-        for relation in self.mimir_worker_relations:
-            relation.data[self.app]["config"] = json.dumps(dict(self.model.config))
-            relation.data[self.app]["hash_ring"] = json.dumps(hash_ring)
-            relation.data[self.app]["s3_storage"] = json.dumps(self._s3_storage)
+        if self.coordinator.is_recommended():
+            logger.warning("This deployment is below the recommended deployment requirement.")
+            event.add_status(ActiveStatus("degraded"))
+        else:
+            event.add_status(ActiveStatus())
 
     def _remote_write_endpoints_changed(self, _):
         # TODO Update grafana-agent config file with the new external prometheus's endpoint
-        pass
-
-    def _on_ruler_joined(self, _):
-        # TODO Update relation data with the rule files (metrics + logs)
         pass
 
     def _on_loki_relation_changed(self, _):

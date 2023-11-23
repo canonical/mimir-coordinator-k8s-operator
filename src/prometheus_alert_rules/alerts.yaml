@@ -552,7 +552,7 @@ groups:
   - alert: MimirAlertmanagerPersistStateFailing
     annotations:
       message: |
-        Mimir Alertmanager {{ $labels.job }}/{{ $labels.pod }} is unable to persist full state snaphots to remote storage.
+        Mimir Alertmanager {{ $labels.job }}/{{ $labels.pod }} is unable to persist full state snapshots to remote storage.
       runbook_url: https://grafana.com/docs/mimir/latest/operators-guide/mimir-runbooks/#mimiralertmanagerpersiststatefailing
     expr: |
       rate(cortex_alertmanager_state_persist_failed_total[15m]) > 0

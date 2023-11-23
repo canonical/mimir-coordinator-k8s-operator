@@ -5,13 +5,11 @@
 """Mimir coordinator."""
 
 import logging
-import typing
 from collections import Counter
-from typing import List, Optional
+from pathlib import Path
+from typing import Any, Dict, Iterable
 
-import pydantic
-from interfaces.mimir_worker.v0.schema import MimirRole, RequirerSchema
-from ops.model import ModelError, Relation, Unit
+from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirClusterProvider, MimirRole
 
 logger = logging.getLogger(__name__)
 
@@ -49,19 +47,26 @@ RECOMMENDED_DEPLOYMENT = Counter(
 deployment to be considered robust according to the official recommendations/guidelines."""
 
 
-def _endpoint_to_role(endpoint: str) -> MimirRole:
-    return MimirRole(endpoint.replace("-", "_"))
-
-
 class MimirCoordinator:
     """Mimir coordinator."""
 
-    def __init__(self, relations: List[Relation]):
-        self.relations = relations
+    def __init__(
+        self,
+        cluster_provider: MimirClusterProvider,
+        # TODO: use and import tls requirer obj
+        tls_requirer: Any = None,
+        # TODO: use and import s3 requirer obj
+        s3_requirer: Any = None,
+        root_data_dir: Path = Path("/etc/mimir"),
+    ):
+        self._cluster_provider = cluster_provider
+        self._s3_requirer = s3_requirer  # type: ignore
+        self._tls_requirer = tls_requirer  # type: ignore
+        self._root_data_dir = root_data_dir
 
-    def is_coherent(self):
+    def is_coherent(self) -> bool:
         """Return True if the roles list makes up a coherent mimir deployment."""
-        roles = self.roles()
+        roles: Iterable[MimirRole] = self._cluster_provider.gather_roles().keys()
         return set(roles).issuperset(MINIMAL_DEPLOYMENT)
 
     def is_recommended(self) -> bool:
@@ -69,41 +74,56 @@ class MimirCoordinator:
 
         I.E. If all required roles are assigned, and each role has the recommended amount of units.
         """
-        roles = self.roles()
+        roles: Dict[MimirRole, int] = self._cluster_provider.gather_roles()
         # python>=3.11 would support roles >= RECOMMENDED_DEPLOYMENT
         for role, min_n in RECOMMENDED_DEPLOYMENT.items():
             if roles.get(role, 0) < min_n:
                 return False
         return True
 
-    def roles(self) -> typing.Counter[MimirRole]:
-        """Gather the roles from the mimir_worker relations and count them."""
-        roles = Counter()
+    def build_config(self, _charm_config: Dict[str, Any]) -> Dict[str, Any]:
+        """Generate shared config file for mimir.
 
-        for relation in self.relations:
-            if not self._relation_data_valid(relation):
-                logger.error("Invalid relation data in %s", relation)
-                continue
+        Reference: https://grafana.com/docs/mimir/latest/configure/
+        """
+        mimir_config: Dict[str, Any] = {
+            "common": {},
+            "alertmanager": {
+                "data_dir": str(self._root_data_dir / "data-alertmanager"),
+            },
+            "compactor": {
+                "data_dir": str(self._root_data_dir / "data-compactor"),
+            },
+            "blocks_storage": {
+                "bucket_store": {
+                    "sync_dir": str(self._root_data_dir / "tsdb-sync"),
+                },
+            },
+        }
 
-            try:
-                role = _endpoint_to_role(relation.name)
-            except ValueError:
-                logger.info(f"Not a mimir-*role* relation: {relation.name}")
-                continue
+        if self._s3_requirer:
+            s3_config = self._s3_requirer.s3_config
+            mimir_config["common"]["storage"] = {
+                "backend": "s3",
+                "s3": {
+                    "region": s3_config.region,  # eg. 'us-west'
+                    "bucket_name": s3_config.bucket_name,  # eg: 'mimir'
+                },
+            }
+            mimir_config["blocks_storage"] = {
+                "s3": {"bucket_name": s3_config.blocks_bucket_name}  # e.g. 'mimir-blocks'
+            }
 
-            roles[role] += len(relation.units)
-        return roles
+        # memberlist config for gossip and hash ring
+        mimir_config["memberlist"] = {
+            "join_members": list(self._cluster_provider.gather_addresses())
+        }
 
-    def _relation_data_valid(self, relation: Relation, unit: Optional[Unit] = None) -> bool:
-        """Check that the relation data is valid."""
-        schema = RequirerSchema
-        units_to_check = [unit] if unit else relation.units
-        for unit in units_to_check:
-            try:
-                schema().validate(
-                    {"app": relation.data[relation.app], "unit": relation.data[unit]}  # type: ignore
-                )
-            except (pydantic.ValidationError, ModelError, KeyError):
-                logger.error(f"relation data invalid: {relation.data}", exc_info=True)
-                return False
-        return True
+        # todo: TLS config for memberlist
+        if self._tls_requirer:
+            mimir_config["tls_enabled"] = True
+            mimir_config["tls_cert_path"] = self._tls_requirer.cacert
+            mimir_config["tls_key_path"] = self._tls_requirer.key
+            mimir_config["tls_ca_path"] = self._tls_requirer.capath
+
+        return mimir_config
