@@ -6,7 +6,7 @@
 import unittest
 
 from charm import MimirCoordinatorK8SOperatorCharm
-from ops.model import ActiveStatus
+from ops.model import ActiveStatus, BlockedStatus
 from ops.testing import Harness
 
 
@@ -17,4 +17,5 @@ class TestCharm(unittest.TestCase):
         self.harness.begin_with_initial_hooks()
 
     def test_simple(self):
-        self.assertIsInstance(self.harness.charm.unit.status, ActiveStatus)
+        self.harness.evaluate_status()
+        self.assertIsInstance(self.harness.charm.unit.status, BlockedStatus)
