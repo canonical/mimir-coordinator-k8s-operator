@@ -19,6 +19,7 @@ from charms.prometheus_k8s.v0.prometheus_remote_write import (
     PrometheusRemoteWriteConsumer,
 )
 from mimir_coordinator import MimirCoordinator
+from nginx import Nginx
 from ops.charm import CharmBase, CollectStatusEvent
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, Relation
@@ -32,6 +33,10 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
 
     def __init__(self, *args):
         super().__init__(*args)
+
+        self._nginx_container = self.unit.get_container("nginx")
+        self._nginx_config_path = "/etc/nginx/nginx.conf"
+
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
 
@@ -41,6 +46,12 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
 
         self.cluster_provider = MimirClusterProvider(self)
         self.coordinator = MimirCoordinator(cluster_provider=self.cluster_provider)
+
+        self.nginx = Nginx()
+        self.framework.observe(
+            self.on.nginx_pebble_ready,  # pyright: ignore
+            self._on_nginx_pebble_ready,
+        )
 
         self.framework.observe(
             self.on.mimir_cluster_relation_changed,  # pyright: ignore
@@ -122,6 +133,12 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
     def _on_loki_relation_changed(self, _):
         # TODO Update rules relation with the new list of Loki push-api endpoints
         pass
+
+    def _on_nginx_pebble_ready(self, _event) -> None:
+        self._nginx_container.push(self.nginx.config_path, self.nginx.config, make_dirs=True)
+
+        self._nginx_container.add_layer("nginx", self.nginx.layer, combine=True)
+        self._nginx_container.autostart()
 
 
 if __name__ == "__main__":  # pragma: nocover
