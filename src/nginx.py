@@ -258,7 +258,7 @@ class Nginx:
                                     },
                                 ],
                             },
-                            # Query frontent
+                            # Query frontend
                             {
                                 "directive": "location",
                                 "args": ["/prometheus"],
