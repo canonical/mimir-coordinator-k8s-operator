@@ -47,7 +47,7 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         self.cluster_provider = MimirClusterProvider(self)
         self.coordinator = MimirCoordinator(cluster_provider=self.cluster_provider)
 
-        self.nginx = Nginx()
+        self.nginx = Nginx(cluster_provider=self.cluster_provider)
         self.framework.observe(
             self.on.nginx_pebble_ready,  # pyright: ignore
             self._on_nginx_pebble_ready,

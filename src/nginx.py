@@ -3,8 +3,10 @@
 """Nginx workload."""
 
 import logging
+from typing import Dict, List, Set
 
 import crossplane
+from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirClusterProvider
 from ops.pebble import Layer
 
 logger = logging.getLogger(__name__)
@@ -15,22 +17,32 @@ class Nginx:
 
     config_path = "/etc/nginx/nginx.conf"
 
-    def __init__(self, *args):
+    def __init__(self, cluster_provider: MimirClusterProvider, *args):
         super().__init__(*args)
+        self.cluster_provider = cluster_provider
 
     @property
     def config(self) -> str:
         """Build and return the Nginx configuration."""
         log_level = "error"
         auth_enabled = False
-        addresses = {
-            "FIXME": "unit.app-endpoints.model.svc.cluster.local",
-            "distributor": "worker.worker-endpoints.cos.svc.cluster.local",
-            "alertmanager": "worker.worker-endpoints.cos.svc.cluster.local",
-            "ruler": "worker.worker-endpoints.cos.svc.cluster.local",
-            "query_frontend": "worker.worker-endpoints.cos.svc.cluster.local",
-            "compactor": "worker.worker-endpoints.cos.svc.cluster.local",
-        }  # FIXME example, get it from somewhere
+        addresses_by_role = self.cluster_provider.gather_addresses_by_role()
+
+        def upstreams(addresses_by_role: Dict[str, Set[str]]) -> List[Dict]:
+            nginx_upstreams = []
+            for role, address_set in addresses_by_role.items():
+                nginx_upstreams.append(
+                    {
+                        "directive": "upstream",
+                        "args": [role],
+                        "block": [
+                            {"directive": "server", "args": [f"{addr}:8080"]}
+                            for addr in address_set
+                        ],
+                    }
+                )
+
+            return nginx_upstreams
 
         def log_verbose(verbose):
             if verbose:
@@ -49,8 +61,8 @@ class Nginx:
 
         def resolver(custom_resolver):
             if custom_resolver:
-                return {"directive": "resolver", "args": [custom_resolver]}
-            return {}  # return the CoreDNS cluster local address
+                return [{"directive": "resolver", "args": [custom_resolver]}]
+            return [{"directive": "resolver", "args": ["kube-dns.kube-system.svc.cluster.local."]}]
 
         def basic_auth(enabled):
             if enabled:
@@ -78,6 +90,8 @@ class Nginx:
                 "directive": "http",
                 "args": [],
                 "block": [
+                    # upstreams (load balancing)
+                    *upstreams(addresses_by_role),
                     # temp paths
                     {"directive": "client_body_temp_path", "args": ["/tmp/client_temp"]},
                     {"directive": "proxy_temp_path", "args": ["/tmp/proxy_temp_path"]},
@@ -89,14 +103,15 @@ class Nginx:
                     {
                         "directive": "log_format",
                         "args": [
-                            'main \'$remote_addr - $remote_user [$time_local]  $status "$request" $body_bytes_sent "$http_referer" "$http_user_agent" "$http_x_forwarded_for";'
+                            "main",
+                            '$remote_addr - $remote_user [$time_local]  $status "$request" $body_bytes_sent "$http_referer" "$http_user_agent" "$http_x_forwarded_for"',
                         ],
                     },
                     *log_verbose(verbose=False),
                     # mimir-related
                     {"directive": "sendfile", "args": ["on"]},
                     {"directive": "tcp_nopush", "args": ["on"]},
-                    resolver(custom_resolver=None),  # empty for now, check if it's necessary
+                    *resolver(custom_resolver=None),
                     # TODO: add custom http block for the user to config?
                     {
                         "directive": "map",
@@ -133,12 +148,8 @@ class Nginx:
                                 "args": ["/distributor"],
                                 "block": [
                                     {
-                                        "directive": "set",
-                                        "args": ["$distributor", addresses["distributor"]],
-                                    },
-                                    {
                                         "directive": "proxy_pass",
-                                        "args": ["http://$distributor:8080$request_uri"],
+                                        "args": ["http://distributor"],
                                     },
                                 ],
                             },
@@ -147,12 +158,8 @@ class Nginx:
                                 "args": ["/api/v1/push"],
                                 "block": [
                                     {
-                                        "directive": "set",
-                                        "args": ["$distributor", addresses["distributor"]],
-                                    },
-                                    {
                                         "directive": "proxy_pass",
-                                        "args": ["http://$distributor:8080$request_uri"],
+                                        "args": ["http://distributor"],
                                     },
                                 ],
                             },
@@ -161,12 +168,8 @@ class Nginx:
                                 "args": ["/otlp/v1/metrics"],
                                 "block": [
                                     {
-                                        "directive": "set",
-                                        "args": ["$distributor", addresses["distributor"]],
-                                    },
-                                    {
                                         "directive": "proxy_pass",
-                                        "args": ["http://$distributor:8080$request_uri"],
+                                        "args": ["http://distributor"],
                                     },
                                 ],
                             },
@@ -176,12 +179,8 @@ class Nginx:
                                 "args": ["/alertmanager"],
                                 "block": [
                                     {
-                                        "directive": "set",
-                                        "args": ["$alertmanager", addresses["alertmanager"]],
-                                    },
-                                    {
                                         "directive": "proxy_pass",
-                                        "args": ["http://$alertmanager:8080$request_uri"],
+                                        "args": ["http://alertmanager"],
                                     },
                                 ],
                             },
@@ -190,12 +189,8 @@ class Nginx:
                                 "args": ["/multitenant_alertmanager/status"],
                                 "block": [
                                     {
-                                        "directive": "set",
-                                        "args": ["$alertmanager", addresses["alertmanager"]],
-                                    },
-                                    {
                                         "directive": "proxy_pass",
-                                        "args": ["http://$alertmanager:8080$request_uri"],
+                                        "args": ["http://alertmanager"],
                                     },
                                 ],
                             },
@@ -204,12 +199,8 @@ class Nginx:
                                 "args": ["/api/v1/alerts"],
                                 "block": [
                                     {
-                                        "directive": "set",
-                                        "args": ["$alertmanager", addresses["alertmanager"]],
-                                    },
-                                    {
                                         "directive": "proxy_pass",
-                                        "args": ["http://$alertmanager:8080$request_uri"],
+                                        "args": ["http://alertmanager"],
                                     },
                                 ],
                             },
@@ -218,10 +209,9 @@ class Nginx:
                                 "directive": "location",
                                 "args": ["/prometheus/config/v1/rules"],
                                 "block": [
-                                    {"directive": "set", "args": ["$ruler", addresses["rules"]]},
                                     {
                                         "directive": "proxy_pass",
-                                        "args": ["http://$ruler:8080$request_uri"],
+                                        "args": ["http://ruler"],
                                     },
                                 ],
                             },
@@ -229,10 +219,9 @@ class Nginx:
                                 "directive": "location",
                                 "args": ["/prometheus/api/v1/rules"],
                                 "block": [
-                                    {"directive": "set", "args": ["$ruler", addresses["ruler"]]},
                                     {
                                         "directive": "proxy_pass",
-                                        "args": ["http://$ruler:8080$request_uri"],
+                                        "args": ["http://ruler"],
                                     },
                                 ],
                             },
@@ -240,10 +229,9 @@ class Nginx:
                                 "directive": "location",
                                 "args": ["/prometheus/api/v1/alerts"],
                                 "block": [
-                                    {"directive": "set", "args": ["$ruler", addresses["ruler"]]},
                                     {
                                         "directive": "proxy_pass",
-                                        "args": ["http://$ruler:8080$request_uri"],
+                                        "args": ["http://ruler"],
                                     },
                                 ],
                             },
@@ -251,10 +239,9 @@ class Nginx:
                                 "directive": "location",
                                 "args": ["=", "/ruler/ring"],
                                 "block": [
-                                    {"directive": "set", "args": ["$ruler", addresses["ruler"]]},
                                     {
                                         "directive": "proxy_pass",
-                                        "args": ["http://$ruler:8080$request_uri"],
+                                        "args": ["http://ruler"],
                                     },
                                 ],
                             },
@@ -264,12 +251,8 @@ class Nginx:
                                 "args": ["/prometheus"],
                                 "block": [
                                     {
-                                        "directive": "set",
-                                        "args": ["$query_frontend", addresses["query_frontend"]],
-                                    },
-                                    {
                                         "directive": "proxy_pass",
-                                        "args": ["http://$query_frontend:8080$request_uri"],
+                                        "args": ["http://query-frontend"],
                                     },
                                 ],
                             },
@@ -279,12 +262,8 @@ class Nginx:
                                 "args": ["=", "/api/v1/status/buildinfo"],
                                 "block": [
                                     {
-                                        "directive": "set",
-                                        "args": ["$query_frontend", addresses["query_frontend"]],
-                                    },
-                                    {
                                         "directive": "proxy_pass",
-                                        "args": ["http://$query_frontend:8080$request_uri"],
+                                        "args": ["http://query-frontend"],
                                     },
                                 ],
                             },
@@ -294,12 +273,8 @@ class Nginx:
                                 "args": ["=", "/api/v1/upload/block/"],
                                 "block": [
                                     {
-                                        "directive": "set",
-                                        "args": ["$compactor", addresses["compactor"]],
-                                    },
-                                    {
                                         "directive": "proxy_pass",
-                                        "args": ["http://$compactor:8080$request_uri"],
+                                        "args": ["http://compactor"],
                                     },
                                 ],
                             },
