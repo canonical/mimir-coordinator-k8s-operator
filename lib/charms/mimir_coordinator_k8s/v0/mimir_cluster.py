@@ -8,6 +8,7 @@ TODO: see https://github.com/canonical/charm-relation-interfaces/issues/121
 """
 import json
 import logging
+from collections import defaultdict
 from enum import Enum
 from typing import Any, Dict, MutableMapping, Set, List, Iterable
 from typing import Optional
@@ -23,7 +24,7 @@ LIBID = "9818a8d44028454a94c6c3a01f4316d2"
 DEFAULT_ENDPOINT_NAME = "mimir-cluster"
 
 LIBAPI = 0
-LIBPATCH = 1
+LIBPATCH = 2
 
 BUILTIN_JUJU_KEYS = {"ingress-address", "private-address", "egress-subnets"}
 
@@ -242,19 +243,32 @@ class MimirClusterProvider(Object):
                     data[role] += role_n
         return data
 
-    def gather_addresses(self) -> Set[str]:
-        """Go through the worker's unit databags to collect all the addresses published by the units."""
-        data = set()
+    def gather_addresses_by_role(self) -> Dict[str, Set[str]]:
+        """Go through the worker's unit databags to collect all the addresses published by the units, by role."""
+        data = defaultdict(set)
         for relation in self._relations:
+            worker_app_data = MimirClusterRequirerAppData.load(relation.data[relation.app])
+            worker_roles = set(worker_app_data.roles)
             for worker_unit in relation.units:
                 try:
                     worker_data = MimirClusterRequirerUnitData.load(relation.data[worker_unit])
                     unit_address = worker_data.address
-                    data.add(unit_address)
+                    for role in worker_roles:
+                        data[role].add(unit_address)
                 except DataValidationError as e:
                     log.error(f"invalid databag contents: {e}")
                     continue
 
+        return data
+
+
+    def gather_addresses(self) -> Set[str]:
+        """Go through the worker's unit databags to collect all the addresses published by the units."""
+        data = set()
+        addresses_by_role = self.gather_addresses_by_role()
+        for role, address_set in addresses_by_role.items():
+            data.update(address_set)
+        
         return data
 
 
