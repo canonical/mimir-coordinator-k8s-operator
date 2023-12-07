@@ -35,7 +35,6 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         super().__init__(*args)
 
         self._nginx_container = self.unit.get_container("nginx")
-        self._nginx_config_path = "/etc/nginx/nginx.conf"
 
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
