@@ -46,6 +46,9 @@ RECOMMENDED_DEPLOYMENT = Counter(
 """The set of roles that need to be allocated for the
 deployment to be considered robust according to the official recommendations/guidelines."""
 
+TLS_MIN_VERSION = "VersionTLS12"
+TLS_CIPHER_SUITES = "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256"
+
 
 class MimirCoordinator:
     """Mimir coordinator."""
@@ -81,7 +84,7 @@ class MimirCoordinator:
                 return False
         return True
 
-    def build_config(self, _charm_config: Dict[str, Any]) -> Dict[str, Any]:
+    def build_config(self, _charm_config: Dict[str, Any], tls: bool = False) -> Dict[str, Any]:
         """Generate shared config file for mimir.
 
         Reference: https://grafana.com/docs/mimir/latest/configure/
@@ -120,10 +123,22 @@ class MimirCoordinator:
         }
 
         # todo: TLS config for memberlist
-        if self._tls_requirer:
-            mimir_config["tls_enabled"] = True
-            mimir_config["tls_cert_path"] = self._tls_requirer.cacert
-            mimir_config["tls_key_path"] = self._tls_requirer.key
-            mimir_config["tls_ca_path"] = self._tls_requirer.capath
+        if tls:
+            mimir_config["server"] = {
+                "tls_min_version": TLS_MIN_VERSION,
+                "tls_cipher_suites": TLS_CIPHER_SUITES,
+                "http_tls_config": {
+                    "cert": self._tls_requirer.cert,
+                    "key": self._tls_requirer.key,
+                    "client_ca": self._tls_requirer.ca,
+                    "client_auth_type": "RequireAndVerifyClientCert",
+                },
+                "grpc_tls_config": {
+                    "cert": self._tls_requirer.cert,
+                    "key": self._tls_requirer.key,
+                    "client_ca": self._tls_requirer.ca,
+                    "client_auth_type": "RequireAndVerifyClientCert",
+                },
+            }
 
         return mimir_config

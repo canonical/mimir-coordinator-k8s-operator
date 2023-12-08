@@ -56,6 +56,12 @@ requires:
     description: |
       Ingress-per-app, to load-balance across multiple units of the coordinator.
 
+  certificates:
+    interface: tls-certificates
+    limit: 1
+    description: |
+      Certificate and key files for securing Mimir communications with TLS.
+
 provides:
   mimir-cluster:
     interface: mimir_cluster
@@ -73,3 +79,7 @@ provides:
     interface: tracing
     description: |
       Send traces to tempo.
+
+peers:
+  replicas:
+    interface: coordinator_replica

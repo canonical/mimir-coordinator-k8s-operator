@@ -35,7 +35,6 @@ async def test_build_and_deploy(ops_test: OpsTest):
             trust: true
             resources:
               nginx-image: {METADATA["resources"]["nginx-image"]["upstream-source"]}
-              agent-image: {METADATA["resources"]["agent-image"]["upstream-source"]}
             scale: 1
           loki:
             charm: loki-k8s

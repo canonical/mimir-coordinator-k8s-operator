@@ -4,7 +4,7 @@
 """Helper module for interacting with the Mimir configuration."""
 
 from dataclasses import asdict
-from typing import List, Literal, Optional, Union
+from typing import Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel
 from pydantic.dataclasses import dataclass as pydantic_dataclass
@@ -83,6 +83,15 @@ class Alertmanager(BaseModel):
     external_url: Optional[str]
 
 
+class Server(BaseModel):
+    """Server schema."""
+
+    http_tls_config: Dict
+    grpc_tls_config: Dict
+    tls_min_version: str
+    tls_cipher_suites: str
+
+
 class _S3StorageBackend(BaseModel):
     endpoint: str
     access_key_id: str
@@ -131,3 +140,4 @@ class MimirBaseConfig(BaseModel):
     ingester: Optional[Ingester]
     ruler: Optional[Ruler]
     alertmanager: Optional[Alertmanager]
+    server: Optional[Server]

@@ -10,11 +10,13 @@ develop a new k8s charm using the Operator Framework:
 https://discourse.charmhub.io/t/4208
 """
 import logging
+import socket
 from typing import List
 
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v0.loki_push_api import LokiPushApiConsumer
 from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirClusterProvider
+from charms.observability_libs.v0.cert_handler import CertHandler
 from charms.prometheus_k8s.v0.prometheus_remote_write import (
     PrometheusRemoteWriteConsumer,
 )
@@ -43,8 +45,17 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         #  targets with the new memberlist.
         #  (Remote write would still be the same nginx-proxied endpoint.)
 
+        self.server_cert = CertHandler(
+            self,
+            key="mimir-server-cert",
+            peer_relation_name="replicas",
+            extra_sans_dns=[self.hostname],
+        )
         self.cluster_provider = MimirClusterProvider(self)
-        self.coordinator = MimirCoordinator(cluster_provider=self.cluster_provider)
+        self.coordinator = MimirCoordinator(
+            cluster_provider=self.cluster_provider,
+            tls_requirer=self.server_cert,
+        )
 
         self.nginx = Nginx(cluster_provider=self.cluster_provider)
         self.framework.observe(
@@ -66,7 +77,6 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         self.grafana_dashboard_provider = GrafanaDashboardProvider(
             self, relation_name="grafana-dashboards-provider"
         )
-
         self.loki_consumer = LokiPushApiConsumer(self, relation_name="logging-consumer")
         self.framework.observe(
             self.loki_consumer.on.loki_push_api_endpoint_joined,  # pyright: ignore
@@ -75,6 +85,24 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         self.framework.observe(
             self.loki_consumer.on.loki_push_api_endpoint_departed,  # pyright: ignore
             self._on_loki_relation_changed,
+        )
+        self.framework.observe(
+            self.server_cert.on.cert_changed,  # pyright: ignore
+            self._on_server_cert_changed,
+        )
+
+    @property
+    def hostname(self) -> str:
+        """Unit's hostname."""
+        return socket.getfqdn()
+
+    @property
+    def _is_cert_available(self) -> bool:
+        return (
+            self.server_cert.enabled
+            and (self.server_cert.cert is not None)
+            and (self.server_cert.key is not None)
+            and (self.server_cert.ca is not None)
         )
 
     @property
@@ -98,9 +126,14 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         """Handle changed configuration."""
         self.publish_config()
 
-    def publish_config(self):
+    def _on_server_cert_changed(self, _):
+        self.framework.breakpoint()
+        self.publish_config(tls=self._is_cert_available)
+
+    def publish_config(self, tls: bool = False):
         """Generate config file and publish to all workers."""
-        mimir_config = self.coordinator.build_config(dict(self.config))
+        mimir_config = self.coordinator.build_config(dict(self.config), tls=tls)
+        logger.warning(mimir_config)
         self.cluster_provider.publish_configs(mimir_config)
 
     def _on_mimir_cluster_changed(self, _):
