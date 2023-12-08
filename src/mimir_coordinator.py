@@ -132,7 +132,7 @@ class MimirCoordinator:
                     "cert": self._tls_requirer.cert,
                     "key": self._tls_requirer.key,
                     "client_ca": self._tls_requirer.ca,
-                    "client_auth_type": "RequireAndVerifyClientCert",
+                    "client_auth_type": "NoClientCert",
                 },
             }
 
