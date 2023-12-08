@@ -46,9 +46,6 @@ RECOMMENDED_DEPLOYMENT = Counter(
 """The set of roles that need to be allocated for the
 deployment to be considered robust according to the official recommendations/guidelines."""
 
-TLS_MIN_VERSION = "VersionTLS12"
-TLS_CIPHER_SUITES = "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256"
-
 
 class MimirCoordinator:
     """Mimir coordinator."""
@@ -125,8 +122,6 @@ class MimirCoordinator:
         # todo: TLS config for memberlist
         if tls:
             mimir_config["server"] = {
-                "tls_min_version": TLS_MIN_VERSION,
-                "tls_cipher_suites": TLS_CIPHER_SUITES,
                 "http_tls_config": {
                     "cert": self._tls_requirer.cert,
                     "key": self._tls_requirer.key,

@@ -88,8 +88,6 @@ class Server(BaseModel):
 
     http_tls_config: Dict
     grpc_tls_config: Dict
-    tls_min_version: str
-    tls_cipher_suites: str
 
 
 class _S3StorageBackend(BaseModel):
