@@ -3,13 +3,20 @@
 """Nginx workload."""
 
 import logging
-from typing import Dict, List, Set
+from typing import Dict, List, Optional, Set
 
 import crossplane
 from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirClusterProvider
 from ops.pebble import Layer
 
 logger = logging.getLogger(__name__)
+
+
+NGINX_DIR = "/etc/nginx"
+NGINX_CONFIG = f"{NGINX_DIR}/nginx.conf"
+KEY_PATH = f"{NGINX_DIR}/certs/server.key"
+CERT_PATH = f"{NGINX_DIR}/certs/server.cert"
+CA_CERT_PATH = f"{NGINX_DIR}/certs/ca.cert"
 
 LOCATIONS_DISTRIBUTOR: List[Dict] = [
     {
@@ -158,80 +165,16 @@ LOCATIONS_COMPACTOR: List[Dict] = [
 class Nginx:
     """Helper class to manage the nginx workload."""
 
-    config_path = "/etc/nginx/nginx.conf"
+    config_path = NGINX_CONFIG
 
     def __init__(self, cluster_provider: MimirClusterProvider, *args):
         super().__init__(*args)
         self.cluster_provider = cluster_provider
 
-    @property
-    def config(self) -> str:
+    def config(self, tls: bool = False) -> str:
         """Build and return the Nginx configuration."""
         log_level = "error"
-        auth_enabled = False
         addresses_by_role = self.cluster_provider.gather_addresses_by_role()
-
-        def upstreams(addresses_by_role: Dict[str, Set[str]]) -> List[Dict]:
-            nginx_upstreams = []
-            for role, address_set in addresses_by_role.items():
-                nginx_upstreams.append(
-                    {
-                        "directive": "upstream",
-                        "args": [role],
-                        "block": [
-                            {"directive": "server", "args": [f"{addr}:8080"]}
-                            for addr in address_set
-                        ],
-                    }
-                )
-
-            return nginx_upstreams
-
-        def locations(addresses_by_role: Dict[str, Set[str]]) -> List[Dict]:
-            nginx_locations = []
-            roles = addresses_by_role.keys()
-            if "distributor" in roles:
-                nginx_locations.extend(LOCATIONS_DISTRIBUTOR)
-            if "alertmanager" in roles:
-                nginx_locations.extend(LOCATIONS_ALERTMANAGER)
-            if "ruler" in roles:
-                nginx_locations.extend(LOCATIONS_RULER)
-            if "query-frontend" in roles:
-                nginx_locations.extend(LOCATIONS_QUERY_FRONTEND)
-            if "compactor" in roles:
-                nginx_locations.extend(LOCATIONS_COMPACTOR)
-            return nginx_locations
-
-        def log_verbose(verbose):
-            if verbose:
-                return [{"directive": "access_log", "args": ["/dev/stderr", "main"]}]
-            return [
-                {
-                    "directive": "map",
-                    "args": ["$status", "$loggable"],
-                    "block": [
-                        {"directive": "~^[23]", "args": ["0"]},
-                        {"directive": "default", "args": ["1"]},
-                    ],
-                },
-                {"directive": "access_log", "args": ["/dev/stderr"]},
-            ]
-
-        def resolver(custom_resolver):
-            if custom_resolver:
-                return [{"directive": "resolver", "args": [custom_resolver]}]
-            return [{"directive": "resolver", "args": ["kube-dns.kube-system.svc.cluster.local."]}]
-
-        def basic_auth(enabled):
-            if enabled:
-                return [
-                    {"directive": "auth_basic", "args": ['"Mimir"']},
-                    {
-                        "directive": "auth_basic_user_file",
-                        "args": ["/etc/nginx/secrets/.htpasswd"],
-                    },
-                ]
-            return []
 
         # build the complete configuration
         full_config = [
@@ -249,7 +192,7 @@ class Nginx:
                 "args": [],
                 "block": [
                     # upstreams (load balancing)
-                    *upstreams(addresses_by_role),
+                    *self._upstreams(addresses_by_role),
                     # temp paths
                     {"directive": "client_body_temp_path", "args": ["/tmp/client_temp"]},
                     {"directive": "proxy_temp_path", "args": ["/tmp/proxy_temp_path"]},
@@ -265,11 +208,11 @@ class Nginx:
                             '$remote_addr - $remote_user [$time_local]  $status "$request" $body_bytes_sent "$http_referer" "$http_user_agent" "$http_x_forwarded_for"',
                         ],
                     },
-                    *log_verbose(verbose=False),
+                    *self._log_verbose(verbose=False),
                     # mimir-related
                     {"directive": "sendfile", "args": ["on"]},
                     {"directive": "tcp_nopush", "args": ["on"]},
-                    *resolver(custom_resolver=None),
+                    *self._resolver(custom_resolver=None),
                     # TODO: add custom http block for the user to config?
                     {
                         "directive": "map",
@@ -281,28 +224,7 @@ class Nginx:
                     },
                     {"directive": "proxy_read_timeout", "args": ["300"]},
                     # server block
-                    {
-                        "directive": "server",
-                        "args": [],
-                        "block": [
-                            {"directive": "listen", "args": ["8080"]},
-                            {"directive": "listen", "args": ["[::]:8080"]},
-                            *basic_auth(auth_enabled),
-                            {
-                                "directive": "location",
-                                "args": ["=", "/"],
-                                "block": [
-                                    {"directive": "return", "args": ["200", "'OK'"]},
-                                    {"directive": "auth_basic", "args": ["off"]},
-                                ],
-                            },
-                            {
-                                "directive": "proxy_set_header",
-                                "args": ["X-Scope-OrgID", "$ensured_x_scope_orgid"],
-                            },
-                            *locations(addresses_by_role),
-                        ],
-                    },
+                    self._server(addresses_by_role, tls),
                 ],
             },
         ]
@@ -326,3 +248,120 @@ class Nginx:
                 },
             }
         )
+
+    def _log_verbose(self, verbose: bool = True) -> List[Dict]:
+        if verbose:
+            return [{"directive": "access_log", "args": ["/dev/stderr", "main"]}]
+        return [
+            {
+                "directive": "map",
+                "args": ["$status", "$loggable"],
+                "block": [
+                    {"directive": "~^[23]", "args": ["0"]},
+                    {"directive": "default", "args": ["1"]},
+                ],
+            },
+            {"directive": "access_log", "args": ["/dev/stderr"]},
+        ]
+
+    def _upstreams(self, addresses_by_role: Dict[str, Set[str]]) -> List[Dict]:
+        nginx_upstreams = []
+        for role, address_set in addresses_by_role.items():
+            nginx_upstreams.append(
+                {
+                    "directive": "upstream",
+                    "args": [role],
+                    "block": [
+                        {"directive": "server", "args": [f"{addr}:8080"]} for addr in address_set
+                    ],
+                }
+            )
+
+        return nginx_upstreams
+
+    def _locations(self, addresses_by_role: Dict[str, Set[str]]) -> List[Dict]:
+        nginx_locations = []
+        roles = addresses_by_role.keys()
+        if "distributor" in roles:
+            nginx_locations.extend(LOCATIONS_DISTRIBUTOR)
+        if "alertmanager" in roles:
+            nginx_locations.extend(LOCATIONS_ALERTMANAGER)
+        if "ruler" in roles:
+            nginx_locations.extend(LOCATIONS_RULER)
+        if "query-frontend" in roles:
+            nginx_locations.extend(LOCATIONS_QUERY_FRONTEND)
+        if "compactor" in roles:
+            nginx_locations.extend(LOCATIONS_COMPACTOR)
+        return nginx_locations
+
+    def _resolver(self, custom_resolver) -> List[Dict]:
+        if custom_resolver:
+            return [{"directive": "resolver", "args": [custom_resolver]}]
+        return [{"directive": "resolver", "args": ["kube-dns.kube-system.svc.cluster.local."]}]
+
+    def _basic_auth(self, enabled) -> List[Optional[Dict]]:
+        if enabled:
+            return [
+                {"directive": "auth_basic", "args": ['"Mimir"']},
+                {
+                    "directive": "auth_basic_user_file",
+                    "args": ["/etc/nginx/secrets/.htpasswd"],
+                },
+            ]
+        return []
+
+    def _server(self, addresses_by_role: Dict[str, Set[str]], tls: bool = False) -> Dict:
+        auth_enabled = False
+
+        if tls:
+            return {
+                "directive": "server",
+                "args": [],
+                "block": [
+                    {"directive": "listen", "args": ["443", "ssl"]},
+                    {"directive": "listen", "args": ["[::]:443", "ssl"]},
+                    *self._basic_auth(auth_enabled),
+                    {
+                        "directive": "location",
+                        "args": ["=", "/"],
+                        "block": [
+                            {"directive": "return", "args": ["200", "'OK'"]},
+                            {"directive": "auth_basic", "args": ["off"]},
+                        ],
+                    },
+                    {
+                        "directive": "proxy_set_header",
+                        "args": ["X-Scope-OrgID", "$ensured_x_scope_orgid"],
+                    },
+                    # FIXME: use a suitable SERVER_NAME
+                    {"directive": "server_name", "args": ["SERVER_NAME"]},
+                    {"directive": "ssl_certificate", "args": [CERT_PATH]},
+                    {"directive": "ssl_certificate_key", "args": [KEY_PATH]},
+                    {"directive": "ssl_protocols", "args": ["TLSv1", "TLSv1.1", "TLSv1.2"]},
+                    {"directive": "ssl_ciphers", "args": ["HIGH:!aNULL:!MD5"]},  # pyright: ignore
+                    *self._locations(addresses_by_role),
+                ],
+            }
+
+        return {
+            "directive": "server",
+            "args": [],
+            "block": [
+                {"directive": "listen", "args": ["8080"]},
+                {"directive": "listen", "args": ["[::]:8080"]},
+                *self._basic_auth(auth_enabled),
+                {
+                    "directive": "location",
+                    "args": ["=", "/"],
+                    "block": [
+                        {"directive": "return", "args": ["200", "'OK'"]},
+                        {"directive": "auth_basic", "args": ["off"]},
+                    ],
+                },
+                {
+                    "directive": "proxy_set_header",
+                    "args": ["X-Scope-OrgID", "$ensured_x_scope_orgid"],
+                },
+                *self._locations(addresses_by_role),
+            ],
+        }

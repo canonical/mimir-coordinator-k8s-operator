@@ -11,6 +11,8 @@ https://discourse.charmhub.io/t/4208
 """
 import logging
 import socket
+import subprocess
+from pathlib import Path
 from typing import List
 
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
@@ -21,7 +23,7 @@ from charms.prometheus_k8s.v0.prometheus_remote_write import (
     PrometheusRemoteWriteConsumer,
 )
 from mimir_coordinator import MimirCoordinator
-from nginx import Nginx
+from nginx import CA_CERT_PATH, CERT_PATH, KEY_PATH, Nginx
 from ops.charm import CharmBase, CollectStatusEvent
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, Relation
@@ -127,7 +129,8 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         self.publish_config()
 
     def _on_server_cert_changed(self, _):
-        self.framework.breakpoint()
+        self._update_cert()
+        self._on_nginx_pebble_ready(_)
         self.publish_config(tls=self._is_cert_available)
 
     def publish_config(self, tls: bool = False):
@@ -166,11 +169,61 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         # TODO Update rules relation with the new list of Loki push-api endpoints
         pass
 
-    def _on_nginx_pebble_ready(self, _event) -> None:
-        self._nginx_container.push(self.nginx.config_path, self.nginx.config, make_dirs=True)
-
+    def _on_nginx_pebble_ready(self, _) -> None:
+        self._nginx_container.push(
+            self.nginx.config_path, self.nginx.config(tls=self._is_cert_available), make_dirs=True
+        )
         self._nginx_container.add_layer("nginx", self.nginx.layer, combine=True)
         self._nginx_container.autostart()
+
+    def _update_cert(self):
+        if not self._nginx_container.can_connect():
+            return
+
+        ca_cert_path = Path("/usr/local/share/ca-certificates/ca.crt")
+
+        if self._is_cert_available:
+            # Save the workload certificates
+            self._nginx_container.push(
+                CERT_PATH,
+                self.server_cert.cert,  # pyright: ignore
+                make_dirs=True,
+            )
+            self._nginx_container.push(
+                KEY_PATH,
+                self.server_cert.key,  # pyright: ignore
+                make_dirs=True,
+            )
+            # Save the CA among the trusted CAs and trust it
+            self._nginx_container.push(
+                ca_cert_path,
+                self.server_cert.ca,  # pyright: ignore
+                make_dirs=True,
+            )
+            # FIXME with the update-ca-certificates machinery prometheus shouldn't need
+            #  CA_CERT_PATH.
+            self._nginx_container.push(
+                CA_CERT_PATH,
+                self.server_cert.ca,  # pyright: ignore
+                make_dirs=True,
+            )
+
+            # Repeat for the charm container. We need it there for prometheus client requests.
+            ca_cert_path.parent.mkdir(exist_ok=True, parents=True)
+            ca_cert_path.write_text(self.server_cert.ca)  # pyright: ignore
+        else:
+            self._nginx_container.remove_path(CERT_PATH, recursive=True)
+            self._nginx_container.remove_path(KEY_PATH, recursive=True)
+            self._nginx_container.remove_path(ca_cert_path, recursive=True)
+            self._nginx_container.remove_path(
+                CA_CERT_PATH, recursive=True
+            )  # TODO: remove (see FIXME ^)
+            # Repeat for the charm container.
+            ca_cert_path.unlink(missing_ok=True)
+
+        # TODO: We need to install update-ca-certificates in Nginx Rock
+        # self._nginx_container.exec(["update-ca-certificates", "--fresh"]).wait()
+        subprocess.run(["update-ca-certificates", "--fresh"])
 
 
 if __name__ == "__main__":  # pragma: nocover
