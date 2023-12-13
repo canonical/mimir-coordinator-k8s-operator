@@ -10,7 +10,9 @@ develop a new k8s charm using the Operator Framework:
 https://discourse.charmhub.io/t/4208
 """
 import logging
-from typing import List
+from typing import Any, Dict, List, Optional
+from minio import Minio
+from minio.error import S3Error
 
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v0.loki_push_api import LokiPushApiConsumer
@@ -21,7 +23,7 @@ from charms.prometheus_k8s.v0.prometheus_remote_write import (
 from mimir_coordinator import MimirCoordinator
 from ops.charm import CharmBase, CollectStatusEvent
 from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, Relation
+from ops.model import ActiveStatus, BlockedStatus, Relation, MaintenanceStatus
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
@@ -41,10 +43,25 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
 
         self.cluster_provider = MimirClusterProvider(self)
         self.coordinator = MimirCoordinator(cluster_provider=self.cluster_provider)
-
+        self._s3_storage_data = None
         self.framework.observe(
             self.on.mimir_cluster_relation_changed,  # pyright: ignore
             self._on_mimir_cluster_changed,
+        )
+
+        self.framework.observe(
+            self.on.s3_relation_created,  # pyright: ignore
+            self._on_s3_created,
+        )
+
+        self.framework.observe(
+            self.on.s3_relation_changed,  # pyright: ignore
+            self._on_mimir_cluster_changed,
+        )
+
+        self.framework.observe(
+            self.on.s3_relation_broken,  # pyright: ignore
+            self._on_s3_broken,
         )
 
         self.remote_write_consumer = PrometheusRemoteWriteConsumer(self)
@@ -69,15 +86,7 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
 
     @property
     def _s3_storage(self) -> dict:
-        # if not self.model.relations['s3']:
-        #     return {}
-        return {
-            "url": "foo",
-            "endpoint": "bar",
-            "access_key": "bar",
-            "insecure": False,
-            "secret_key": "x12",
-        }
+        return self._s3_storage_data or {}
 
     @property
     def mimir_worker_relations(self) -> List[Relation]:
@@ -90,15 +99,85 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
 
     def publish_config(self):
         """Generate config file and publish to all workers."""
-        mimir_config = self.coordinator.build_config(dict(self.config))
+        mimir_config = self.coordinator.build_config(self._s3_storage)
         self.cluster_provider.publish_configs(mimir_config)
 
+    def create_minio_buckets(self, conn: dict, bucket_names: list):
+        """Create Minio buckets"""
+        try:
+            client = Minio(
+                endpoint=f'{conn["service"]}.{conn["namespace"]}.svc.cluster.local:{conn["port"]}',
+                access_key=conn["access_key"],
+                secret_key=conn["secret_key"],
+                secure=conn["secure"],
+            )
+            for bucket in bucket_names:
+                found = client.bucket_exists(bucket)
+                if not found:
+                    client.make_bucket(bucket)
+                else:
+                    logger.info("Bucket already exists")
+        except S3Error:
+            logger.error("Error creating S3 buckets")
+
+    def parse_s3_data(self, s3_data):
+        data_passed_dict = dict(item.split(": ") for item in s3_data.split("\n") if item)
+        data_passed_dict["secure"] = data_passed_dict.get("secure", "").lower() == "true"
+
+        return {
+            "access_key": data_passed_dict.get("access-key", ""),
+            "namespace": data_passed_dict.get("namespace", ""),
+            "port": data_passed_dict.get("port", ""),
+            "secret_key": data_passed_dict.get("secret-key", ""),
+            "secure": data_passed_dict.get("secure", ""),
+            "service": data_passed_dict.get("service", ""),
+        }
+
     def _on_mimir_cluster_changed(self, _):
-        if self.coordinator.is_coherent():
-            logger.info("mimir deployment coherent: publishing configs")
-            self.publish_config()
-        else:
-            logger.warning("this mimir deployment is incoherent")
+        if not self.coordinator.is_coherent():
+            self.unit.status = BlockedStatus(
+                "Incoherent deployment: Some required Mimir roles are missing."
+            )
+            return
+        self.unit.status = MaintenanceStatus("Configuring Mimir...")
+        self.process_s3_relation()
+        if not self._s3_storage_data and self.coordinator.is_scaled():
+            self.unit.status = BlockedStatus("Replicated units must use S3 storage.")
+            return
+        self.publish_config()
+        self.unit.status = ActiveStatus()
+
+
+    def process_s3_relation(self):
+        s3_relation = self.model.get_relation("s3")
+        if not s3_relation:
+            self._s3_storage_data = None
+            return
+        data_passed = s3_relation.data.get(s3_relation.app, {}).get("data")
+        if not data_passed:
+            self._s3_storage_data = None
+            return
+        s3_parsed_data = self.parse_s3_data(data_passed)
+        self.create_minio_buckets(s3_parsed_data, ["mimir"])
+        self._s3_storage_data = s3_parsed_data
+
+    def _on_s3_created(self, _):
+        s3_relation = self.model.get_relation("s3")
+        s3_relation.data[self.model.app]["_supported_versions"] = "- v1"
+
+    def _on_s3_broken(self, _):
+        if not self.coordinator.is_coherent():
+            self.unit.status = BlockedStatus(
+                "Incoherent deployment: Some required Mimir roles are missing."
+            )
+            return
+        self.unit.status = MaintenanceStatus("Configuring Mimir...")
+        self._s3_storage_data = None
+        if self.coordinator.is_scaled():
+            self.unit.status = BlockedStatus("Replicated units must use S3 storage.")
+            return
+        self.publish_config()
+        self.unit.status = ActiveStatus()
 
     def _on_collect_status(self, event: CollectStatusEvent):
         """Handle start event."""

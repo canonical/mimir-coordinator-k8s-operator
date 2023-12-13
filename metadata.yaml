@@ -29,7 +29,7 @@ storage:
 
 requires:
   s3:
-    interface: s3
+    interface: object-storage
     limit: 1
     description: |
       The coordinator obtains storage info on behalf of the workers, and
