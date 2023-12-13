@@ -68,9 +68,9 @@ class MimirCoordinator:
         """Return True if the roles list makes up a coherent mimir deployment."""
         roles: Iterable[MimirRole] = self._cluster_provider.gather_roles().keys()
         return set(roles).issuperset(MINIMAL_DEPLOYMENT)
-    
+
     def is_scaled(self) -> bool:
-        """Return True if more than 1 worker are forming the mimir cluster"""
+        """Return True if more than 1 worker are forming the mimir cluster."""
         return len(list(self._cluster_provider.gather_addresses())) > 1
 
     def is_recommended(self) -> bool:
@@ -92,40 +92,40 @@ class MimirCoordinator:
         """
         mimir_config: Dict[str, Any] = {
             "common": {},
-            "alertmanager": self.build_alertmanager_config(),
-            "alertmanager_storage": self.build_alertmanager_storage_config(),
-            "compactor": self.build_compactor_config(),
-            "ruler": self.build_ruler_config(),
-            "ruler_storage": self.build_ruler_storage_config(),
-            "blocks_storage": self.build_blocks_storage_config(),
+            "alertmanager": self._build_alertmanager_config(),
+            "alertmanager_storage": self._build_alertmanager_storage_config(),
+            "compactor": self._build_compactor_config(),
+            "ruler": self._build_ruler_config(),
+            "ruler_storage": self._build_ruler_storage_config(),
+            "blocks_storage": self._build_blocks_storage_config(),
         }
 
         if s3_data:
-            mimir_config["common"]["storage"] = self.build_s3_storage_config(s3_data)
-            self.update_s3_storage_config(mimir_config["blocks_storage"], "filesystem", "blocks")
-            self.update_s3_storage_config(mimir_config["ruler_storage"], "filesystem", "rules")
-            self.update_s3_storage_config(
+            mimir_config["common"]["storage"] = self._build_s3_storage_config(s3_data)
+            self._update_s3_storage_config(mimir_config["blocks_storage"], "filesystem", "blocks")
+            self._update_s3_storage_config(mimir_config["ruler_storage"], "filesystem", "rules")
+            self._update_s3_storage_config(
                 mimir_config["alertmanager_storage"], "filesystem", "alerts"
             )
 
-        mimir_config["memberlist"] = self.build_memberlist_config()
+        mimir_config["memberlist"] = self._build_memberlist_config()
 
         if self._tls_requirer:
-            mimir_config.update(self.build_tls_config())
+            mimir_config.update(self._build_tls_config())
 
         return mimir_config
 
     # data_dir:
     # The Mimir Alertmanager stores the alerts state on local disk at the location configured using -alertmanager.storage.path.
     # Should be persisted if not replicated
-    def build_alertmanager_config(self) -> Dict[str, Any]:
+    def _build_alertmanager_config(self) -> Dict[str, Any]:
         return {
             "data_dir": str(self._root_data_dir / "data-alertmanager"),
         }
 
     # filesystem: dir
     # The Mimir Alertmanager also periodically stores the alert state in the storage backend configured with -alertmanager-storage.backend (For Recovery)
-    def build_alertmanager_storage_config(self) -> Dict[str, Any]:
+    def _build_alertmanager_storage_config(self) -> Dict[str, Any]:
         return {
             "filesystem": {
                 "dir": str(self._root_data_dir / "data-alertmanager-recovery"),
@@ -135,7 +135,7 @@ class MimirCoordinator:
     # data_dir:
     # Directory to temporarily store blocks during compaction.
     # This directory is not required to be persisted between restarts.
-    def build_compactor_config(self) -> Dict[str, Any]:
+    def _build_compactor_config(self) -> Dict[str, Any]:
         return {
             "data_dir": str(self._root_data_dir / "data-compactor"),
         }
@@ -143,7 +143,7 @@ class MimirCoordinator:
     # rule_path:
     # Directory to store temporary rule files loaded by the Prometheus rule managers.
     # This directory is not required to be persisted between restarts.
-    def build_ruler_config(self) -> Dict[str, Any]:
+    def _build_ruler_config(self) -> Dict[str, Any]:
         return {
             "rule_path": str(self._root_data_dir / "data-ruler"),
         }
@@ -151,7 +151,7 @@ class MimirCoordinator:
     # filesystem: dir
     # Storage backend reads Prometheus recording rules from the local filesystem.
     # The ruler looks for tenant rules in the self._root_data_dir/rules/<TENANT ID> directory. The ruler requires rule files to be in the Prometheus format.
-    def build_ruler_storage_config(self) -> Dict[str, Any]:
+    def _build_ruler_storage_config(self) -> Dict[str, Any]:
         return {
             "filesystem": {
                 "dir": str(self._root_data_dir / "rules"),
@@ -171,7 +171,7 @@ class MimirCoordinator:
 
     # The TSDB dir is used by ingesters, while the filesystem: dir is the "object storage"
     # Ingesters are expected to upload TSDB blocks to filesystem: dir every 2h.
-    def build_blocks_storage_config(self) -> Dict[str, Any]:
+    def _build_blocks_storage_config(self) -> Dict[str, Any]:
         return {
             "bucket_store": {
                 "sync_dir": str(self._root_data_dir / "tsdb-sync"),
@@ -184,7 +184,7 @@ class MimirCoordinator:
             },
         }
 
-    def build_s3_storage_config(self, s3_data: dict) -> Dict[str, Any]:
+    def _build_s3_storage_config(self, s3_data: dict) -> Dict[str, Any]:
         return {
             "backend": "s3",
             "s3": {
@@ -196,17 +196,17 @@ class MimirCoordinator:
             },
         }
 
-    def update_s3_storage_config(
+    def _update_s3_storage_config(
         self, storage_config: Dict[str, Any], old_key: str, prefix_name: str
     ) -> None:
         if old_key in storage_config:
             storage_config.pop(old_key)
             storage_config["storage_prefix"] = prefix_name
 
-    def build_memberlist_config(self) -> Dict[str, Any]:
+    def _build_memberlist_config(self) -> Dict[str, Any]:
         return {"join_members": list(self._cluster_provider.gather_addresses())}
 
-    def build_tls_config(self) -> Dict[str, Any]:
+    def _build_tls_config(self) -> Dict[str, Any]:
         return {
             "tls_enabled": True,
             "tls_cert_path": self._tls_requirer.cacert,

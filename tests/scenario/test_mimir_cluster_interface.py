@@ -91,8 +91,12 @@ def test_address_collection(workers_addresses):
             i: MimirClusterRequirerUnitData(address=address, juju_topology=topo).dump()
             for i, address in enumerate(worker_addresses)
         }
-        relations.append(Relation("mimir-cluster-provide", remote_units_data=units_data))
-
+        roles_data = MimirClusterRequirerAppData(roles=[MimirRole.read, MimirRole.write]).dump()
+        relations.append(
+            Relation(
+                "mimir-cluster-provide", remote_app_data=roles_data, remote_units_data=units_data
+            )
+        )
     # all unit addresses should show up
     expected = set(chain(*workers_addresses))
 
