@@ -136,7 +136,6 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
     def publish_config(self, tls: bool = False):
         """Generate config file and publish to all workers."""
         mimir_config = self.coordinator.build_config(dict(self.config), tls=tls)
-        logger.warning(mimir_config)
         self.cluster_provider.publish_configs(mimir_config)
 
     def _on_mimir_cluster_changed(self, _):
@@ -200,17 +199,11 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
                 self.server_cert.ca,  # pyright: ignore
                 make_dirs=True,
             )
-            # FIXME with the update-ca-certificates machinery prometheus shouldn't need
-            #  CA_CERT_PATH.
             self._nginx_container.push(
                 CA_CERT_PATH,
                 self.server_cert.ca,  # pyright: ignore
                 make_dirs=True,
             )
-
-            # Repeat for the charm container. We need it there for prometheus client requests.
-            ca_cert_path.parent.mkdir(exist_ok=True, parents=True)
-            ca_cert_path.write_text(self.server_cert.ca)  # pyright: ignore
         else:
             self._nginx_container.remove_path(CERT_PATH, recursive=True)
             self._nginx_container.remove_path(KEY_PATH, recursive=True)
