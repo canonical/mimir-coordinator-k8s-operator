@@ -9,6 +9,9 @@ from typing import List, Literal, Optional, Union
 from pydantic import BaseModel
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 
+S3_RELATION_NAME = "s3"
+BUCKET_NAME = "mimir"
+
 
 class InvalidConfigurationError(Exception):
     """Invalid configuration."""
@@ -85,11 +88,10 @@ class Alertmanager(BaseModel):
 
 class _S3StorageBackend(BaseModel):
     access_key: str = ""
-    namespace: str = ""
-    port: str = ""
+    endpoint: str = ""
     secret_key: str = ""
-    secure: bool = False
-    service: str = ""
+    bucket: str = ""
+    region: str = ""
 
 
 class _FilesystemStorageBackend(BaseModel):

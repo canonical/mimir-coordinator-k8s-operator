@@ -2,5 +2,3 @@ ops
 pydantic
 # crossplane is a package from nginxinc to interact with the Nginx config
 crossplane
-# minio Python API is used to create bucket for mimir if S3 storage is used
-minio

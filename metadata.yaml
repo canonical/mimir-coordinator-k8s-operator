@@ -29,12 +29,12 @@ resources:
 
 requires:
   s3:
-    interface: object-storage
+    interface: s3
     limit: 1
     description: |
       The coordinator obtains storage information on behalf of the workers and forwards all workers
       the storage details over mimir-worker. Limited to 1 to ensure only one storage backend will
-      be connected to Mimir. Currently supports [Minio](https://charmhub.io/minio).
+      be connected to Mimir.
 
   send-remote-write:
     interface: prometheus_remote_write

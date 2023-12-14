@@ -189,11 +189,11 @@ class MimirCoordinator:
         return {
             "backend": "s3",
             "s3": {
-                "endpoint": f"{s3_data.service}.{s3_data.namespace}.svc.cluster.local:{s3_data.port}",
+                "endpoint": s3_data.endpoint,
                 "access_key_id": s3_data.access_key,
                 "secret_access_key": s3_data.secret_key,
-                "insecure": not s3_data.secure,
-                "bucket_name": "mimir",
+                "bucket_name": s3_data.bucket,
+                "region": s3_data.region,
             },
         }
 
