@@ -32,8 +32,9 @@ requires:
     interface: object-storage
     limit: 1
     description: |
-      The coordinator obtains storage info on behalf of the workers, and
-      forwards all workers the storage details over mimir-worker.
+      The coordinator obtains storage information on behalf of the workers and forwards all workers
+      the storage details over mimir-worker. Limited to 1 to ensure only one storage backend will
+      be connected to Mimir. Currently supports [Minio](https://charmhub.io/minio).
 
   send-remote-write:
     interface: prometheus_remote_write

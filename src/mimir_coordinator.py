@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable
 
 from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirClusterProvider, MimirRole
+from mimir_config import _S3StorageBackend
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +86,7 @@ class MimirCoordinator:
                 return False
         return True
 
-    def build_config(self, s3_data: dict) -> Dict[str, Any]:
+    def build_config(self, s3_data: _S3StorageBackend) -> Dict[str, Any]:
         """Generate shared config file for mimir.
 
         Reference: https://grafana.com/docs/mimir/latest/configure/
@@ -100,7 +101,7 @@ class MimirCoordinator:
             "blocks_storage": self._build_blocks_storage_config(),
         }
 
-        if s3_data:
+        if s3_data != _S3StorageBackend():
             mimir_config["common"]["storage"] = self._build_s3_storage_config(s3_data)
             self._update_s3_storage_config(mimir_config["blocks_storage"], "filesystem", "blocks")
             self._update_s3_storage_config(mimir_config["ruler_storage"], "filesystem", "rules")
@@ -184,14 +185,14 @@ class MimirCoordinator:
             },
         }
 
-    def _build_s3_storage_config(self, s3_data: dict) -> Dict[str, Any]:
+    def _build_s3_storage_config(self, s3_data: _S3StorageBackend) -> Dict[str, Any]:
         return {
             "backend": "s3",
             "s3": {
-                "endpoint": f'{s3_data["service"]}.{s3_data["namespace"]}.svc.cluster.local:{s3_data["port"]}',
-                "access_key_id": s3_data["access_key"],
-                "secret_access_key": s3_data["secret_key"],
-                "insecure": not s3_data["secure"],
+                "endpoint": f"{s3_data.service}.{s3_data.namespace}.svc.cluster.local:{s3_data.port}",
+                "access_key_id": s3_data.access_key,
+                "secret_access_key": s3_data.secret_key,
+                "insecure": not s3_data.secure,
                 "bucket_name": "mimir",
             },
         }

@@ -84,11 +84,12 @@ class Alertmanager(BaseModel):
 
 
 class _S3StorageBackend(BaseModel):
-    endpoint: str
-    access_key_id: str
-    secret_access_key: str
-    insecure: bool = False
-    signature_version: str = "v4"
+    access_key: str = ""
+    namespace: str = ""
+    port: str = ""
+    secret_key: str = ""
+    secure: bool = False
+    service: str = ""
 
 
 class _FilesystemStorageBackend(BaseModel):

@@ -18,13 +18,14 @@ from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirClusterProvider
 from charms.prometheus_k8s.v0.prometheus_remote_write import (
     PrometheusRemoteWriteConsumer,
 )
+from mimir_config import _S3StorageBackend
 from mimir_coordinator import MimirCoordinator
 from minio import Minio
 from minio.error import S3Error
 from nginx import Nginx
 from ops.charm import CharmBase, CollectStatusEvent
 from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, Relation
+from ops.model import ActiveStatus, BlockedStatus, Relation
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
@@ -54,7 +55,7 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
             self._on_nginx_pebble_ready,
         )
 
-        self._s3_storage_data = None
+        self._s3_storage_data = _S3StorageBackend()
         self.framework.observe(
             self.on.mimir_cluster_relation_changed,  # pyright: ignore
             self._on_mimir_cluster_changed,
@@ -74,7 +75,6 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
             self.on.s3_relation_broken,  # pyright: ignore
             self._on_s3_broken,
         )
-
         self.remote_write_consumer = PrometheusRemoteWriteConsumer(self)
         self.framework.observe(
             self.remote_write_consumer.on.endpoints_changed,  # pyright: ignore
@@ -96,10 +96,6 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         )
 
     @property
-    def _s3_storage(self) -> dict:
-        return self._s3_storage_data or {}
-
-    @property
     def mimir_worker_relations(self) -> List[Relation]:
         """Returns the list of worker relations."""
         return self.model.relations.get("mimir_worker", [])
@@ -110,17 +106,28 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
 
     def publish_config(self):
         """Generate config file and publish to all workers."""
-        mimir_config = self.coordinator.build_config(self._s3_storage)
+        mimir_config = self.coordinator.build_config(self._s3_storage_data)
         self.cluster_provider.publish_configs(mimir_config)
 
-    def create_minio_buckets(self, conn: dict, bucket_names: list):
-        """Create Minio buckets."""
+    def create_minio_buckets(self, conn: _S3StorageBackend, bucket_names: list):
+        """Create Minio buckets if they do not exist.
+
+        Mimir expects specific buckets to be present in the S3-compatible
+        storage, and this function creates them if they are not already present.
+
+        Args:
+            conn (S3DataModel): The S3 storage backend configuration.
+            bucket_names (list): A list of bucket names to be created if they do not exist.
+
+        Raises:
+            S3Error: If there is an error while creating S3 buckets.
+        """
         try:
             client = Minio(
-                endpoint=f'{conn["service"]}.{conn["namespace"]}.svc.cluster.local:{conn["port"]}',
-                access_key=conn["access_key"],
-                secret_key=conn["secret_key"],
-                secure=conn["secure"],
+                endpoint=f"{conn.service}.{conn.namespace}.svc.cluster.local:{conn.port}",
+                access_key=conn.access_key,
+                secret_key=conn.secret_key,
+                secure=conn.secure,
             )
             for bucket in bucket_names:
                 found = client.bucket_exists(bucket)
@@ -132,40 +139,41 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
             logger.error("Error creating S3 buckets")
 
     def _parse_s3_data(self, s3_data):
+        # This method is used to parse data published by the Minio S3 storage,
+        # which uses the serialized_data_interface. The parsed data is then loaded
+        # into the Pydantic S3Model (_S3StorageBackend).
         data_passed_dict = dict(item.split(": ") for item in s3_data.split("\n") if item)
         data_passed_dict["secure"] = data_passed_dict.get("secure", "").lower() == "true"
-
-        return {
-            "access_key": data_passed_dict.get("access-key", ""),
-            "namespace": data_passed_dict.get("namespace", ""),
-            "port": data_passed_dict.get("port", ""),
-            "secret_key": data_passed_dict.get("secret-key", ""),
-            "secure": data_passed_dict.get("secure", ""),
-            "service": data_passed_dict.get("service", ""),
-        }
+        data_passed_dict["access_key"] = data_passed_dict.pop("access-key")
+        data_passed_dict["secret_key"] = data_passed_dict.pop("secret-key")
+        self._s3_storage_data = _S3StorageBackend(**data_passed_dict)
 
     def _on_mimir_cluster_changed(self, _):
         if not self.coordinator.is_coherent():
             logger.warning("Incoherent deployment: Some required Mimir roles are missing.")
             return
         self._process_s3_relation()
-        if not self._s3_storage_data and self.coordinator.is_scaled():
+        if self._s3_storage_data == _S3StorageBackend() and self.coordinator.is_scaled():
             logger.warning("Filesystem storage cannot be used with replicated mimir workers")
             return
         self.publish_config()
 
     def _process_s3_relation(self):
+        # This method is used to process the S3 relation in the model. It checks if
+        # data is available in the application data bag as a multiline string and uses
+        # the _parse_s3_data method to parse the S3 data.
         s3_relation = self.model.get_relation("s3")
         if s3_relation and s3_relation.app:
-            data_passed = s3_relation.data.get(s3_relation.app, {}).get("data")
-            if data_passed:
-                s3_parsed_data = self._parse_s3_data(data_passed)
-                self.create_minio_buckets(s3_parsed_data, ["mimir"])
-                self._s3_storage_data = s3_parsed_data
+            if data_passed := s3_relation.data.get(s3_relation.app, {}).get("data"):
+                self._parse_s3_data(data_passed)
+                self.create_minio_buckets(self._s3_storage_data, ["mimir"])
                 return
-        self._s3_storage_data = None
+        self._s3_storage_data = _S3StorageBackend()
 
     def _on_s3_created(self, _):
+        # The Minio charm only publishes the S3 connection data if the requester has a matching
+        # "_supported_versions" field in the requirer data bag. Therefore, upon relation creation,
+        # we add this field to the data bag to indicate support for version "v1". to match Minio
         s3_relation = self.model.get_relation("s3")
         if s3_relation:
             s3_relation.data[self.model.app]["_supported_versions"] = "- v1"
@@ -174,8 +182,7 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         if not self.coordinator.is_coherent():
             logger.warning("Incoherent deployment: Some required Mimir roles are missing.")
             return
-        self.model.unit.status = MaintenanceStatus("Configuring Mimir...")
-        self._s3_storage_data = None
+        self._s3_storage_data = _S3StorageBackend()
         if self.coordinator.is_scaled():
             logger.warning("Filesystem storage cannot be used with replicated mimir workers")
             return
@@ -187,7 +194,7 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
             event.add_status(
                 BlockedStatus("Incoherent deployment: you are lacking some required Mimir roles")
             )
-        if not self._s3_storage_data and self.coordinator.is_scaled():
+        if self._s3_storage_data == _S3StorageBackend() and self.coordinator.is_scaled():
             event.add_status(
                 BlockedStatus("Missing s3 relation, replicated units must use S3 storage.")
             )
