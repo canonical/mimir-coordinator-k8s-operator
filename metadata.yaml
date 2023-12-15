@@ -80,6 +80,9 @@ provides:
     description: |
       Send traces to tempo.
 
+# FIXME: We need this relationship since it is needed by CertHandler
+# Once this PR is merged https://github.com/canonical/observability-libs/pull/66
+# we can remove it
 peers:
   replicas:
     interface: coordinator_replica

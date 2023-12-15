@@ -130,7 +130,7 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
 
     def _on_server_cert_changed(self, _):
         self._update_cert()
-        self._on_nginx_pebble_ready(_)
+        self._ensure_pebble_layer()
         self.publish_config(tls=self._is_cert_available)
 
     def publish_config(self, tls: bool = False):
@@ -169,11 +169,15 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         pass
 
     def _on_nginx_pebble_ready(self, _) -> None:
+        self._ensure_pebble_layer()
+
+    def _ensure_pebble_layer(self) -> None:
         self._nginx_container.push(
             self.nginx.config_path, self.nginx.config(tls=self._is_cert_available), make_dirs=True
         )
         self._nginx_container.add_layer("nginx", self.nginx.layer, combine=True)
         self._nginx_container.autostart()
+
 
     def _update_cert(self):
         if not self._nginx_container.can_connect():
