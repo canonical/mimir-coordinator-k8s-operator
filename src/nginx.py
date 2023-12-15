@@ -167,9 +167,10 @@ class Nginx:
 
     config_path = NGINX_CONFIG
 
-    def __init__(self, cluster_provider: MimirClusterProvider, *args):
+    def __init__(self, cluster_provider: MimirClusterProvider, server_name: str, *args):
         super().__init__(*args)
         self.cluster_provider = cluster_provider
+        self.server_name = server_name
 
     def config(self, tls: bool = False) -> str:
         """Build and return the Nginx configuration."""
@@ -334,7 +335,7 @@ class Nginx:
                         "args": ["X-Scope-OrgID", "$ensured_x_scope_orgid"],
                     },
                     # FIXME: use a suitable SERVER_NAME
-                    {"directive": "server_name", "args": ["SERVER_NAME"]},
+                    {"directive": "server_name", "args": [self.server_name]},
                     {"directive": "ssl_certificate", "args": [CERT_PATH]},
                     {"directive": "ssl_certificate_key", "args": [KEY_PATH]},
                     {"directive": "ssl_protocols", "args": ["TLSv1", "TLSv1.1", "TLSv1.2"]},
