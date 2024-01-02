@@ -99,6 +99,7 @@ class MimirCoordinator:
             "ruler": self._build_ruler_config(),
             "ruler_storage": self._build_ruler_storage_config(),
             "blocks_storage": self._build_blocks_storage_config(),
+            "memberlist" : self._build_memberlist_config(),
         }
 
         if s3_data != _S3StorageBackend():
@@ -108,8 +109,6 @@ class MimirCoordinator:
             self._update_s3_storage_config(
                 mimir_config["alertmanager_storage"], "filesystem", "alerts"
             )
-
-        mimir_config["memberlist"] = self._build_memberlist_config()
 
         if self._tls_requirer:
             mimir_config.update(self._build_tls_config())
