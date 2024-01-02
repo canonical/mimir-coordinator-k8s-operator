@@ -99,7 +99,7 @@ class MimirCoordinator:
             "ruler": self._build_ruler_config(),
             "ruler_storage": self._build_ruler_storage_config(),
             "blocks_storage": self._build_blocks_storage_config(),
-            "memberlist" : self._build_memberlist_config(),
+            "memberlist": self._build_memberlist_config(),
         }
 
         if s3_data != _S3StorageBackend():
