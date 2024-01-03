@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable
 
 from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirClusterProvider, MimirRole
-from mimir_config import _S3StorageBackend
+from mimir_config import _S3ConfigData
 
 logger = logging.getLogger(__name__)
 
@@ -70,8 +70,8 @@ class MimirCoordinator:
         roles: Iterable[MimirRole] = self._cluster_provider.gather_roles().keys()
         return set(roles).issuperset(MINIMAL_DEPLOYMENT)
 
-    def is_scaled(self) -> bool:
-        """Return True if more than 1 worker are forming the mimir cluster."""
+    def has_multiple_workers(self) -> bool:
+        """Return True if there are multiple workers forming the Mimir cluster."""
         return len(list(self._cluster_provider.gather_addresses())) > 1
 
     def is_recommended(self) -> bool:
@@ -86,7 +86,7 @@ class MimirCoordinator:
                 return False
         return True
 
-    def build_config(self, s3_data: _S3StorageBackend) -> Dict[str, Any]:
+    def build_config(self, s3_config_data: _S3ConfigData) -> Dict[str, Any]:
         """Generate shared config file for mimir.
 
         Reference: https://grafana.com/docs/mimir/latest/configure/
@@ -102,13 +102,11 @@ class MimirCoordinator:
             "memberlist": self._build_memberlist_config(),
         }
 
-        if s3_data != _S3StorageBackend():
-            mimir_config["common"]["storage"] = self._build_s3_storage_config(s3_data)
-            self._update_s3_storage_config(mimir_config["blocks_storage"], "filesystem", "blocks")
-            self._update_s3_storage_config(mimir_config["ruler_storage"], "filesystem", "rules")
-            self._update_s3_storage_config(
-                mimir_config["alertmanager_storage"], "filesystem", "alerts"
-            )
+        if s3_config_data != _S3ConfigData():
+            mimir_config["common"]["storage"] = self._build_s3_storage_config(s3_config_data)
+            self._update_s3_storage_config(mimir_config["blocks_storage"], "blocks")
+            self._update_s3_storage_config(mimir_config["ruler_storage"], "rules")
+            self._update_s3_storage_config(mimir_config["alertmanager_storage"], "alerts")
 
         if self._tls_requirer:
             mimir_config.update(self._build_tls_config())
@@ -184,23 +182,26 @@ class MimirCoordinator:
             },
         }
 
-    def _build_s3_storage_config(self, s3_data: _S3StorageBackend) -> Dict[str, Any]:
+    def _build_s3_storage_config(self, s3_config_data: _S3ConfigData) -> Dict[str, Any]:
         return {
             "backend": "s3",
             "s3": {
-                "endpoint": s3_data.endpoint,
-                "access_key_id": s3_data.access_key,
-                "secret_access_key": s3_data.secret_key,
-                "bucket_name": s3_data.bucket,
-                "region": s3_data.region,
+                "endpoint": s3_config_data.endpoint,
+                "access_key_id": s3_config_data.access_key,
+                "secret_access_key": s3_config_data.secret_key,
+                "bucket_name": s3_config_data.bucket,
+                "region": s3_config_data.region,
             },
         }
 
-    def _update_s3_storage_config(
-        self, storage_config: Dict[str, Any], old_key: str, prefix_name: str
-    ) -> None:
-        if old_key in storage_config:
-            storage_config.pop(old_key)
+    def _update_s3_storage_config(self, storage_config: Dict[str, Any], prefix_name: str) -> None:
+        """Update S3 storage configuration in `storage_config`.
+
+        If the key 'filesystem' is present in `storage_config`, remove it and add a new key
+        'storage_prefix' with the value of `prefix_name` for the S3 bucket.
+        """
+        if "filesystem" in storage_config:
+            storage_config.pop("filesystem")
             storage_config["storage_prefix"] = prefix_name
 
     def _build_memberlist_config(self) -> Dict[str, Any]:

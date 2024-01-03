@@ -32,9 +32,7 @@ requires:
     interface: s3
     limit: 1
     description: |
-      The coordinator obtains storage information on behalf of the workers and forwards all workers
-      the storage details over mimir-worker. Limited to 1 to ensure only one storage backend will
-      be connected to Mimir.
+      The coordinator obtains and shares storage details with workers, enabling Mimir's access to an S3 bucket for data storage.
 
   send-remote-write:
     interface: prometheus_remote_write

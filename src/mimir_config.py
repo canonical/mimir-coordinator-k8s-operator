@@ -86,7 +86,7 @@ class Alertmanager(BaseModel):
     external_url: Optional[str]
 
 
-class _S3StorageBackend(BaseModel):
+class _S3ConfigData(BaseModel):
     access_key: str = ""
     endpoint: str = ""
     secret_key: str = ""
@@ -98,7 +98,7 @@ class _FilesystemStorageBackend(BaseModel):
     dir: str
 
 
-_StorageBackend = Union[_S3StorageBackend, _FilesystemStorageBackend]
+_StorageBackend = Union[_S3ConfigData, _FilesystemStorageBackend]
 _StorageKey = Union[Literal["filesystem"], Literal["s3"]]
 
 

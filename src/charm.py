@@ -21,7 +21,7 @@ from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirClusterProvider
 from charms.prometheus_k8s.v0.prometheus_remote_write import (
     PrometheusRemoteWriteConsumer,
 )
-from mimir_config import BUCKET_NAME, S3_RELATION_NAME, _S3StorageBackend
+from mimir_config import BUCKET_NAME, S3_RELATION_NAME, _S3ConfigData
 from mimir_coordinator import MimirCoordinator
 from nginx import Nginx
 from ops.charm import CharmBase, CollectStatusEvent
@@ -56,16 +56,17 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
             self._on_nginx_pebble_ready,
         )
 
-        self._s3_storage_data = _S3StorageBackend()
         self.framework.observe(
             self.on.mimir_cluster_relation_changed,  # pyright: ignore
             self._on_mimir_cluster_changed,
         )
 
         self.framework.observe(
-            self.s3_requirer.on.credentials_changed, self._on_mimir_cluster_changed
+            self.s3_requirer.on.credentials_changed, self._on_s3_requirer_credentials_changed
         )
-        self.framework.observe(self.s3_requirer.on.credentials_gone, self._on_s3_departed)
+        self.framework.observe(
+            self.s3_requirer.on.credentials_gone, self._on_s3_requirer_credentials_gone
+        )
 
         self.remote_write_consumer = PrometheusRemoteWriteConsumer(self)
         self.framework.observe(
@@ -92,43 +93,48 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         """Returns the list of worker relations."""
         return self.model.relations.get("mimir_worker", [])
 
-    def _on_config_changed(self, event):
+    def _on_config_changed(self, _):
         """Handle changed configuration."""
-        self.publish_config()
-
-    def publish_config(self):
-        """Generate config file and publish to all workers."""
-        mimir_config = self.coordinator.build_config(self._s3_storage_data)
-        self.cluster_provider.publish_configs(mimir_config)
-
-    def _s3_connection_info(self):
-        """Parse a _S3StorageBackend object from relation data."""
-        if not self.s3_requirer.relations:
-            self._s3_storage_data = _S3StorageBackend()
-            return
-        raw = self.s3_requirer.get_s3_connection_info()
-        raw["access_key"], raw["secret_key"] = raw.pop("access-key", ""), raw.pop("secret-key", "")
-        self._s3_storage_data = _S3StorageBackend(**raw)
+        s3_config_data = self._get_s3_storage_config()
+        self.publish_config(s3_config_data)
 
     def _on_mimir_cluster_changed(self, _):
-        if not self.coordinator.is_coherent():
-            logger.warning("Incoherent deployment: Some required Mimir roles are missing.")
-            return
-        self._s3_connection_info()
-        if self._s3_storage_data == _S3StorageBackend() and self.coordinator.is_scaled():
-            logger.warning("Filesystem storage cannot be used with replicated mimir workers")
-            return
-        self.publish_config()
+        self._process_cluster_and_s3_credentials_changes()
 
-    def _on_s3_departed(self, _):
-        self._s3_storage_data = _S3StorageBackend()
+    def _on_s3_requirer_credentials_changed(self, _):
+        self._process_cluster_and_s3_credentials_changes()
+
+    def _process_cluster_and_s3_credentials_changes(self):
         if not self.coordinator.is_coherent():
             logger.warning("Incoherent deployment: Some required Mimir roles are missing.")
             return
-        if self.coordinator.is_scaled():
+        s3_config_data = self._get_s3_storage_config()
+        if s3_config_data == _S3ConfigData() and self.coordinator.has_multiple_workers():
             logger.warning("Filesystem storage cannot be used with replicated mimir workers")
             return
-        self.publish_config()
+        self.publish_config(s3_config_data)
+
+    def _on_s3_requirer_credentials_gone(self, _):
+        if not self.coordinator.is_coherent():
+            logger.warning("Incoherent deployment: Some required Mimir roles are missing.")
+            return
+        if self.coordinator.has_multiple_workers():
+            logger.warning("Filesystem storage cannot be used with replicated mimir workers")
+            return
+        self.publish_config(_S3ConfigData())
+
+    def publish_config(self, s3_config_data: _S3ConfigData):
+        """Generate config file and publish to all workers."""
+        mimir_config = self.coordinator.build_config(s3_config_data)
+        self.cluster_provider.publish_configs(mimir_config)
+
+    def _get_s3_storage_config(self):
+        """Retrieve S3 storage configuration."""
+        if not self.s3_requirer.relations:
+            return _S3ConfigData()
+        raw = self.s3_requirer.get_s3_connection_info()
+        raw["access_key"], raw["secret_key"] = raw.pop("access-key", ""), raw.pop("secret-key", "")
+        return _S3ConfigData(**raw)
 
     def _on_collect_status(self, event: CollectStatusEvent):
         """Handle start event."""
@@ -136,7 +142,8 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
             event.add_status(
                 BlockedStatus("Incoherent deployment: you are lacking some required Mimir roles")
             )
-        if self._s3_storage_data == _S3StorageBackend() and self.coordinator.is_scaled():
+        s3_config_data = self._get_s3_storage_config()
+        if s3_config_data == _S3ConfigData() and self.coordinator.has_multiple_workers():
             event.add_status(
                 BlockedStatus("Missing s3 relation, replicated units must use S3 storage.")
             )
