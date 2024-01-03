@@ -11,6 +11,149 @@ from ops.pebble import Layer
 
 logger = logging.getLogger(__name__)
 
+LOCATIONS_DISTRIBUTOR: List[Dict] = [
+    {
+        "directive": "location",
+        "args": ["/distributor"],
+        "block": [
+            {
+                "directive": "proxy_pass",
+                "args": ["http://distributor"],
+            },
+        ],
+    },
+    {
+        "directive": "location",
+        "args": ["/api/v1/push"],
+        "block": [
+            {
+                "directive": "proxy_pass",
+                "args": ["http://distributor"],
+            },
+        ],
+    },
+    {
+        "directive": "location",
+        "args": ["/otlp/v1/metrics"],
+        "block": [
+            {
+                "directive": "proxy_pass",
+                "args": ["http://distributor"],
+            },
+        ],
+    },
+]
+LOCATIONS_ALERTMANAGER: List[Dict] = [
+    {
+        "directive": "location",
+        "args": ["/alertmanager"],
+        "block": [
+            {
+                "directive": "proxy_pass",
+                "args": ["http://alertmanager"],
+            },
+        ],
+    },
+    {
+        "directive": "location",
+        "args": ["/multitenant_alertmanager/status"],
+        "block": [
+            {
+                "directive": "proxy_pass",
+                "args": ["http://alertmanager"],
+            },
+        ],
+    },
+    {
+        "directive": "location",
+        "args": ["/api/v1/alerts"],
+        "block": [
+            {
+                "directive": "proxy_pass",
+                "args": ["http://alertmanager"],
+            },
+        ],
+    },
+]
+LOCATIONS_RULER: List[Dict] = [
+    {
+        "directive": "location",
+        "args": ["/prometheus/config/v1/rules"],
+        "block": [
+            {
+                "directive": "proxy_pass",
+                "args": ["http://ruler"],
+            },
+        ],
+    },
+    {
+        "directive": "location",
+        "args": ["/prometheus/api/v1/rules"],
+        "block": [
+            {
+                "directive": "proxy_pass",
+                "args": ["http://ruler"],
+            },
+        ],
+    },
+    {
+        "directive": "location",
+        "args": ["/prometheus/api/v1/alerts"],
+        "block": [
+            {
+                "directive": "proxy_pass",
+                "args": ["http://ruler"],
+            },
+        ],
+    },
+    {
+        "directive": "location",
+        "args": ["=", "/ruler/ring"],
+        "block": [
+            {
+                "directive": "proxy_pass",
+                "args": ["http://ruler"],
+            },
+        ],
+    },
+]
+LOCATIONS_QUERY_FRONTEND: List[Dict] = [
+    {
+        "directive": "location",
+        "args": ["/prometheus"],
+        "block": [
+            {
+                "directive": "proxy_pass",
+                "args": ["http://query-frontend"],
+            },
+        ],
+    },
+    # Buildinfo endpoint can go to any component
+    {
+        "directive": "location",
+        "args": ["=", "/api/v1/status/buildinfo"],
+        "block": [
+            {
+                "directive": "proxy_pass",
+                "args": ["http://query-frontend"],
+            },
+        ],
+    },
+]
+LOCATIONS_COMPACTOR: List[Dict] = [
+    # Compactor endpoint for uploading blocks
+    {
+        "directive": "location",
+        "args": ["=", "/api/v1/upload/block/"],
+        "block": [
+            {
+                "directive": "proxy_pass",
+                "args": ["http://compactor"],
+            },
+        ],
+    },
+]
+
 
 class Nginx:
     """Helper class to manage the nginx workload."""
@@ -43,6 +186,21 @@ class Nginx:
                 )
 
             return nginx_upstreams
+
+        def locations(addresses_by_role: Dict[str, Set[str]]) -> List[Dict]:
+            nginx_locations = []
+            roles = addresses_by_role.keys()
+            if "distributor" in roles:
+                nginx_locations.extend(LOCATIONS_DISTRIBUTOR)
+            if "alertmanager" in roles:
+                nginx_locations.extend(LOCATIONS_ALERTMANAGER)
+            if "ruler" in roles:
+                nginx_locations.extend(LOCATIONS_RULER)
+            if "query-frontend" in roles:
+                nginx_locations.extend(LOCATIONS_QUERY_FRONTEND)
+            if "compactor" in roles:
+                nginx_locations.extend(LOCATIONS_COMPACTOR)
+            return nginx_locations
 
         def log_verbose(verbose):
             if verbose:
@@ -142,142 +300,7 @@ class Nginx:
                                 "directive": "proxy_set_header",
                                 "args": ["X-Scope-OrgID", "$ensured_x_scope_orgid"],
                             },
-                            # Distributor endpoints
-                            {
-                                "directive": "location",
-                                "args": ["/distributor"],
-                                "block": [
-                                    {
-                                        "directive": "proxy_pass",
-                                        "args": ["http://distributor"],
-                                    },
-                                ],
-                            },
-                            {
-                                "directive": "location",
-                                "args": ["/api/v1/push"],
-                                "block": [
-                                    {
-                                        "directive": "proxy_pass",
-                                        "args": ["http://distributor"],
-                                    },
-                                ],
-                            },
-                            {
-                                "directive": "location",
-                                "args": ["/otlp/v1/metrics"],
-                                "block": [
-                                    {
-                                        "directive": "proxy_pass",
-                                        "args": ["http://distributor"],
-                                    },
-                                ],
-                            },
-                            # Alertmanager endpoints
-                            {
-                                "directive": "location",
-                                "args": ["/alertmanager"],
-                                "block": [
-                                    {
-                                        "directive": "proxy_pass",
-                                        "args": ["http://alertmanager"],
-                                    },
-                                ],
-                            },
-                            {
-                                "directive": "location",
-                                "args": ["/multitenant_alertmanager/status"],
-                                "block": [
-                                    {
-                                        "directive": "proxy_pass",
-                                        "args": ["http://alertmanager"],
-                                    },
-                                ],
-                            },
-                            {
-                                "directive": "location",
-                                "args": ["/api/v1/alerts"],
-                                "block": [
-                                    {
-                                        "directive": "proxy_pass",
-                                        "args": ["http://alertmanager"],
-                                    },
-                                ],
-                            },
-                            # Ruler endpoints
-                            {
-                                "directive": "location",
-                                "args": ["/prometheus/config/v1/rules"],
-                                "block": [
-                                    {
-                                        "directive": "proxy_pass",
-                                        "args": ["http://ruler"],
-                                    },
-                                ],
-                            },
-                            {
-                                "directive": "location",
-                                "args": ["/prometheus/api/v1/rules"],
-                                "block": [
-                                    {
-                                        "directive": "proxy_pass",
-                                        "args": ["http://ruler"],
-                                    },
-                                ],
-                            },
-                            {
-                                "directive": "location",
-                                "args": ["/prometheus/api/v1/alerts"],
-                                "block": [
-                                    {
-                                        "directive": "proxy_pass",
-                                        "args": ["http://ruler"],
-                                    },
-                                ],
-                            },
-                            {
-                                "directive": "location",
-                                "args": ["=", "/ruler/ring"],
-                                "block": [
-                                    {
-                                        "directive": "proxy_pass",
-                                        "args": ["http://ruler"],
-                                    },
-                                ],
-                            },
-                            # Query frontend
-                            {
-                                "directive": "location",
-                                "args": ["/prometheus"],
-                                "block": [
-                                    {
-                                        "directive": "proxy_pass",
-                                        "args": ["http://query-frontend"],
-                                    },
-                                ],
-                            },
-                            # Buildinfo endpoint can go to any component
-                            {
-                                "directive": "location",
-                                "args": ["=", "/api/v1/status/buildinfo"],
-                                "block": [
-                                    {
-                                        "directive": "proxy_pass",
-                                        "args": ["http://query-frontend"],
-                                    },
-                                ],
-                            },
-                            # Compactor endpoint for uploading blocks
-                            {
-                                "directive": "location",
-                                "args": ["=", "/api/v1/upload/block/"],
-                                "block": [
-                                    {
-                                        "directive": "proxy_pass",
-                                        "args": ["http://compactor"],
-                                    },
-                                ],
-                            },
+                            *locations(addresses_by_role),
                         ],
                     },
                 ],
