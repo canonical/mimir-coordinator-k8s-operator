@@ -121,9 +121,6 @@ class MimirCoordinator:
                     "client_auth_type": "RequestClientCert",
                 },
             }
-            
-        if self._tls_requirer:
-            mimir_config.update(self._build_tls_config())
 
         return mimir_config
 
@@ -213,11 +210,3 @@ class MimirCoordinator:
 
     def _build_memberlist_config(self) -> Dict[str, Any]:
         return {"join_members": list(self._cluster_provider.gather_addresses())}
-
-    def _build_tls_config(self) -> Dict[str, Any]:
-        return {
-            "tls_enabled": True,
-            "tls_cert_path": self._tls_requirer.cacert,
-            "tls_key_path": self._tls_requirer.key,
-            "tls_ca_path": self._tls_requirer.capath,
-        }
