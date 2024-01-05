@@ -7,10 +7,9 @@
 import logging
 from collections import Counter
 from pathlib import Path
-from typing import Any, Dict, Iterable
+from typing import Any, Dict, Iterable, Optional
 
 from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirClusterProvider, MimirRole
-from mimir_config import _S3ConfigData
 
 logger = logging.getLogger(__name__)
 
@@ -70,10 +69,6 @@ class MimirCoordinator:
         roles: Iterable[MimirRole] = self._cluster_provider.gather_roles().keys()
         return set(roles).issuperset(MINIMAL_DEPLOYMENT)
 
-    def has_multiple_workers(self) -> bool:
-        """Return True if there are multiple workers forming the Mimir cluster."""
-        return len(list(self._cluster_provider.gather_addresses())) > 1
-
     def is_recommended(self) -> bool:
         """Return True if is a superset of the minimal deployment.
 
@@ -86,7 +81,7 @@ class MimirCoordinator:
                 return False
         return True
 
-    def build_config(self, s3_config_data: _S3ConfigData) -> Dict[str, Any]:
+    def build_config(self, s3_config_data: Optional[dict]) -> Dict[str, Any]:
         """Generate shared config file for mimir.
 
         Reference: https://grafana.com/docs/mimir/latest/configure/
@@ -102,7 +97,7 @@ class MimirCoordinator:
             "memberlist": self._build_memberlist_config(),
         }
 
-        if s3_config_data != _S3ConfigData():
+        if s3_config_data:
             mimir_config["common"]["storage"] = self._build_s3_storage_config(s3_config_data)
             self._update_s3_storage_config(mimir_config["blocks_storage"], "blocks")
             self._update_s3_storage_config(mimir_config["ruler_storage"], "rules")
@@ -182,16 +177,10 @@ class MimirCoordinator:
             },
         }
 
-    def _build_s3_storage_config(self, s3_config_data: _S3ConfigData) -> Dict[str, Any]:
+    def _build_s3_storage_config(self, s3_config_data: dict) -> Dict[str, Any]:
         return {
             "backend": "s3",
-            "s3": {
-                "endpoint": s3_config_data.endpoint,
-                "access_key_id": s3_config_data.access_key,
-                "secret_access_key": s3_config_data.secret_key,
-                "bucket_name": s3_config_data.bucket,
-                "region": s3_config_data.region,
-            },
+            "s3": s3_config_data,
         }
 
     def _update_s3_storage_config(self, storage_config: Dict[str, Any], prefix_name: str) -> None:

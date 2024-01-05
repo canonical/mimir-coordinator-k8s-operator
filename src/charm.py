@@ -10,7 +10,7 @@ develop a new k8s charm using the Operator Framework:
 https://discourse.charmhub.io/t/4208
 """
 import logging
-from typing import List
+from typing import List, Optional
 
 from charms.data_platform_libs.v0.s3 import (
     S3Requirer,
@@ -93,6 +93,16 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         """Returns the list of worker relations."""
         return self.model.relations.get("mimir_worker", [])
 
+    def has_multiple_workers(self) -> bool:
+        """Return True if there are multiple workers forming the Mimir cluster."""
+        mimir_cluster_relations = self.model.relations.get("mimir-cluster", [])
+        remote_units_count = sum(
+            len(relation.units)
+            for relation in mimir_cluster_relations
+            if relation.app != self.model.app
+        )
+        return remote_units_count > 1
+
     def _on_config_changed(self, _):
         """Handle changed configuration."""
         s3_config_data = self._get_s3_storage_config()
@@ -109,7 +119,7 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
             logger.warning("Incoherent deployment: Some required Mimir roles are missing.")
             return
         s3_config_data = self._get_s3_storage_config()
-        if s3_config_data == _S3ConfigData() and self.coordinator.has_multiple_workers():
+        if not s3_config_data and self.has_multiple_workers():
             logger.warning("Filesystem storage cannot be used with replicated mimir workers")
             return
         self.publish_config(s3_config_data)
@@ -118,12 +128,12 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         if not self.coordinator.is_coherent():
             logger.warning("Incoherent deployment: Some required Mimir roles are missing.")
             return
-        if self.coordinator.has_multiple_workers():
+        if self.has_multiple_workers():
             logger.warning("Filesystem storage cannot be used with replicated mimir workers")
             return
-        self.publish_config(_S3ConfigData())
+        self.publish_config(None)
 
-    def publish_config(self, s3_config_data: _S3ConfigData):
+    def publish_config(self, s3_config_data: Optional[dict]):
         """Generate config file and publish to all workers."""
         mimir_config = self.coordinator.build_config(s3_config_data)
         self.cluster_provider.publish_configs(mimir_config)
@@ -131,10 +141,9 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
     def _get_s3_storage_config(self):
         """Retrieve S3 storage configuration."""
         if not self.s3_requirer.relations:
-            return _S3ConfigData()
+            return None
         raw = self.s3_requirer.get_s3_connection_info()
-        raw["access_key"], raw["secret_key"] = raw.pop("access-key", ""), raw.pop("secret-key", "")
-        return _S3ConfigData(**raw)
+        return _S3ConfigData.load_and_dump_to_dict(raw)
 
     def _on_collect_status(self, event: CollectStatusEvent):
         """Handle start event."""
@@ -143,9 +152,11 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
                 BlockedStatus("Incoherent deployment: you are lacking some required Mimir roles")
             )
         s3_config_data = self._get_s3_storage_config()
-        if s3_config_data == _S3ConfigData() and self.coordinator.has_multiple_workers():
+        if not s3_config_data and self.has_multiple_workers():
             event.add_status(
-                BlockedStatus("Missing s3 relation, replicated units must use S3 storage.")
+                BlockedStatus(
+                    "When multiple units of Mimir are deployed, you must add a valid S3 relation. S3 relation missing/invalid."
+                )
             )
 
         if self.coordinator.is_recommended():
