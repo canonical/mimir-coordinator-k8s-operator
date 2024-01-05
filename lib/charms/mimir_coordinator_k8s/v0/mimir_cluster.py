@@ -10,7 +10,7 @@ import json
 import logging
 from collections import defaultdict
 from enum import Enum
-from typing import Any, Dict, MutableMapping, Set, List, Iterable
+from typing import Any, Dict, MutableMapping, Set, List, Iterable, TypeVar, Protocol, Union
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -52,7 +52,7 @@ class DatabagModel(BaseModel):
     """Pydantic config."""
 
     @classmethod
-    def load(cls, databag: MutableMapping):
+    def load(cls, databag: MutableMapping[str, str]):
         """Load this model from a Juju databag."""
         nest_under = cls.model_config.get('_NEST_UNDER')
         if nest_under:
@@ -72,7 +72,7 @@ class DatabagModel(BaseModel):
             log.error(msg, exc_info=True)
             raise DataValidationError(msg) from e
 
-    def dump(self, databag: Optional[MutableMapping] = None, clear: bool = True):
+    def dump(self, databag: Optional[MutableMapping[str, str]] = None, clear: bool = True):
         """Write the contents of this model to Juju databag.
 
         :param databag: the databag to write the data to.
@@ -179,7 +179,7 @@ class MimirClusterProviderAppData(DatabagModel):
 
 class ProviderSchema(DataBagSchema):
     """The schema for the provider side of this interface."""
-    app: MimirClusterProviderAppData  # pyright: ignore
+    app: MimirClusterProviderAppData  # pyright: ignore[reportIncompatibleVariableOverride]
 
 
 class JujuTopology(pydantic.BaseModel):
@@ -199,12 +199,12 @@ class MimirClusterRequirerAppData(DatabagModel):
 
 class RequirerSchema(DataBagSchema):
     """The schema for the requirer side of this interface."""
-    unit: MimirClusterRequirerUnitData  # pyright: ignore
-    app: MimirClusterRequirerAppData  # pyright: ignore
+    unit: MimirClusterRequirerUnitData  # pyright: ignore[reportIncompatibleVariableOverride]
+    app: MimirClusterRequirerAppData  # pyright: ignore[reportIncompatibleVariableOverride]
 
 
 class MimirClusterProvider(Object):
-    def __init__(self, charm, key: Optional[str] = None,
+    def __init__(self, charm: ops.CharmBase, key: Optional[str] = None,
                  endpoint: str = DEFAULT_ENDPOINT_NAME):
         super().__init__(charm, key)
         self._charm = charm
@@ -247,23 +247,22 @@ class MimirClusterProvider(Object):
         """Go through the worker's unit databags to collect all the addresses published by the units, by role."""
         data = defaultdict(set)
         for relation in self._relations:
-            if relation.app:
-                remote_app_databag = relation.data[relation.app]
+
+            if not relation.app:
+                log.debug(f"skipped {relation} as .app is None")
+                continue
+
+            worker_app_data = MimirClusterRequirerAppData.load(relation.data[relation.app])
+            worker_roles = set(worker_app_data.roles)
+            for worker_unit in relation.units:
                 try:
-                    worker_roles: List[MimirRole] = MimirClusterRequirerAppData.load(remote_app_databag).roles
+                    worker_data = MimirClusterRequirerUnitData.load(relation.data[worker_unit])
+                    unit_address = worker_data.address
+                    for role in worker_roles:
+                        data[role].add(unit_address)
                 except DataValidationError as e:
                     log.error(f"invalid databag contents: {e}")
-                    worker_roles = []
-
-                for worker_unit in relation.units:
-                    try:
-                        worker_data = MimirClusterRequirerUnitData.load(relation.data[worker_unit])
-                        unit_address = worker_data.address
-                        for role in worker_roles:
-                            data[role].add(unit_address)
-                    except DataValidationError as e:
-                        log.error(f"invalid databag contents: {e}")
-                        continue
+                    continue
 
         return data
 
@@ -338,13 +337,13 @@ class MimirClusterRequirer(Object):
         self.framework.observe(self._charm.on[endpoint].relation_broken,
                                self._on_mimir_cluster_relation_broken)
 
-    def _on_mimir_cluster_relation_broken(self, e):
+    def _on_mimir_cluster_relation_broken(self, _event: ops.RelationBrokenEvent):
         self.on.removed.emit()
 
-    def _on_mimir_cluster_relation_created(self, e):
-        self.on.created.emit(relation=e.relation, app=e.app, unit=e.unit)
+    def _on_mimir_cluster_relation_created(self, event: ops.RelationCreatedEvent):
+        self.on.created.emit(relation=event.relation, app=event.app, unit=event.unit)
 
-    def _on_mimir_cluster_relation_changed(self, _):
+    def _on_mimir_cluster_relation_changed(self, _event: ops.RelationChangedEvent):
         # to prevent the event from firing if the relation is in an unhealthy state (breaking...)
         if self.relation:
             new_config = self.get_mimir_config()
@@ -370,8 +369,8 @@ class MimirClusterRequirer(Object):
         app_data = relation.data[self._charm.app]
 
         try:
-            (MimirClusterRequirerUnitData.load(unit_data) and
-             MimirClusterRequirerAppData.load(app_data))
+            MimirClusterRequirerUnitData.load(unit_data)
+            MimirClusterRequirerAppData.load(app_data)
         except DataValidationError as e:
             log.error(f"invalid databag contents: {e}")
             return False

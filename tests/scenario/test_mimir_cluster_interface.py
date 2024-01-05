@@ -86,17 +86,20 @@ def test_role_collection(workers_roles, expected):
 def test_address_collection(workers_addresses):
     relations = []
     topo = {"unit": "foo/0", "model": "bar"}
+    remote_app_data = MimirClusterRequirerAppData(roles=[MimirRole.alertmanager]).dump()
     for worker_addresses in workers_addresses:
         units_data = {
             i: MimirClusterRequirerUnitData(address=address, juju_topology=topo).dump()
             for i, address in enumerate(worker_addresses)
         }
-        roles_data = MimirClusterRequirerAppData(roles=[MimirRole.read, MimirRole.write]).dump()
         relations.append(
             Relation(
-                "mimir-cluster-provide", remote_app_data=roles_data, remote_units_data=units_data
+                "mimir-cluster-provide",
+                remote_units_data=units_data,
+                remote_app_data=remote_app_data,
             )
         )
+
     # all unit addresses should show up
     expected = set(chain(*workers_addresses))
 

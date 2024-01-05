@@ -3,7 +3,7 @@
 """Nginx workload."""
 
 import logging
-from typing import Dict, List, Set
+from typing import Any, Dict, List, Optional, Set
 
 import crossplane
 from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirClusterProvider
@@ -11,7 +11,7 @@ from ops.pebble import Layer
 
 logger = logging.getLogger(__name__)
 
-LOCATIONS_DISTRIBUTOR: List[Dict] = [
+LOCATIONS_DISTRIBUTOR: List[Dict[str, Any]] = [
     {
         "directive": "location",
         "args": ["/distributor"],
@@ -160,8 +160,7 @@ class Nginx:
 
     config_path = "/etc/nginx/nginx.conf"
 
-    def __init__(self, cluster_provider: MimirClusterProvider, *args):
-        super().__init__(*args)
+    def __init__(self, cluster_provider: MimirClusterProvider):
         self.cluster_provider = cluster_provider
 
     @property
@@ -171,7 +170,7 @@ class Nginx:
         auth_enabled = False
         addresses_by_role = self.cluster_provider.gather_addresses_by_role()
 
-        def upstreams(addresses_by_role: Dict[str, Set[str]]) -> List[Dict]:
+        def upstreams(addresses_by_role: Dict[str, Set[str]]) -> List[Dict[str, Any]]:
             nginx_upstreams = []
             for role, address_set in addresses_by_role.items():
                 nginx_upstreams.append(
@@ -187,7 +186,7 @@ class Nginx:
 
             return nginx_upstreams
 
-        def locations(addresses_by_role: Dict[str, Set[str]]) -> List[Dict]:
+        def locations(addresses_by_role: Dict[str, Set[str]]) -> List[Dict[str, Any]]:
             nginx_locations = []
             roles = addresses_by_role.keys()
             if "distributor" in roles:
@@ -202,7 +201,7 @@ class Nginx:
                 nginx_locations.extend(LOCATIONS_COMPACTOR)
             return nginx_locations
 
-        def log_verbose(verbose):
+        def log_verbose(verbose: bool) -> List[Dict[str, Any]]:
             if verbose:
                 return [{"directive": "access_log", "args": ["/dev/stderr", "main"]}]
             return [
@@ -217,12 +216,12 @@ class Nginx:
                 {"directive": "access_log", "args": ["/dev/stderr"]},
             ]
 
-        def resolver(custom_resolver):
+        def resolver(custom_resolver: Optional[str]) -> List[Dict[str, Any]]:
             if custom_resolver:
                 return [{"directive": "resolver", "args": [custom_resolver]}]
             return [{"directive": "resolver", "args": ["kube-dns.kube-system.svc.cluster.local."]}]
 
-        def basic_auth(enabled):
+        def basic_auth(enabled: bool) -> List[Dict[str, Any]]:
             if enabled:
                 return [
                     {"directive": "auth_basic", "args": ['"Mimir"']},
