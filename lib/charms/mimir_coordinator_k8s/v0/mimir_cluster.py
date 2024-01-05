@@ -10,7 +10,7 @@ import json
 import logging
 from collections import defaultdict
 from enum import Enum
-from typing import Any, Dict, MutableMapping, Set, List, Iterable
+from typing import Any, Dict, MutableMapping, Set, List, Iterable, TypeVar, Protocol, Union
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -179,7 +179,7 @@ class MimirClusterProviderAppData(DatabagModel):
 
 class ProviderSchema(DataBagSchema):
     """The schema for the provider side of this interface."""
-    app: MimirClusterProviderAppData
+    app: MimirClusterProviderAppData  # pyright: ignore[reportIncompatibleVariableOverride]
 
 
 class JujuTopology(pydantic.BaseModel):
@@ -199,8 +199,8 @@ class MimirClusterRequirerAppData(DatabagModel):
 
 class RequirerSchema(DataBagSchema):
     """The schema for the requirer side of this interface."""
-    unit: MimirClusterRequirerUnitData
-    app: MimirClusterRequirerAppData
+    unit: MimirClusterRequirerUnitData# pyright: ignore[reportIncompatibleVariableOverride]
+    app: MimirClusterRequirerAppData# pyright: ignore[reportIncompatibleVariableOverride]
 
 
 class MimirClusterProvider(Object):
