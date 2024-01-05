@@ -12,6 +12,7 @@ https://discourse.charmhub.io/t/4208
 import logging
 from typing import List
 
+import ops
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v0.loki_push_api import LokiPushApiConsumer
 from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirClusterProvider
@@ -20,19 +21,16 @@ from charms.prometheus_k8s.v0.prometheus_remote_write import (
 )
 from mimir_coordinator import MimirCoordinator
 from nginx import Nginx
-from ops.charm import CharmBase, CollectStatusEvent
-from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, Relation
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
 
 
-class MimirCoordinatorK8SOperatorCharm(CharmBase):
+class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     """Charm the service."""
 
-    def __init__(self, *args):
-        super().__init__(*args)
+    def __init__(self, framework: ops.Framework):
+        super().__init__(framework)
 
         self._nginx_container = self.unit.get_container("nginx")
 
@@ -78,7 +76,7 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         )
 
     @property
-    def _s3_storage(self) -> dict:
+    def _s3_storage(self) -> dict:  # type: ignore
         # if not self.model.relations['s3']:
         #     return {}
         return {
@@ -90,11 +88,11 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         }
 
     @property
-    def mimir_worker_relations(self) -> List[Relation]:
+    def mimir_worker_relations(self) -> List[ops.Relation]:
         """Returns the list of worker relations."""
         return self.model.relations.get("mimir_worker", [])
 
-    def _on_config_changed(self, event):
+    def _on_config_changed(self, _event: ops.ConfigChangedEvent):
         """Handle changed configuration."""
         self.publish_config()
 
@@ -103,27 +101,27 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         mimir_config = self.coordinator.build_config(dict(self.config))
         self.cluster_provider.publish_configs(mimir_config)
 
-    def _on_mimir_cluster_changed(self, _):
+    def _on_mimir_cluster_changed(self, _event: ops.RelationChangedEvent):
         if self.coordinator.is_coherent():
             logger.info("mimir deployment coherent: publishing configs")
             self.publish_config()
         else:
             logger.warning("this mimir deployment is incoherent")
 
-    def _on_collect_status(self, event: CollectStatusEvent):
+    def _on_collect_status(self, event: ops.CollectStatusEvent):
         """Handle start event."""
         if not self.coordinator.is_coherent():
             event.add_status(
-                BlockedStatus(
+                ops.BlockedStatus(
                     "Incoherent deployment: you are " "lacking some required Mimir roles"
                 )
             )
 
         if self.coordinator.is_recommended():
             logger.warning("This deployment is below the recommended deployment requirement.")
-            event.add_status(ActiveStatus("degraded"))
+            event.add_status(ops.ActiveStatus("degraded"))
         else:
-            event.add_status(ActiveStatus())
+            event.add_status(ops.ActiveStatus())
 
     def _remote_write_endpoints_changed(self, _):
         # TODO Update grafana-agent config file with the new external prometheus's endpoint
@@ -133,7 +131,7 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         # TODO Update rules relation with the new list of Loki push-api endpoints
         pass
 
-    def _on_nginx_pebble_ready(self, _event) -> None:
+    def _on_nginx_pebble_ready(self, _event: ops.PebbleReadyEvent) -> None:
         self._nginx_container.push(self.nginx.config_path, self.nginx.config, make_dirs=True)
 
         self._nginx_container.add_layer("nginx", self.nginx.layer, combine=True)
@@ -141,4 +139,4 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
 
 
 if __name__ == "__main__":  # pragma: nocover
-    main(MimirCoordinatorK8SOperatorCharm)
+    ops.main.main(MimirCoordinatorK8SOperatorCharm)
