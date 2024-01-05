@@ -199,8 +199,8 @@ class MimirClusterRequirerAppData(DatabagModel):
 
 class RequirerSchema(DataBagSchema):
     """The schema for the requirer side of this interface."""
-    unit: MimirClusterRequirerUnitData# pyright: ignore[reportIncompatibleVariableOverride]
-    app: MimirClusterRequirerAppData# pyright: ignore[reportIncompatibleVariableOverride]
+    unit: MimirClusterRequirerUnitData  # pyright: ignore[reportIncompatibleVariableOverride]
+    app: MimirClusterRequirerAppData  # pyright: ignore[reportIncompatibleVariableOverride]
 
 
 class MimirClusterProvider(Object):
