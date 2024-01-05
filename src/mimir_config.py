@@ -7,7 +7,7 @@ import logging
 from dataclasses import asdict
 from typing import List, Literal, Optional, Union
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 
 S3_RELATION_NAME = "s3"
@@ -96,15 +96,6 @@ class _S3ConfigData(BaseModel):
     secret_access_key: str = Field(alias="secret-key")
     bucket_name: str = Field(alias="bucket")
     region: str = ""
-
-    @classmethod
-    def load_and_dump_to_dict(cls, raw_s3_config_data: dict) -> Optional[dict]:
-        try:
-            return cls(**raw_s3_config_data).model_dump()
-        except ValidationError:
-            msg = f"failed to validate s3 config data: {raw_s3_config_data}"
-            logger.error(msg, exc_info=True)
-            return None
 
 
 class _FilesystemStorageBackend(BaseModel):

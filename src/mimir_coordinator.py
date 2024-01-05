@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, Optional
 
 from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirClusterProvider, MimirRole
+from mimir_config import _S3ConfigData
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +82,7 @@ class MimirCoordinator:
                 return False
         return True
 
-    def build_config(self, s3_config_data: Optional[dict]) -> Dict[str, Any]:
+    def build_config(self, s3_config_data: Optional[_S3ConfigData]) -> Dict[str, Any]:
         """Generate shared config file for mimir.
 
         Reference: https://grafana.com/docs/mimir/latest/configure/
@@ -177,10 +178,10 @@ class MimirCoordinator:
             },
         }
 
-    def _build_s3_storage_config(self, s3_config_data: dict) -> Dict[str, Any]:
+    def _build_s3_storage_config(self, s3_config_data: _S3ConfigData) -> Dict[str, Any]:
         return {
             "backend": "s3",
-            "s3": s3_config_data,
+            "s3": s3_config_data.model_dump(),
         }
 
     def _update_s3_storage_config(self, storage_config: Dict[str, Any], prefix_name: str) -> None:

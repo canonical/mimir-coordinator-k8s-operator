@@ -49,13 +49,14 @@ class TestMimirConfig(unittest.TestCase):
         self.assertEqual(blocks_storage_config, expected_config)
 
     def test_build_config_with_s3_data(self):
-        s3_config_data = {
+        raw_s3_config_data = {
             "endpoint": "s3.com:port",
-            "access_key_id": "your_access_key",
-            "secret_access_key": "your_secret_key",
-            "bucket_name": "your_bucket",
+            "access-key": "your_access_key",
+            "secret-key": "your_secret_key",
+            "bucket": "your_bucket",
             "region": "your_region",
         }
+        s3_config_data = _S3ConfigData(**raw_s3_config_data)
         mimir_config = self.coordinator.build_config(s3_config_data)
         self.assertEqual(
             mimir_config["common"]["storage"],
@@ -68,14 +69,14 @@ class TestMimirConfig(unittest.TestCase):
         self.assertNotIn("storage", mimir_config["common"])
 
     def test_build_s3_storage_config(self):
-        s3_config_data = {
+        raw_s3_config_data = {
             "endpoint": "s3.com:port",
             "access-key": "your_access_key",
             "secret-key": "your_secret_key",
             "bucket": "your_bucket",
             "region": "your_region",
         }
-        s3_config_data = _S3ConfigData.load_and_dump_to_dict(s3_config_data)
+        s3_config_data = _S3ConfigData(**raw_s3_config_data)
         s3_storage_config = self.coordinator._build_s3_storage_config(s3_config_data)
         expected_config = {
             "backend": "s3",

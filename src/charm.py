@@ -27,6 +27,7 @@ from nginx import Nginx
 from ops.charm import CharmBase, CollectStatusEvent
 from ops.main import main
 from ops.model import ActiveStatus, BlockedStatus, Relation
+from pydantic import ValidationError
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
@@ -133,7 +134,7 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
             return
         self.publish_config(None)
 
-    def publish_config(self, s3_config_data: Optional[dict]):
+    def publish_config(self, s3_config_data: Optional[_S3ConfigData]):
         """Generate config file and publish to all workers."""
         mimir_config = self.coordinator.build_config(s3_config_data)
         self.cluster_provider.publish_configs(mimir_config)
@@ -143,7 +144,12 @@ class MimirCoordinatorK8SOperatorCharm(CharmBase):
         if not self.s3_requirer.relations:
             return None
         raw = self.s3_requirer.get_s3_connection_info()
-        return _S3ConfigData.load_and_dump_to_dict(raw)
+        try:
+            return _S3ConfigData(**raw)
+        except ValidationError:
+            msg = f"failed to validate s3 config data: {raw}"
+            logger.error(msg, exc_info=True)
+            return None
 
     def _on_collect_status(self, event: CollectStatusEvent):
         """Handle start event."""
