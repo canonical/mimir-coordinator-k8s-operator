@@ -179,7 +179,7 @@ class MimirClusterProviderAppData(DatabagModel):
 
 class ProviderSchema(DataBagSchema):
     """The schema for the provider side of this interface."""
-    app: MimirClusterProviderAppData
+    app: MimirClusterProviderAppData  # pyright: ignore
 
 
 class JujuTopology(pydantic.BaseModel):
@@ -199,8 +199,8 @@ class MimirClusterRequirerAppData(DatabagModel):
 
 class RequirerSchema(DataBagSchema):
     """The schema for the requirer side of this interface."""
-    unit: MimirClusterRequirerUnitData
-    app: MimirClusterRequirerAppData
+    unit: MimirClusterRequirerUnitData  # pyright: ignore
+    app: MimirClusterRequirerAppData  # pyright: ignore
 
 
 class MimirClusterProvider(Object):
@@ -247,17 +247,23 @@ class MimirClusterProvider(Object):
         """Go through the worker's unit databags to collect all the addresses published by the units, by role."""
         data = defaultdict(set)
         for relation in self._relations:
-            worker_app_data = MimirClusterRequirerAppData.load(relation.data[relation.app])
-            worker_roles = set(worker_app_data.roles)
-            for worker_unit in relation.units:
+            if relation.app:
+                remote_app_databag = relation.data[relation.app]
                 try:
-                    worker_data = MimirClusterRequirerUnitData.load(relation.data[worker_unit])
-                    unit_address = worker_data.address
-                    for role in worker_roles:
-                        data[role].add(unit_address)
+                    worker_roles: List[MimirRole] = MimirClusterRequirerAppData.load(remote_app_databag).roles
                 except DataValidationError as e:
                     log.error(f"invalid databag contents: {e}")
-                    continue
+                    worker_roles = []
+
+                for worker_unit in relation.units:
+                    try:
+                        worker_data = MimirClusterRequirerUnitData.load(relation.data[worker_unit])
+                        unit_address = worker_data.address
+                        for role in worker_roles:
+                            data[role].add(unit_address)
+                    except DataValidationError as e:
+                        log.error(f"invalid databag contents: {e}")
+                        continue
 
         return data
 
