@@ -3,11 +3,17 @@
 
 """Helper module for interacting with the Mimir configuration."""
 
+import logging
 from dataclasses import asdict
 from typing import List, Literal, Optional, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from pydantic.dataclasses import dataclass as pydantic_dataclass
+
+S3_RELATION_NAME = "s3"
+BUCKET_NAME = "mimir"
+
+logger = logging.getLogger(__name__)
 
 
 class InvalidConfigurationError(Exception):
@@ -83,19 +89,20 @@ class Alertmanager(BaseModel):
     external_url: Optional[str]
 
 
-class _S3StorageBackend(BaseModel):
+class _S3ConfigData(BaseModel):
+    model_config = {"populate_by_name": True}
+    access_key_id: str = Field(alias="access-key")
     endpoint: str
-    access_key_id: str
-    secret_access_key: str
-    insecure: bool = False
-    signature_version: str = "v4"
+    secret_access_key: str = Field(alias="secret-key")
+    bucket_name: str = Field(alias="bucket")
+    region: str = ""
 
 
 class _FilesystemStorageBackend(BaseModel):
     dir: str
 
 
-_StorageBackend = Union[_S3StorageBackend, _FilesystemStorageBackend]
+_StorageBackend = Union[_S3ConfigData, _FilesystemStorageBackend]
 _StorageKey = Union[Literal["filesystem"], Literal["s3"]]
 
 
