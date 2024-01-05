@@ -3,7 +3,7 @@
 """Nginx workload."""
 
 import logging
-from typing import Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
 import crossplane
 from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirClusterProvider
@@ -18,7 +18,7 @@ KEY_PATH = f"{NGINX_DIR}/certs/server.key"
 CERT_PATH = f"{NGINX_DIR}/certs/server.cert"
 CA_CERT_PATH = f"{NGINX_DIR}/certs/ca.cert"
 
-LOCATIONS_DISTRIBUTOR: List[Dict] = [
+LOCATIONS_DISTRIBUTOR: List[Dict[str, Any]] = [
     {
         "directive": "location",
         "args": ["/distributor"],
@@ -167,8 +167,7 @@ class Nginx:
 
     config_path = NGINX_CONFIG
 
-    def __init__(self, cluster_provider: MimirClusterProvider, server_name: str, *args):
-        super().__init__(*args)
+    def __init__(self, cluster_provider: MimirClusterProvider, server_name: str):
         self.cluster_provider = cluster_provider
         self.server_name = server_name
 
