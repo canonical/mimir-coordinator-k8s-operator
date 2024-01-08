@@ -58,7 +58,7 @@ class MimirCoordinator:
         tls_requirer: Any = None,
         # TODO: use and import s3 requirer obj
         s3_requirer: Any = None,
-        root_data_dir: Path = Path("/etc/mimir"),
+        root_data_dir: Path = Path("/data"),
     ):
         self._cluster_provider = cluster_provider
         self._s3_requirer = s3_requirer  # type: ignore
