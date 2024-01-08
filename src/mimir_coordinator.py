@@ -82,8 +82,9 @@ class MimirCoordinator:
                 return False
         return True
 
-
-    def build_config(self, s3_config_data: Optional[_S3ConfigData], tls: bool = False) -> Dict[str, Any]:
+    def build_config(
+        self, s3_config_data: Optional[_S3ConfigData], tls: bool = False
+    ) -> Dict[str, Any]:
         """Generate shared config file for mimir.
 
         Reference: https://grafana.com/docs/mimir/latest/configure/
@@ -107,22 +108,25 @@ class MimirCoordinator:
 
         # todo: TLS config for memberlist
         if tls:
-            mimir_config["server"] = {
-                "http_tls_config": {
-                    "cert": self._tls_requirer.cert,
-                    "key": self._tls_requirer.key,
-                    "client_ca": self._tls_requirer.ca,
-                    "client_auth_type": "RequestClientCert",
-                },
-                "grpc_tls_config": {
-                    "cert": self._tls_requirer.cert,
-                    "key": self._tls_requirer.key,
-                    "client_ca": self._tls_requirer.ca,
-                    "client_auth_type": "RequestClientCert",
-                },
-            }
+            mimir_config["server"] = self._build_tls_config()
 
         return mimir_config
+
+    def _build_tls_config(self) -> Dict[str, Any]:
+        return {
+            "http_tls_config": {
+                "cert": self._tls_requirer.cert,
+                "key": self._tls_requirer.key,
+                "client_ca": self._tls_requirer.ca,
+                "client_auth_type": "RequestClientCert",
+            },
+            "grpc_tls_config": {
+                "cert": self._tls_requirer.cert,
+                "key": self._tls_requirer.key,
+                "client_ca": self._tls_requirer.ca,
+                "client_auth_type": "RequestClientCert",
+            },
+        }
 
     # data_dir:
     # The Mimir Alertmanager stores the alerts state on local disk at the location configured using -alertmanager.storage.path.
@@ -201,6 +205,7 @@ class MimirCoordinator:
 
     def _update_s3_storage_config(self, storage_config: Dict[str, Any], prefix_name: str) -> None:
         """Update S3 storage configuration in `storage_config`.
+
         If the key 'filesystem' is present in `storage_config`, remove it and add a new key
         'storage_prefix' with the value of `prefix_name` for the S3 bucket.
         """

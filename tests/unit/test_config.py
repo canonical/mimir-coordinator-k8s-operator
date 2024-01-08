@@ -9,6 +9,10 @@ class TestMimirConfig(unittest.TestCase):
     def setUp(self):
         self.cluster_provider = MagicMock()
         self.tls_requirer = MagicMock()
+        self.tls_requirer.cert = "CERT"
+        self.tls_requirer.key = "KEY"
+        self.tls_requirer.ca = "CA CERT"
+
         self.coordinator = MimirCoordinator(
             cluster_provider=self.cluster_provider,
             tls_requirer=self.tls_requirer,
@@ -109,15 +113,20 @@ class TestMimirConfig(unittest.TestCase):
         self.assertEqual(memberlist_config, expected_config)
 
     def test_build_tls_config(self):
-        self.tls_requirer.cacert = "/path/to/cert.pem"
-        self.tls_requirer.key = "/path/to/key.pem"
-        self.tls_requirer.capath = "/path/to/ca.pem"
         tls_config = self.coordinator._build_tls_config()
         expected_config = {
-            "tls_enabled": True,
-            "tls_cert_path": "/path/to/cert.pem",
-            "tls_key_path": "/path/to/key.pem",
-            "tls_ca_path": "/path/to/ca.pem",
+            "http_tls_config": {
+                "cert": "CERT",
+                "key": "KEY",
+                "client_ca": "CA CERT",
+                "client_auth_type": "RequestClientCert",
+            },
+            "grpc_tls_config": {
+                "cert": "CERT",
+                "key": "KEY",
+                "client_ca": "CA CERT",
+                "client_auth_type": "RequestClientCert",
+            },
         }
         self.assertEqual(tls_config, expected_config)
 

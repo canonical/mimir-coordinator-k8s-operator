@@ -249,7 +249,7 @@ class Nginx:
             }
         )
 
-    def _log_verbose(self, verbose: bool = True) -> List[Dict]:
+    def _log_verbose(self, verbose: bool = True) -> List[Dict[str, Any]]:
         if verbose:
             return [{"directive": "access_log", "args": ["/dev/stderr", "main"]}]
         return [
@@ -264,7 +264,7 @@ class Nginx:
             {"directive": "access_log", "args": ["/dev/stderr"]},
         ]
 
-    def _upstreams(self, addresses_by_role: Dict[str, Set[str]]) -> List[Dict]:
+    def _upstreams(self, addresses_by_role: Dict[str, Set[str]]) -> List[Dict[str, Any]]:
         nginx_upstreams = []
         for role, address_set in addresses_by_role.items():
             nginx_upstreams.append(
@@ -279,7 +279,7 @@ class Nginx:
 
         return nginx_upstreams
 
-    def _locations(self, addresses_by_role: Dict[str, Set[str]]) -> List[Dict]:
+    def _locations(self, addresses_by_role: Dict[str, Set[str]]) -> List[Dict[str, Any]]:
         nginx_locations = []
         roles = addresses_by_role.keys()
         if "distributor" in roles:
@@ -294,12 +294,12 @@ class Nginx:
             nginx_locations.extend(LOCATIONS_COMPACTOR)
         return nginx_locations
 
-    def _resolver(self, custom_resolver) -> List[Dict]:
+    def _resolver(self, custom_resolver: Optional[List[Any]] = None) -> List[Dict[str, Any]]:
         if custom_resolver:
             return [{"directive": "resolver", "args": [custom_resolver]}]
         return [{"directive": "resolver", "args": ["kube-dns.kube-system.svc.cluster.local."]}]
 
-    def _basic_auth(self, enabled) -> List[Optional[Dict]]:
+    def _basic_auth(self, enabled: bool) -> List[Optional[Dict[str, Any]]]:
         if enabled:
             return [
                 {"directive": "auth_basic", "args": ['"Mimir"']},
@@ -310,7 +310,7 @@ class Nginx:
             ]
         return []
 
-    def _server(self, addresses_by_role: Dict[str, Set[str]], tls: bool = False) -> Dict:
+    def _server(self, addresses_by_role: Dict[str, Set[str]], tls: bool = False) -> Dict[str, Any]:
         auth_enabled = False
 
         if tls:

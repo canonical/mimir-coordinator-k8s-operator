@@ -13,7 +13,7 @@ import logging
 import socket
 import subprocess
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 
 import ops
 from charms.data_platform_libs.v0.s3 import (
@@ -29,11 +29,8 @@ from charms.prometheus_k8s.v0.prometheus_remote_write import (
 from mimir_config import BUCKET_NAME, S3_RELATION_NAME, _S3ConfigData
 from mimir_coordinator import MimirCoordinator
 from nginx import CA_CERT_PATH, CERT_PATH, KEY_PATH, Nginx
-from ops.charm import CharmBase, CollectStatusEvent
-from ops.main import main
-from ops.model import ActiveStatus, BlockedStatus, Relation
+from ops.charm import CollectStatusEvent
 from pydantic import ValidationError
-
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
@@ -42,8 +39,8 @@ logger = logging.getLogger(__name__)
 class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     """Charm the service."""
 
-    def __init__(self, framework: ops.Framework):
-        super().__init__(framework)
+    def __init__(self, *args: Any):
+        super().__init__(*args)
 
         self._nginx_container = self.unit.get_container("nginx")
 
@@ -136,7 +133,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         )
         return remote_units_count > 1
 
-    def _on_config_changed(self, __: ops.ConfigChangedEvent):
+    def _on_config_changed(self, _: ops.ConfigChangedEvent):
         """Handle changed configuration."""
         s3_config_data = self._get_s3_storage_config()
         self.publish_config(s3_config_data)
@@ -146,9 +143,9 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self._ensure_pebble_layer()
         self.publish_config(tls=self._is_cert_available)
 
-    def publish_config(self, tls: bool = False, s3_config_data: Optional[_S3ConfigData]):
+    def publish_config(self, s3_config_data: Optional[_S3ConfigData] = None, tls: bool = False):
         """Generate config file and publish to all workers."""
-        mimir_config = self.coordinator.build_config(s3_config_data, tls=tls)
+        mimir_config = self.coordinator.build_config(s3_config_data=s3_config_data, tls=tls)
         self.cluster_provider.publish_configs(mimir_config)
 
     def _on_mimir_cluster_changed(self, _):
@@ -174,7 +171,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         if self.has_multiple_workers():
             logger.warning("Filesystem storage cannot be used with replicated mimir workers")
             return
-        self.publish_config(None)        
+        self.publish_config(None)
 
     def _get_s3_storage_config(self):
         """Retrieve S3 storage configuration."""
@@ -188,7 +185,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             logger.error(msg, exc_info=True)
             return None
 
-    def _on_collect_status(self, event: ops.CollectStatusEvent):
+    def _on_collect_status(self, event: CollectStatusEvent):
         """Handle start event."""
         if not self.coordinator.is_coherent():
             event.add_status(
@@ -227,7 +224,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         )
         self._nginx_container.add_layer("nginx", self.nginx.layer, combine=True)
         self._nginx_container.autostart()
-
 
     def _update_cert(self):
         if not self._nginx_container.can_connect():
