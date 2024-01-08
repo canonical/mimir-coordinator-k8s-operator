@@ -20,35 +20,35 @@ class TestMimirConfig(unittest.TestCase):
 
     def test_build_alertmanager_config(self):
         alertmanager_config = self.coordinator._build_alertmanager_config()
-        expected_config = {"data_dir": "/etc/mimir/data-alertmanager"}
+        expected_config = {"data_dir": "/data/data-alertmanager"}
         self.assertEqual(alertmanager_config, expected_config)
 
     def test_build_alertmanager_storage_config(self):
         alertmanager_storage_config = self.coordinator._build_alertmanager_storage_config()
-        expected_config = {"filesystem": {"dir": "/etc/mimir/data-alertmanager-recovery"}}
+        expected_config = {"filesystem": {"dir": "/data/data-alertmanager-recovery"}}
         self.assertEqual(alertmanager_storage_config, expected_config)
 
     def test_build_compactor_config(self):
         compactor_config = self.coordinator._build_compactor_config()
-        expected_config = {"data_dir": "/etc/mimir/data-compactor"}
+        expected_config = {"data_dir": "/data/data-compactor"}
         self.assertEqual(compactor_config, expected_config)
 
     def test_build_ruler_config(self):
         ruler_config = self.coordinator._build_ruler_config()
-        expected_config = {"rule_path": "/etc/mimir/data-ruler"}
+        expected_config = {"rule_path": "/data/data-ruler"}
         self.assertEqual(ruler_config, expected_config)
 
     def test_build_ruler_storage_config(self):
         ruler_storage_config = self.coordinator._build_ruler_storage_config()
-        expected_config = {"filesystem": {"dir": "/etc/mimir/rules"}}
+        expected_config = {"filesystem": {"dir": "/data/rules"}}
         self.assertEqual(ruler_storage_config, expected_config)
 
     def test_build_blocks_storage_config(self):
         blocks_storage_config = self.coordinator._build_blocks_storage_config()
         expected_config = {
-            "bucket_store": {"sync_dir": "/etc/mimir/tsdb-sync"},
-            "filesystem": {"dir": "/etc/mimir/blocks"},
-            "tsdb": {"dir": "/etc/mimir/tsdb"},
+            "bucket_store": {"sync_dir": "/data/tsdb-sync"},
+            "filesystem": {"dir": "/data/blocks"},
+            "tsdb": {"dir": "/data/tsdb"},
         }
         self.assertEqual(blocks_storage_config, expected_config)
 
@@ -95,7 +95,7 @@ class TestMimirConfig(unittest.TestCase):
         self.assertEqual(s3_storage_config, expected_config)
 
     def test_update_s3_storage_config(self):
-        storage_config = {"filesystem": {"dir": "/etc/mimir/blocks"}}
+        storage_config = {"filesystem": {"dir": "/data/blocks"}}
         self.coordinator._update_s3_storage_config(storage_config, "blocks")
         expected_config = {"storage_prefix": "blocks"}
         self.assertEqual(storage_config, expected_config)
