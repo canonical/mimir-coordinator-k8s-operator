@@ -22,6 +22,8 @@ from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirClusterProvider
 from charms.prometheus_k8s.v0.prometheus_remote_write import (
     PrometheusRemoteWriteConsumer,
 )
+from charms.tempo_k8s.v1.charm_tracing import trace_charm
+from charms.tempo_k8s.v1.tracing import TracingEndpointRequirer
 from mimir_config import BUCKET_NAME, S3_RELATION_NAME, _S3ConfigData
 from mimir_coordinator import MimirCoordinator
 from nginx import Nginx
@@ -31,6 +33,16 @@ from pydantic import ValidationError
 logger = logging.getLogger(__name__)
 
 
+@trace_charm(
+    tracing_endpoint="tempo",
+    extra_types=[
+        S3Requirer,
+        MimirClusterProvider,
+        MimirCoordinator,
+        Nginx,
+    ],
+    # TODO add certificate file once TLS support is merged
+)
 class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     """Charm the service."""
 
@@ -50,6 +62,8 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self.coordinator = MimirCoordinator(cluster_provider=self.cluster_provider)
 
         self.nginx = Nginx(cluster_provider=self.cluster_provider)
+        self.tracing = TracingEndpointRequirer(self)
+
         self.framework.observe(
             self.on.nginx_pebble_ready,  # pyright: ignore
             self._on_nginx_pebble_ready,
@@ -184,6 +198,14 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
 
         self._nginx_container.add_layer("nginx", self.nginx.layer, combine=True)
         self._nginx_container.autostart()
+
+    @property
+    def tempo(self) -> Optional[str]:
+        """Tempo endpoint for charm tracing."""
+        if self.tracing.is_ready():
+            return self.tracing.otlp_http_endpoint()
+        else:
+            return None
 
 
 if __name__ == "__main__":  # pragma: nocover
