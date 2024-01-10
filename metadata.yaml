@@ -59,7 +59,7 @@ requires:
     interface: tracing
     limit: 1
     description: |
-      Enables sending traces for charm troubleshooting.
+      Enables sending traces to the tracing backend.
 
 provides:
   mimir-cluster:

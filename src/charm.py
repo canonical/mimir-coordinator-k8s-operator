@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 @trace_charm(
-    tracing_endpoint="tempo",
+    tracing_endpoint="tempo_endpoint",
     extra_types=[
         S3Requirer,
         MimirClusterProvider,
@@ -200,7 +200,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self._nginx_container.autostart()
 
     @property
-    def tempo(self) -> Optional[str]:
+    def tempo_endpoint(self) -> Optional[str]:
         """Tempo endpoint for charm tracing."""
         if self.tracing.is_ready():
             return self.tracing.otlp_http_endpoint()
