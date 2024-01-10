@@ -55,6 +55,12 @@ requires:
     description: |
       Ingress-per-app, to load-balance across multiple units of the coordinator.
 
+  tracing:
+    interface: tracing
+    limit: 1
+    description: |
+      Enables sending traces to the tracing backend.
+
 provides:
   mimir-cluster:
     interface: mimir_cluster
@@ -68,7 +74,3 @@ provides:
       Forward workers' built-in dashboards to grafana
       (the coordinator, not the worker, owns all dashboards).
 
-  tracing:
-    interface: tracing
-    description: |
-      Send traces to tempo.
