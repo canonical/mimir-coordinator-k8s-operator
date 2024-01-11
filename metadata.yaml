@@ -80,11 +80,6 @@ provides:
       Forward workers' built-in dashboards to grafana
       (the coordinator, not the worker, owns all dashboards).
 
-  tracing:
-    interface: tracing
-    description: |
-      Send traces to tempo.
-
 # FIXME: We need this relationship since it is needed by CertHandler
 # Once this PR is merged https://github.com/canonical/observability-libs/pull/66
 # we can remove it
