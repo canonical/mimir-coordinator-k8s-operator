@@ -22,7 +22,7 @@ from charms.data_platform_libs.v0.s3 import (
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v0.loki_push_api import LokiPushApiConsumer
 from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirClusterProvider
-from charms.observability_libs.v0.cert_handler import CertHandler
+from charms.observability_libs.v1.cert_handler import CertHandler
 from charms.prometheus_k8s.v0.prometheus_remote_write import (
     PrometheusRemoteWriteConsumer,
 )
@@ -62,11 +62,16 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         #  targets with the new memberlist.
         #  (Remote write would still be the same nginx-proxied endpoint.)
 
+        # self.server_cert = CertHandler(
+        #     self,
+        #     key="mimir-server-cert",
+        #     peer_relation_name="replicas",
+        #     extra_sans_dns=[self.hostname],
+        # )
         self.server_cert = CertHandler(
-            self,
+            charm=self,
             key="mimir-server-cert",
-            peer_relation_name="replicas",
-            extra_sans_dns=[self.hostname],
+            sans=[self.hostname],
         )
         self.s3_requirer = S3Requirer(self, S3_RELATION_NAME, BUCKET_NAME)
         self.cluster_provider = MimirClusterProvider(self)
@@ -127,9 +132,9 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     def _is_cert_available(self) -> bool:
         return (
             self.server_cert.enabled
-            and (self.server_cert.cert is not None)
-            and (self.server_cert.key is not None)
-            and (self.server_cert.ca is not None)
+            and (self.server_cert.server_cert is not None)
+            and (self.server_cert.private_key is not None)
+            and (self.server_cert.ca_cert is not None)
         )
 
     @property
@@ -249,23 +254,23 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             # Save the workload certificates
             self._nginx_container.push(
                 CERT_PATH,
-                self.server_cert.cert,  # pyright: ignore
+                self.server_cert.server_cert,  # pyright: ignore
                 make_dirs=True,
             )
             self._nginx_container.push(
                 KEY_PATH,
-                self.server_cert.key,  # pyright: ignore
+                self.server_cert.private_key,  # pyright: ignore
                 make_dirs=True,
             )
             # Save the CA among the trusted CAs and trust it
             self._nginx_container.push(
                 ca_cert_path,
-                self.server_cert.ca,  # pyright: ignore
+                self.server_cert.ca_cert,  # pyright: ignore
                 make_dirs=True,
             )
             self._nginx_container.push(
                 CA_CERT_PATH,
-                self.server_cert.ca,  # pyright: ignore
+                self.server_cert.ca_cert,  # pyright: ignore
                 make_dirs=True,
             )
         else:

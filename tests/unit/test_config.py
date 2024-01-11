@@ -9,9 +9,9 @@ class TestMimirConfig(unittest.TestCase):
     def setUp(self):
         self.cluster_provider = MagicMock()
         self.tls_requirer = MagicMock()
-        self.tls_requirer.cert = "CERT"
-        self.tls_requirer.key = "KEY"
-        self.tls_requirer.ca = "CA CERT"
+        self.tls_requirer.server_cert = "CERT"
+        self.tls_requirer.private_key = "KEY"
+        self.tls_requirer.ca_cert = "CA CERT"
 
         self.coordinator = MimirCoordinator(
             cluster_provider=self.cluster_provider,

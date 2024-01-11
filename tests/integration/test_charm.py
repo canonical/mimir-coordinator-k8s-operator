@@ -62,6 +62,12 @@ async def test_build_and_deploy(ops_test: OpsTest):
     # Deploy the charm and wait for active/idle status
     await deploy_literal_bundle(ops_test, test_bundle)  # See appendix below
     await ops_test.model.wait_for_idle(
-        status="active", raise_on_error=False, timeout=600, idle_period=30
+        apps=["loki", "prometheus", "grafana"],
+        status="active",
+        raise_on_error=False,
+        timeout=600,
+        idle_period=30,
     )
-    await ops_test.model.wait_for_idle(status="active")
+    await ops_test.model.wait_for_idle(
+        apps=[mc.name], status="blocked", raise_on_error=False, timeout=600, idle_period=30
+    )

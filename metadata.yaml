@@ -79,10 +79,3 @@ provides:
     description: |
       Forward workers' built-in dashboards to grafana
       (the coordinator, not the worker, owns all dashboards).
-
-# FIXME: We need this relationship since it is needed by CertHandler
-# Once this PR is merged https://github.com/canonical/observability-libs/pull/66
-# we can remove it
-peers:
-  replicas:
-    interface: coordinator_replica

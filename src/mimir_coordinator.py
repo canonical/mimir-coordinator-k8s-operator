@@ -115,15 +115,15 @@ class MimirCoordinator:
     def _build_tls_config(self) -> Dict[str, Any]:
         return {
             "http_tls_config": {
-                "cert": self._tls_requirer.cert,
-                "key": self._tls_requirer.key,
-                "client_ca": self._tls_requirer.ca,
+                "cert": self._tls_requirer.server_cert,
+                "key": self._tls_requirer.private_key,
+                "client_ca": self._tls_requirer.ca_cert,
                 "client_auth_type": "RequestClientCert",
             },
             "grpc_tls_config": {
-                "cert": self._tls_requirer.cert,
-                "key": self._tls_requirer.key,
-                "client_ca": self._tls_requirer.ca,
+                "cert": self._tls_requirer.server_cert,
+                "key": self._tls_requirer.private_key,
+                "client_ca": self._tls_requirer.ca_cert,
                 "client_auth_type": "RequestClientCert",
             },
         }
