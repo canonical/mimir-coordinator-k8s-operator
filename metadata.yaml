@@ -61,6 +61,12 @@ requires:
     description: |
       Certificate and key files for securing Mimir communications with TLS.
 
+  tracing:
+    interface: tracing
+    limit: 1
+    description: |
+      Enables sending traces to the tracing backend.
+
 provides:
   mimir-cluster:
     interface: mimir_cluster
