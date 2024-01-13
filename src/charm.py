@@ -62,12 +62,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         #  targets with the new memberlist.
         #  (Remote write would still be the same nginx-proxied endpoint.)
 
-        # self.server_cert = CertHandler(
-        #     self,
-        #     key="mimir-server-cert",
-        #     peer_relation_name="replicas",
-        #     extra_sans_dns=[self.hostname],
-        # )
         self.server_cert = CertHandler(
             charm=self,
             key="mimir-server-cert",

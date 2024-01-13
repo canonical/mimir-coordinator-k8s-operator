@@ -45,13 +45,17 @@ async def test_nginx_config_has_ssl(ops_test: OpsTest):
             trust=True,
         ),
     )
+
     await asyncio.gather(
-        ops_test.model.add_relation(mimir_app_name, ca_app_name),
+        ops_test.model.wait_for_idle(apps=[mimir_app_name], status="blocked"),
+        ops_test.model.wait_for_idle(apps=[ca_app_name], status="active")
     )
-    await ops_test.model.wait_for_idle(apps=[mimir_app_name], status="blocked")
-    await ops_test.model.wait_for_idle(apps=[ca_app_name], status="active")
+    await ops_test.model.add_relation(mimir_app_name, ca_app_name)
+    await asyncio.gather(
+        ops_test.model.wait_for_idle(apps=[mimir_app_name], status="blocked"),
+        ops_test.model.wait_for_idle(apps=[ca_app_name], status="active")
+    )
 
     nginx_config = get_nginx_config(ops_test).decode()
-
     assert "ssl_certificate /etc/nginx/certs/server.cert;" in nginx_config
     assert "ssl_certificate_key /etc/nginx/certs/server.key;" in nginx_config
