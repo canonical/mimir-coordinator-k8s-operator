@@ -92,8 +92,8 @@ class Alertmanager(BaseModel):
 class Server(BaseModel):
     """Server schema."""
 
-    http_tls_config: Dict
-    grpc_tls_config: Dict
+    http_tls_config: Dict[str, Dict[str, str]]
+    grpc_tls_config: Dict[str, Dict[str, str]]
 
 
 class _S3ConfigData(BaseModel):

@@ -161,6 +161,18 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         mimir_config = self.coordinator.build_config(s3_config_data=s3_config_data, tls=tls)
         self.cluster_provider.publish_configs(mimir_config)
 
+        if tls:
+            self.publish_secrets()
+
+    def publish_secrets(self) -> None:
+        """Publish secrets."""
+        secrets = {
+            "private_key_secret_id": self.server_cert.private_key_secret_id,
+            "ca_server_cert_secret_id": self.server_cert.ca_server_cert_secret_id,
+        }
+        self.cluster_provider.publish_secrets(secrets)
+        self.cluster_provider.grant_permisions(secrets)
+
     def _on_mimir_cluster_changed(self, _):
         self._process_cluster_and_s3_credentials_changes()
 

@@ -9,10 +9,6 @@ class TestMimirConfig(unittest.TestCase):
     def setUp(self):
         self.cluster_provider = MagicMock()
         self.tls_requirer = MagicMock()
-        self.tls_requirer.server_cert = "CERT"
-        self.tls_requirer.private_key = "KEY"
-        self.tls_requirer.ca_cert = "CA CERT"
-
         self.coordinator = MimirCoordinator(
             cluster_provider=self.cluster_provider,
             tls_requirer=self.tls_requirer,
@@ -116,15 +112,15 @@ class TestMimirConfig(unittest.TestCase):
         tls_config = self.coordinator._build_tls_config()
         expected_config = {
             "http_tls_config": {
-                "cert": "CERT",
-                "key": "KEY",
-                "client_ca": "CA CERT",
+                "cert_file": "/etc/mimir/server.cert",
+                "key_file": "/etc/mimir/private.key",
+                "client_ca_file": "/etc/mimir/ca.cert",
                 "client_auth_type": "RequestClientCert",
             },
             "grpc_tls_config": {
-                "cert": "CERT",
-                "key": "KEY",
-                "client_ca": "CA CERT",
+                "cert_file": "/etc/mimir/server.cert",
+                "key_file": "/etc/mimir/private.key",
+                "client_ca_file": "/etc/mimir/ca.cert",
                 "client_auth_type": "RequestClientCert",
             },
         }

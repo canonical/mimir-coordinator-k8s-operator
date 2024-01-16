@@ -9,7 +9,13 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional
 
-from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirClusterProvider, MimirRole
+from charms.mimir_coordinator_k8s.v0.mimir_cluster import (
+    MIMIR_CERT_FILE,
+    MIMIR_CLIENT_CA_FILE,
+    MIMIR_KEY_FILE,
+    MimirClusterProvider,
+    MimirRole,
+)
 from mimir_config import _S3ConfigData
 
 logger = logging.getLogger(__name__)
@@ -113,19 +119,15 @@ class MimirCoordinator:
         return mimir_config
 
     def _build_tls_config(self) -> Dict[str, Any]:
+        tls_config = {
+            "cert_file": MIMIR_CERT_FILE,
+            "key_file": MIMIR_KEY_FILE,
+            "client_ca_file": MIMIR_CLIENT_CA_FILE,
+            "client_auth_type": "RequestClientCert",
+        }
         return {
-            "http_tls_config": {
-                "cert": self._tls_requirer.server_cert,
-                "key": self._tls_requirer.private_key,
-                "client_ca": self._tls_requirer.ca_cert,
-                "client_auth_type": "RequestClientCert",
-            },
-            "grpc_tls_config": {
-                "cert": self._tls_requirer.server_cert,
-                "key": self._tls_requirer.private_key,
-                "client_ca": self._tls_requirer.ca_cert,
-                "client_auth_type": "RequestClientCert",
-            },
+            "http_tls_config": tls_config,
+            "grpc_tls_config": tls_config,
         }
 
     # data_dir:

@@ -66,7 +66,7 @@ logger = logging.getLogger(__name__)
 
 LIBID = "b5cd5cd580f3428fa5f59a8876dcbe6a"
 LIBAPI = 1
-LIBPATCH = 0
+LIBPATCH = 1
 
 
 def is_ip_address(value: str) -> bool:
@@ -297,6 +297,15 @@ class CertHandler(Object):
                 relation.data[self.charm.unit]["secret-id"] = secret.id  # pyright: ignore
                 self.on.cert_changed.emit()  # pyright: ignore
 
+    def _retrieve_secret_id(self, secret_id_name: str) -> Optional[str]:
+        if not (relation := self.charm.model.get_relation(self.certificates_relation_name)):
+            return None
+
+        if not (secret_id := relation.data[self.charm.unit].get(secret_id_name)):
+            return None
+
+        return secret_id
+
     def _retrieve_from_secret(self, value: str, secret_id_name: str) -> Optional[str]:
         if not (relation := self.charm.model.get_relation(self.certificates_relation_name)):
             return None
@@ -314,6 +323,11 @@ class CertHandler(Object):
     def private_key(self) -> Optional[str]:
         """Private key."""
         return self._retrieve_from_secret("private-key", "private-key-secret-id")
+
+    @property
+    def private_key_secret_id(self) -> Optional[str]:
+        """Private key secret id."""
+        return self._retrieve_secret_id("private-key-secret-id")
 
     @property
     def _csr(self) -> Optional[str]:
@@ -337,6 +351,11 @@ class CertHandler(Object):
     def ca_cert(self) -> Optional[str]:
         """CA Certificate."""
         return self._retrieve_from_secret("ca-cert", "secret-id")
+
+    @property
+    def ca_server_cert_secret_id(self) -> Optional[str]:
+        """CA, servert cert secret id."""
+        return self._retrieve_secret_id("secret-id")
 
     @property
     def server_cert(self) -> Optional[str]:
@@ -376,13 +395,13 @@ class CertHandler(Object):
         self._generate_csr(overwrite=True, clear_cert=True)
         self.on.cert_changed.emit()  # pyright: ignore
 
-    def _on_all_certificates_invalidated(self, event: AllCertificatesInvalidatedEvent) -> None:
+    def _on_all_certificates_invalidated(self, _: AllCertificatesInvalidatedEvent) -> None:
         # Do what you want with this information, probably remove all certificates
         # Note: assuming "limit: 1" in metadata
         self._generate_csr(overwrite=True, clear_cert=True)
         self.on.cert_changed.emit()  # pyright: ignore
 
-    def _on_certificates_relation_broken(self, event: RelationBrokenEvent) -> None:
+    def _on_certificates_relation_broken(self, _: RelationBrokenEvent) -> None:
         """Clear the certificates data when removing the relation."""
         try:
             secret = self.model.get_secret(label="csr-secret-id")

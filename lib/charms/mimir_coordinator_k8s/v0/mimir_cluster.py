@@ -24,10 +24,14 @@ LIBID = "9818a8d44028454a94c6c3a01f4316d2"
 DEFAULT_ENDPOINT_NAME = "mimir-cluster"
 
 LIBAPI = 0
-LIBPATCH = 2
+LIBPATCH = 3
 
 BUILTIN_JUJU_KEYS = {"ingress-address", "private-address", "egress-subnets"}
 
+MIMIR_CONFIG_FILE = "/etc/mimir/mimir-config.yaml"
+MIMIR_CERT_FILE = "/etc/mimir/server.cert"
+MIMIR_KEY_FILE = "/etc/mimir/private.key"
+MIMIR_CLIENT_CA_FILE = "/etc/mimir/ca.cert"
 
 class MimirClusterError(Exception):
     """Base class for exceptions raised by this module."""
@@ -222,6 +226,20 @@ class MimirClusterProvider(Object):
                 local_app_databag = relation.data[self.model.app]
                 databag_model.dump(local_app_databag)
 
+    def publish_secrets(self, secrets: Dict[str, Any]) -> None:
+        """Publish secrets ids to all related mimir worker clusters."""
+        for relation in self._relations:
+            if relation:
+                relation.data[self.model.app]["secrets"] = json.dumps(secrets)
+
+    def grant_permisions(self, secrets: Dict[str, Any]) -> None:
+        """Grant secret's permissions."""
+        for relation in self._relations:
+            for secret_id in secrets.values():
+                secret = self._charm.model.get_secret(id=secret_id)
+                secret.grant(relation)
+
+
     def gather_roles(self) -> Dict[MimirRole, int]:
         """Go through the worker's app databags and sum the available application roles."""
         data = {}
@@ -273,7 +291,7 @@ class MimirClusterProvider(Object):
         addresses_by_role = self.gather_addresses_by_role()
         for role, address_set in addresses_by_role.items():
             data.update(address_set)
-        
+
         return data
 
 
@@ -417,3 +435,8 @@ class MimirClusterRequirer(Object):
                 log.error(f"invalid databag contents: {e}")
                 return {}
         return data
+
+    def get_cert_secret_ids(self) -> Optional[str]:
+        """Fetch certificates secrets ids for the mimir config."""
+        if self.relation and self.relation.app:
+                return self.relation.data[self.relation.app].get("secrets", None)
