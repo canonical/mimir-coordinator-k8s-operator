@@ -432,5 +432,5 @@ class MimirClusterRequirer(Object):
                 data = coordinator_databag.loki_addresses
             except DataValidationError as e:
                 log.error(f"invalid databag contents: {e}")
-                return {}
+                return []
         return data
