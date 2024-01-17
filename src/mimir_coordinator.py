@@ -89,7 +89,7 @@ class MimirCoordinator:
         return True
 
     def build_config(
-        self, s3_config_data: Optional[_S3ConfigData], tls: bool = False
+        self, s3_config_data: Optional[_S3ConfigData], tls_enabled: bool = False
     ) -> Dict[str, Any]:
         """Generate shared config file for mimir.
 
@@ -113,7 +113,7 @@ class MimirCoordinator:
             self._update_s3_storage_config(mimir_config["alertmanager_storage"], "alerts")
 
         # todo: TLS config for memberlist
-        if tls:
+        if tls_enabled:
             mimir_config["server"] = self._build_tls_config()
 
         return mimir_config

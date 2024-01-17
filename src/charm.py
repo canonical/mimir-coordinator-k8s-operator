@@ -158,7 +158,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
 
     def publish_config(self, s3_config_data: Optional[_S3ConfigData] = None, tls: bool = False):
         """Generate config file and publish to all workers."""
-        mimir_config = self.coordinator.build_config(s3_config_data=s3_config_data, tls=tls)
+        mimir_config = self.coordinator.build_config(s3_config_data=s3_config_data, tls_enabled=tls)
         self.cluster_provider.publish_configs(mimir_config)
 
         if tls:
