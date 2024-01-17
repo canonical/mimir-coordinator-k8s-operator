@@ -55,14 +55,11 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     def __init__(self, *args: Any):
         super().__init__(*args)
 
-        self._nginx_container = self.unit.get_container("nginx")
-
-        self.framework.observe(self.on.config_changed, self._on_config_changed)
-        self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
         # TODO: On any worker relation-joined/departed, need to updade grafana agent's scrape
         #  targets with the new memberlist.
         #  (Remote write would still be the same nginx-proxied endpoint.)
 
+        self._nginx_container = self.unit.get_container("nginx")
         self.server_cert = CertHandler(
             charm=self,
             key="mimir-server-cert",
@@ -74,49 +71,106 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             cluster_provider=self.cluster_provider,
             tls_requirer=self.server_cert,
         )
-
         self.nginx = Nginx(cluster_provider=self.cluster_provider, server_name=self.hostname)
         self.tracing = TracingEndpointRequirer(self)
-
-        self.framework.observe(
-            self.on.nginx_pebble_ready,  # pyright: ignore
-            self._on_nginx_pebble_ready,
+        self.remote_write_consumer = PrometheusRemoteWriteConsumer(self)
+        self.grafana_dashboard_provider = GrafanaDashboardProvider(
+            self, relation_name="grafana-dashboards-provider"
         )
+        self.loki_consumer = LokiPushApiConsumer(self, relation_name="logging-consumer")
 
+        ######################################
+        # === EVENT HANDLER REGISTRATION === #
+        ######################################
+        self.framework.observe(self.on.config_changed, self._on_config_changed)
+        self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
+        self.framework.observe(self.on.nginx_pebble_ready, self._on_nginx_pebble_ready)
         self.framework.observe(
-            self.on.mimir_cluster_relation_changed,  # pyright: ignore
-            self._on_mimir_cluster_changed,
+            self.on.mimir_cluster_relation_changed, self._on_mimir_cluster_changed
         )
-
         self.framework.observe(
             self.s3_requirer.on.credentials_changed, self._on_s3_requirer_credentials_changed
         )
         self.framework.observe(
             self.s3_requirer.on.credentials_gone, self._on_s3_requirer_credentials_gone
         )
+        self.framework.observe(
+            self.remote_write_consumer.on.endpoints_changed,
+            self._on_remote_write_endpoints_changed,
+        )
+        self.framework.observe(
+            self.loki_consumer.on.loki_push_api_endpoint_joined, self._on_loki_relation_changed
+        )
+        self.framework.observe(
+            self.loki_consumer.on.loki_push_api_endpoint_departed, self._on_loki_relation_changed
+        )
+        self.framework.observe(self.server_cert.on.cert_changed, self._on_server_cert_changed)
 
-        self.remote_write_consumer = PrometheusRemoteWriteConsumer(self)
-        self.framework.observe(
-            self.remote_write_consumer.on.endpoints_changed,  # pyright: ignore
-            self._remote_write_endpoints_changed,
-        )
+    ##########################
+    # === EVENT HANDLERS === #
+    ##########################
 
-        self.grafana_dashboard_provider = GrafanaDashboardProvider(
-            self, relation_name="grafana-dashboards-provider"
-        )
-        self.loki_consumer = LokiPushApiConsumer(self, relation_name="logging-consumer")
-        self.framework.observe(
-            self.loki_consumer.on.loki_push_api_endpoint_joined,  # pyright: ignore
-            self._on_loki_relation_changed,
-        )
-        self.framework.observe(
-            self.loki_consumer.on.loki_push_api_endpoint_departed,  # pyright: ignore
-            self._on_loki_relation_changed,
-        )
-        self.framework.observe(
-            self.server_cert.on.cert_changed,  # pyright: ignore
-            self._on_server_cert_changed,
-        )
+    def _on_config_changed(self, _: ops.ConfigChangedEvent):
+        """Handle changed configuration."""
+        s3_config_data = self._get_s3_storage_config()
+        self.publish_config(s3_config_data)
+
+    def _on_server_cert_changed(self, _):
+        self._update_cert()
+        self._ensure_pebble_layer()
+        self.publish_config(tls=self._is_cert_available)
+
+    def _on_mimir_cluster_changed(self, _):
+        self._process_cluster_and_s3_credentials_changes()
+
+    def _on_s3_requirer_credentials_changed(self, _):
+        self._process_cluster_and_s3_credentials_changes()
+
+    def _on_s3_requirer_credentials_gone(self, _):
+        if not self.coordinator.is_coherent():
+            logger.warning("Incoherent deployment: Some required Mimir roles are missing.")
+            return
+        if self.has_multiple_workers():
+            logger.warning("Filesystem storage cannot be used with replicated mimir workers")
+            return
+        self.publish_config(None)
+
+    def _on_collect_status(self, event: CollectStatusEvent):
+        """Handle start event."""
+        if not self.coordinator.is_coherent():
+            event.add_status(
+                ops.BlockedStatus(
+                    "Incoherent deployment: you are lacking some required Mimir roles"
+                )
+            )
+        s3_config_data = self._get_s3_storage_config()
+        if not s3_config_data and self.has_multiple_workers():
+            event.add_status(
+                ops.BlockedStatus(
+                    "When multiple units of Mimir are deployed, you must add a valid S3 relation. S3 relation missing/invalid."
+                )
+            )
+
+        if self.coordinator.is_recommended():
+            logger.warning("This deployment is below the recommended deployment requirement.")
+            event.add_status(ops.ActiveStatus("degraded"))
+        else:
+            event.add_status(ops.ActiveStatus())
+
+    def _on_remote_write_endpoints_changed(self, _):
+        # TODO Update grafana-agent config file with the new external prometheus's endpoint
+        pass
+
+    def _on_loki_relation_changed(self, _):
+        # TODO Update rules relation with the new list of Loki push-api endpoints
+        pass
+
+    def _on_nginx_pebble_ready(self, _) -> None:
+        self._ensure_pebble_layer()
+
+    ######################
+    # === PROPERTIES === #
+    ######################
 
     @property
     def hostname(self) -> str:
@@ -137,6 +191,18 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         """Returns the list of worker relations."""
         return self.model.relations.get("mimir_worker", [])
 
+    @property
+    def tempo_endpoint(self) -> Optional[str]:
+        """Tempo endpoint for charm tracing."""
+        if self.tracing.is_ready():
+            return self.tracing.otlp_http_endpoint()
+        else:
+            return None
+
+    ###########################
+    # === UTILITY METHODS === #
+    ###########################
+
     def has_multiple_workers(self) -> bool:
         """Return True if there are multiple workers forming the Mimir cluster."""
         mimir_cluster_relations = self.model.relations.get("mimir-cluster", [])
@@ -146,16 +212,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             if relation.app != self.model.app
         )
         return remote_units_count > 1
-
-    def _on_config_changed(self, _: ops.ConfigChangedEvent):
-        """Handle changed configuration."""
-        s3_config_data = self._get_s3_storage_config()
-        self.publish_config(s3_config_data)
-
-    def _on_server_cert_changed(self, _):
-        self._update_cert()
-        self._ensure_pebble_layer()
-        self.publish_config(tls=self._is_cert_available)
 
     def publish_config(self, s3_config_data: Optional[_S3ConfigData] = None, tls: bool = False):
         """Generate config file and publish to all workers."""
@@ -183,12 +239,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                 secret = self.model.get_secret(id=secret_id)
                 secret.grant(relation)
 
-    def _on_mimir_cluster_changed(self, _):
-        self._process_cluster_and_s3_credentials_changes()
-
-    def _on_s3_requirer_credentials_changed(self, _):
-        self._process_cluster_and_s3_credentials_changes()
-
     def _process_cluster_and_s3_credentials_changes(self):
         if not self.coordinator.is_coherent():
             logger.warning("Incoherent deployment: Some required Mimir roles are missing.")
@@ -198,15 +248,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             logger.warning("Filesystem storage cannot be used with replicated mimir workers")
             return
         self.publish_config(s3_config_data)
-
-    def _on_s3_requirer_credentials_gone(self, _):
-        if not self.coordinator.is_coherent():
-            logger.warning("Incoherent deployment: Some required Mimir roles are missing.")
-            return
-        if self.has_multiple_workers():
-            logger.warning("Filesystem storage cannot be used with replicated mimir workers")
-            return
-        self.publish_config(None)
 
     def _get_s3_storage_config(self):
         """Retrieve S3 storage configuration."""
@@ -219,39 +260,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             msg = f"failed to validate s3 config data: {raw}"
             logger.error(msg, exc_info=True)
             return None
-
-    def _on_collect_status(self, event: CollectStatusEvent):
-        """Handle start event."""
-        if not self.coordinator.is_coherent():
-            event.add_status(
-                ops.BlockedStatus(
-                    "Incoherent deployment: you are lacking some required Mimir roles"
-                )
-            )
-        s3_config_data = self._get_s3_storage_config()
-        if not s3_config_data and self.has_multiple_workers():
-            event.add_status(
-                ops.BlockedStatus(
-                    "When multiple units of Mimir are deployed, you must add a valid S3 relation. S3 relation missing/invalid."
-                )
-            )
-
-        if self.coordinator.is_recommended():
-            logger.warning("This deployment is below the recommended deployment requirement.")
-            event.add_status(ops.ActiveStatus("degraded"))
-        else:
-            event.add_status(ops.ActiveStatus())
-
-    def _remote_write_endpoints_changed(self, _):
-        # TODO Update grafana-agent config file with the new external prometheus's endpoint
-        pass
-
-    def _on_loki_relation_changed(self, _):
-        # TODO Update rules relation with the new list of Loki push-api endpoints
-        pass
-
-    def _on_nginx_pebble_ready(self, _) -> None:
-        self._ensure_pebble_layer()
 
     def _ensure_pebble_layer(self) -> None:
         self._nginx_container.push(
@@ -302,14 +310,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         # TODO: We need to install update-ca-certificates in Nginx Rock
         # self._nginx_container.exec(["update-ca-certificates", "--fresh"]).wait()
         subprocess.run(["update-ca-certificates", "--fresh"])
-
-    @property
-    def tempo_endpoint(self) -> Optional[str]:
-        """Tempo endpoint for charm tracing."""
-        if self.tracing.is_ready():
-            return self.tracing.otlp_http_endpoint()
-        else:
-            return None
 
 
 if __name__ == "__main__":  # pragma: nocover
