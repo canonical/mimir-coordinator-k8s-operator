@@ -307,10 +307,7 @@ class CertHandler(Object):
         return secret_id
 
     def _retrieve_from_secret(self, value: str, secret_id_name: str) -> Optional[str]:
-        if not (relation := self.charm.model.get_relation(self.certificates_relation_name)):
-            return None
-
-        if not (secret_id := relation.data[self.charm.unit].get(secret_id_name)):
+        if not (secret_id := self._retrieve_secret_id(secret_id_name)):
             return None
 
         if not (secret := self.model.get_secret(id=secret_id)):
