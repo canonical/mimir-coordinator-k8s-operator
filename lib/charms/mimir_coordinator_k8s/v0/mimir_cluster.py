@@ -172,6 +172,7 @@ def expand_roles(roles: Iterable[MimirRole]) -> Set[MimirRole]:
 
 class MimirClusterProviderAppData(DatabagModel):
     mimir_config: Dict[str, Any]
+    loki_addresses: List[str]
     # todo: validate with
     #  https://grafana.com/docs/mimir/latest/configure/about-configurations/#:~:text=Validate%20a%20configuration,or%20in%20a%20CI%20environment.
     #  caveat: only the requirer node can do it
@@ -212,10 +213,12 @@ class MimirClusterProvider(Object):
 
     def publish_configs(self,
                         mimir_config: Dict[str, Any],
+                        loki_addresses: List[str],
                         ) -> None:
         """Publish the mimir config to all related mimir worker clusters."""
         databag_model = MimirClusterProviderAppData(
             mimir_config=mimir_config,
+            loki_addresses=loki_addresses
         )
         for relation in self._relations:
             if relation:

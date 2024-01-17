@@ -10,7 +10,7 @@ develop a new k8s charm using the Operator Framework:
 https://discourse.charmhub.io/t/4208
 """
 import logging
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import ops
 from charms.data_platform_libs.v0.s3 import (
@@ -98,8 +98,9 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         )
         self.framework.observe(
             self.loki_consumer.on.loki_push_api_endpoint_departed,  # pyright: ignore
-            self._on_loki_relation_changed,
+            self._on_loki_relation_departed,
         )
+        self._loki_urls = []
 
     @property
     def mimir_worker_relations(self) -> List[ops.Relation]:
@@ -119,13 +120,17 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     def _on_config_changed(self, __: ops.ConfigChangedEvent):
         """Handle changed configuration."""
         s3_config_data = self._get_s3_storage_config()
-        self.publish_config(s3_config_data)
+        self.publish_config(s3_config_data, self._loki_urls)
 
     def _on_mimir_cluster_changed(self, _):
         self._process_cluster_and_s3_credentials_changes()
 
     def _on_s3_requirer_credentials_changed(self, _):
         self._process_cluster_and_s3_credentials_changes()
+
+    def _extract_loki_urls(self, loki_addresses: List[Dict[str, str]]) -> List[str]:
+        """Extract URLs from a list of Loki addresses."""
+        return [entry["url"] for entry in loki_addresses]
 
     def _process_cluster_and_s3_credentials_changes(self):
         if not self.coordinator.is_coherent():
@@ -135,7 +140,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         if not s3_config_data and self.has_multiple_workers():
             logger.warning("Filesystem storage cannot be used with replicated mimir workers")
             return
-        self.publish_config(s3_config_data)
+        self.publish_config(s3_config_data, self._loki_urls)
 
     def _on_s3_requirer_credentials_gone(self, _):
         if not self.coordinator.is_coherent():
@@ -144,12 +149,12 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         if self.has_multiple_workers():
             logger.warning("Filesystem storage cannot be used with replicated mimir workers")
             return
-        self.publish_config(None)
+        self.publish_config(None, self._loki_urls)
 
-    def publish_config(self, s3_config_data: Optional[_S3ConfigData]):
+    def publish_config(self, s3_config_data: Optional[_S3ConfigData], loki_addresses: List[str]):
         """Generate config file and publish to all workers."""
         mimir_config = self.coordinator.build_config(s3_config_data)
-        self.cluster_provider.publish_configs(mimir_config)
+        self.cluster_provider.publish_configs(mimir_config, loki_addresses)
 
     def _get_s3_storage_config(self):
         """Retrieve S3 storage configuration."""
@@ -190,8 +195,14 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         pass
 
     def _on_loki_relation_changed(self, _):
-        # TODO Update rules relation with the new list of Loki push-api endpoints
-        pass
+        endpoints = self.loki_consumer.loki_endpoints
+        if endpoints:
+            self._loki_urls = self._extract_loki_urls(endpoints)
+            self._process_cluster_and_s3_credentials_changes()
+
+    def _on_loki_relation_departed(self, _):
+        self._loki_urls = []
+        self._process_cluster_and_s3_credentials_changes()
 
     def _on_nginx_pebble_ready(self, _event: ops.PebbleReadyEvent) -> None:
         self._nginx_container.push(self.nginx.config_path, self.nginx.config, make_dirs=True)
