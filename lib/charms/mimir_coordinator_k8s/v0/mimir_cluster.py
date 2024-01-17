@@ -420,3 +420,17 @@ class MimirClusterRequirer(Object):
                 log.error(f"invalid databag contents: {e}")
                 return {}
         return data
+
+    def get_loki_addresses_config(self) -> List[str]:
+        """Fetch the loki_addresses from the coordinator databag."""
+        data = []
+        relation = self.relation
+        if relation:
+            try:
+                databag = relation.data[relation.app]  # type: ignore # all checks are done in __init__
+                coordinator_databag = MimirClusterProviderAppData.load(databag)
+                data = coordinator_databag.loki_addresses
+            except DataValidationError as e:
+                log.error(f"invalid databag contents: {e}")
+                return {}
+        return data
