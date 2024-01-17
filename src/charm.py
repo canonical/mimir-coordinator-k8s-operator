@@ -89,6 +89,9 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             self.on.mimir_cluster_relation_changed, self._on_mimir_cluster_changed
         )
         self.framework.observe(
+            self.on.mimir_cluster_relation_departed, self._on_mimir_cluster_departed
+        )
+        self.framework.observe(
             self.s3_requirer.on.credentials_changed, self._on_s3_requirer_credentials_changed
         )
         self.framework.observe(
@@ -122,6 +125,11 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
 
     def _on_mimir_cluster_changed(self, _):
         self._process_cluster_and_s3_credentials_changes()
+        self.publish_config(tls=self._is_cert_available)
+
+    def _on_mimir_cluster_departed(self, _):
+        self._process_cluster_and_s3_credentials_changes()
+        self.publish_config()
 
     def _on_s3_requirer_credentials_changed(self, _):
         self._process_cluster_and_s3_credentials_changes()
