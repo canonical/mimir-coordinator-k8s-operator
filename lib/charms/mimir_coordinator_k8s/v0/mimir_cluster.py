@@ -226,20 +226,6 @@ class MimirClusterProvider(Object):
                 local_app_databag = relation.data[self.model.app]
                 databag_model.dump(local_app_databag)
 
-    def publish_secrets(self, secrets: Dict[str, Any]) -> None:
-        """Publish secrets ids to all related mimir worker clusters."""
-        for relation in self._relations:
-            if relation:
-                relation.data[self.model.app]["secrets"] = json.dumps(secrets)
-
-    def grant_permisions(self, secrets: Dict[str, Any]) -> None:
-        """Grant secret's permissions."""
-        for relation in self._relations:
-            for secret_id in secrets.values():
-                secret = self._charm.model.get_secret(id=secret_id)
-                secret.grant(relation)
-
-
     def gather_roles(self) -> Dict[MimirRole, int]:
         """Go through the worker's app databags and sum the available application roles."""
         data = {}

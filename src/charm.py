@@ -9,6 +9,7 @@ develop a new k8s charm using the Operator Framework:
 
 https://discourse.charmhub.io/t/4208
 """
+import json
 import logging
 import socket
 import subprocess
@@ -158,20 +159,29 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
 
     def publish_config(self, s3_config_data: Optional[_S3ConfigData] = None, tls: bool = False):
         """Generate config file and publish to all workers."""
-        mimir_config = self.coordinator.build_config(s3_config_data=s3_config_data, tls_enabled=tls)
+        mimir_config = self.coordinator.build_config(
+            s3_config_data=s3_config_data, tls_enabled=tls
+        )
         self.cluster_provider.publish_configs(mimir_config)
 
         if tls:
-            self.publish_secrets()
+            self.publish_grant_secrets()
 
-    def publish_secrets(self) -> None:
-        """Publish secrets."""
+    def publish_grant_secrets(self) -> None:
+        """Publish and Grant secrets to the mimir-cluster relation."""
         secrets = {
             "private_key_secret_id": self.server_cert.private_key_secret_id,
             "ca_server_cert_secret_id": self.server_cert.ca_server_cert_secret_id,
         }
-        self.cluster_provider.publish_secrets(secrets)
-        self.cluster_provider.grant_permisions(secrets)
+
+        relations = self.model.relations["mimir-cluster"]
+        for relation in relations:
+            relation.data[self.model.app]["secrets"] = json.dumps(secrets)
+            logger.debug("Secrets published")
+
+            for secret_id in secrets.values():
+                secret = self.model.get_secret(id=secret_id)
+                secret.grant(relation)
 
     def _on_mimir_cluster_changed(self, _):
         self._process_cluster_and_s3_credentials_changes()
