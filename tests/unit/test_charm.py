@@ -3,6 +3,7 @@
 #
 # Learn more about testing at: https://juju.is/docs/sdk/testing
 
+import os
 import unittest
 
 from charm import MimirCoordinatorK8SOperatorCharm
@@ -12,6 +13,7 @@ from ops.testing import Harness
 
 class TestCharm(unittest.TestCase):
     def setUp(self):
+        os.environ["JUJU_VERSION"] = "3.0.3"
         self.harness = Harness(MimirCoordinatorK8SOperatorCharm)
         self.addCleanup(self.harness.cleanup)
         self.harness.begin_with_initial_hooks()

@@ -9,7 +9,13 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional
 
-from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirClusterProvider, MimirRole
+from charms.mimir_coordinator_k8s.v0.mimir_cluster import (
+    MIMIR_CERT_FILE,
+    MIMIR_CLIENT_CA_FILE,
+    MIMIR_KEY_FILE,
+    MimirClusterProvider,
+    MimirRole,
+)
 from mimir_config import _S3ConfigData
 
 logger = logging.getLogger(__name__)
@@ -82,7 +88,9 @@ class MimirCoordinator:
                 return False
         return True
 
-    def build_config(self, s3_config_data: Optional[_S3ConfigData]) -> Dict[str, Any]:
+    def build_config(
+        self, s3_config_data: Optional[_S3ConfigData], tls_enabled: bool = False
+    ) -> Dict[str, Any]:
         """Generate shared config file for mimir.
 
         Reference: https://grafana.com/docs/mimir/latest/configure/
@@ -104,10 +112,23 @@ class MimirCoordinator:
             self._update_s3_storage_config(mimir_config["ruler_storage"], "rules")
             self._update_s3_storage_config(mimir_config["alertmanager_storage"], "alerts")
 
-        if self._tls_requirer:
-            mimir_config.update(self._build_tls_config())
+        # todo: TLS config for memberlist
+        if tls_enabled:
+            mimir_config["server"] = self._build_tls_config()
 
         return mimir_config
+
+    def _build_tls_config(self) -> Dict[str, Any]:
+        tls_config = {
+            "cert_file": MIMIR_CERT_FILE,
+            "key_file": MIMIR_KEY_FILE,
+            "client_ca_file": MIMIR_CLIENT_CA_FILE,
+            "client_auth_type": "RequestClientCert",
+        }
+        return {
+            "http_tls_config": tls_config,
+            "grpc_tls_config": tls_config,
+        }
 
     # data_dir:
     # The Mimir Alertmanager stores the alerts state on local disk at the location configured using -alertmanager.storage.path.
@@ -196,11 +217,3 @@ class MimirCoordinator:
 
     def _build_memberlist_config(self) -> Dict[str, Any]:
         return {"join_members": list(self._cluster_provider.gather_addresses())}
-
-    def _build_tls_config(self) -> Dict[str, Any]:
-        return {
-            "tls_enabled": True,
-            "tls_cert_path": self._tls_requirer.cacert,
-            "tls_key_path": self._tls_requirer.key,
-            "tls_ca_path": self._tls_requirer.capath,
-        }

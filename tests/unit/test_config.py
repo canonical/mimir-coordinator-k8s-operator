@@ -109,15 +109,20 @@ class TestMimirConfig(unittest.TestCase):
         self.assertEqual(memberlist_config, expected_config)
 
     def test_build_tls_config(self):
-        self.tls_requirer.cacert = "/path/to/cert.pem"
-        self.tls_requirer.key = "/path/to/key.pem"
-        self.tls_requirer.capath = "/path/to/ca.pem"
         tls_config = self.coordinator._build_tls_config()
         expected_config = {
-            "tls_enabled": True,
-            "tls_cert_path": "/path/to/cert.pem",
-            "tls_key_path": "/path/to/key.pem",
-            "tls_ca_path": "/path/to/ca.pem",
+            "http_tls_config": {
+                "cert_file": "/etc/mimir/server.cert",
+                "key_file": "/etc/mimir/private.key",
+                "client_ca_file": "/etc/mimir/ca.cert",
+                "client_auth_type": "RequestClientCert",
+            },
+            "grpc_tls_config": {
+                "cert_file": "/etc/mimir/server.cert",
+                "key_file": "/etc/mimir/private.key",
+                "client_ca_file": "/etc/mimir/ca.cert",
+                "client_auth_type": "RequestClientCert",
+            },
         }
         self.assertEqual(tls_config, expected_config)
 
