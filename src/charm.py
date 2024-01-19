@@ -41,13 +41,13 @@ logger = logging.getLogger(__name__)
 
 @trace_charm(
     tracing_endpoint="tempo_endpoint",
+    server_cert="server_cert_path",
     extra_types=[
         S3Requirer,
         MimirClusterProvider,
         MimirCoordinator,
         Nginx,
     ],
-    # TODO add certificate file once TLS support is merged
 )
 class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     """Charm the service."""
@@ -206,6 +206,11 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             return self.tracing.otlp_http_endpoint()
         else:
             return None
+
+    @property
+    def server_cert_path(self) -> Optional[str]:
+        """Server certificate path for tls tracing."""
+        return CERT_PATH
 
     ###########################
     # === UTILITY METHODS === #
