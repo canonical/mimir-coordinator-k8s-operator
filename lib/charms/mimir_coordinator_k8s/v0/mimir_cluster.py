@@ -172,7 +172,7 @@ def expand_roles(roles: Iterable[MimirRole]) -> Set[MimirRole]:
 
 class MimirClusterProviderAppData(DatabagModel):
     mimir_config: Dict[str, Any]
-    loki_addresses: List[str]
+    loki_endpoints: Dict[str, str]
     # todo: validate with
     #  https://grafana.com/docs/mimir/latest/configure/about-configurations/#:~:text=Validate%20a%20configuration,or%20in%20a%20CI%20environment.
     #  caveat: only the requirer node can do it
@@ -213,12 +213,12 @@ class MimirClusterProvider(Object):
 
     def publish_configs(self,
                         mimir_config: Dict[str, Any],
-                        loki_addresses: List[str],
+                        loki_endpoints: Dict[str, str],
                         ) -> None:
         """Publish the mimir config to all related mimir worker clusters."""
         databag_model = MimirClusterProviderAppData(
             mimir_config=mimir_config,
-            loki_addresses=loki_addresses
+            loki_endpoints=loki_endpoints
         )
         for relation in self._relations:
             if relation:
@@ -421,16 +421,16 @@ class MimirClusterRequirer(Object):
                 return {}
         return data
 
-    def get_loki_addresses_config(self) -> List[str]:
-        """Fetch the loki_addresses from the coordinator databag."""
-        data = []
+    def get_loki_endpoints(self) -> Dict[str, str]:
+        """Fetch the loki endpoints from the coordinator databag."""
+        data = {}
         relation = self.relation
         if relation:
             try:
                 databag = relation.data[relation.app]  # type: ignore # all checks are done in __init__
                 coordinator_databag = MimirClusterProviderAppData.load(databag)
-                data = coordinator_databag.loki_addresses
+                data = coordinator_databag.loki_endpoints
             except DataValidationError as e:
                 log.error(f"invalid databag contents: {e}")
-                return []
+                return {}
         return data

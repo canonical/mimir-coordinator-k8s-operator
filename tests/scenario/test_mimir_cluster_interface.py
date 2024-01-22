@@ -114,10 +114,10 @@ def test_address_collection(workers_addresses):
 
 def test_requirer_getters():
     cfg = {"a": "b"}
-    lgs = []
+    lgs = {}
     relation = Relation(
         "mimir-cluster-require",
-        remote_app_data=MimirClusterProviderAppData(mimir_config=cfg, loki_addresses=lgs).dump(),
+        remote_app_data=MimirClusterProviderAppData(mimir_config=cfg, loki_endpoints=lgs).dump(),
     )
 
     state = State(relations=[relation])

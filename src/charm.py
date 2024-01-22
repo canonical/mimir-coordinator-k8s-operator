@@ -9,6 +9,7 @@ develop a new k8s charm using the Operator Framework:
 
 https://discourse.charmhub.io/t/4208
 """
+import json
 import logging
 from typing import Dict, List, Optional
 
@@ -100,7 +101,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             self.loki_consumer.on.loki_push_api_endpoint_departed,  # pyright: ignore
             self._on_loki_relation_departed,
         )
-        self._loki_urls = []
+        self._loki_endpoints = {}
 
     @property
     def mimir_worker_relations(self) -> List[ops.Relation]:
@@ -120,17 +121,13 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     def _on_config_changed(self, __: ops.ConfigChangedEvent):
         """Handle changed configuration."""
         s3_config_data = self._get_s3_storage_config()
-        self.publish_config(s3_config_data, self._loki_urls)
+        self.publish_config(s3_config_data, self._loki_endpoints)
 
     def _on_mimir_cluster_changed(self, _):
         self._process_cluster_and_s3_credentials_changes()
 
     def _on_s3_requirer_credentials_changed(self, _):
         self._process_cluster_and_s3_credentials_changes()
-
-    def _extract_loki_urls(self, loki_addresses: List[Dict[str, str]]) -> List[str]:
-        """Extract URLs from a list of Loki addresses."""
-        return [entry["url"] for entry in loki_addresses]
 
     def _process_cluster_and_s3_credentials_changes(self):
         if not self.coordinator.is_coherent():
@@ -140,7 +137,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         if not s3_config_data and self.has_multiple_workers():
             logger.warning("Filesystem storage cannot be used with replicated mimir workers")
             return
-        self.publish_config(s3_config_data, self._loki_urls)
+        self.publish_config(s3_config_data, self._loki_endpoints)
 
     def _on_s3_requirer_credentials_gone(self, _):
         if not self.coordinator.is_coherent():
@@ -149,12 +146,14 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         if self.has_multiple_workers():
             logger.warning("Filesystem storage cannot be used with replicated mimir workers")
             return
-        self.publish_config(None, self._loki_urls)
+        self.publish_config(None, self._loki_endpoints)
 
-    def publish_config(self, s3_config_data: Optional[_S3ConfigData], loki_addresses: List[str]):
+    def publish_config(
+        self, s3_config_data: Optional[_S3ConfigData], loki_endpoints: Dict[str, str]
+    ):
         """Generate config file and publish to all workers."""
         mimir_config = self.coordinator.build_config(s3_config_data)
-        self.cluster_provider.publish_configs(mimir_config, loki_addresses)
+        self.cluster_provider.publish_configs(mimir_config, loki_endpoints)
 
     def _get_s3_storage_config(self):
         """Retrieve S3 storage configuration."""
@@ -194,15 +193,35 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         # TODO Update grafana-agent config file with the new external prometheus's endpoint
         pass
 
-    def _on_loki_relation_changed(self, _):
-        endpoints = self.loki_consumer.loki_endpoints
+    def _on_loki_relation_changed(self, event: ops.RelationChangedEvent):
+        endpoints = self._get_loki_endpoints(event.relation.name)
         if endpoints:
-            self._loki_urls = self._extract_loki_urls(endpoints)
+            self._loki_endpoints = endpoints
             self._process_cluster_and_s3_credentials_changes()
 
     def _on_loki_relation_departed(self, _):
-        self._loki_urls = []
+        self._loki_endpoints = {}
         self._process_cluster_and_s3_credentials_changes()
+
+    def _get_loki_endpoints(self, relation_name: str) -> Dict[str, str]:
+        """Fetch Loki Push API endpoints sent from LokiPushApiProvider through relation data.
+
+        Returns:
+            {
+                "loki/0": "http://loki1:3100/loki/api/v1/push",
+                "loki/1": "http://loki2:3100/loki/api/v1/push",
+            }
+        """
+        endpoints = {}
+        for relation in self.model.relations[relation_name]:
+            for unit in relation.units:
+                endpoint = relation.data[unit].get("endpoint")
+                if endpoint:
+                    deserialized_endpoint = json.loads(endpoint)
+                    url = deserialized_endpoint.get("url")
+                    if url:
+                        endpoints[unit.name] = url
+        return endpoints
 
     def _on_nginx_pebble_ready(self, _event: ops.PebbleReadyEvent) -> None:
         self._nginx_container.push(self.nginx.config_path, self.nginx.config, make_dirs=True)
