@@ -193,14 +193,16 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         # TODO Update grafana-agent config file with the new external prometheus's endpoint
         pass
 
-    def _on_loki_relation_changed(self, event: ops.RelationChangedEvent):
-        endpoints = self._get_loki_endpoints(event.relation.name)
-        if endpoints:
-            self._loki_endpoints = endpoints
-            self._process_cluster_and_s3_credentials_changes()
+    def _update_loki_endpoints(self, relation_name: str):
+        endpoints = self._get_loki_endpoints(relation_name)
+        self._loki_endpoints = endpoints if endpoints else {}
 
-    def _on_loki_relation_departed(self, _):
-        self._loki_endpoints = {}
+    def _on_loki_relation_changed(self, _: ops.RelationChangedEvent):
+        self._update_loki_endpoints("logging-consumer")
+        self._process_cluster_and_s3_credentials_changes()
+
+    def _on_loki_relation_departed(self, _: ops.RelationDepartedEvent):
+        self._update_loki_endpoints("logging-consumer")
         self._process_cluster_and_s3_credentials_changes()
 
     def _get_loki_endpoints(self, relation_name: str) -> Dict[str, str]:
