@@ -146,9 +146,11 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     def _on_collect_status(self, event: CollectStatusEvent):
         """Handle start event."""
         if not self.coordinator.is_coherent():
+            missing_roles = [role.value for role in self.coordinator.missing_roles()]
             event.add_status(
                 ops.BlockedStatus(
-                    "Incoherent deployment: you are lacking some required Mimir roles"
+                    f"Incoherent deployment: you are lacking some required Mimir roles "
+                    f"({missing_roles})"
                 )
             )
         s3_config_data = self._get_s3_storage_config()

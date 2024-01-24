@@ -13,10 +13,6 @@ containers:
   nginx:
     resource: nginx-image
 
-storage:
-  data:
-    type: filesystem
-
 resources:
   nginx-image:
     type: oci-image
