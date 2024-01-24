@@ -33,6 +33,8 @@ from pydantic import ValidationError
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
 
+LOGGING_RELATION_NAME = "logging-consumer"
+
 
 @trace_charm(
     tracing_endpoint="tempo_endpoint",
@@ -71,6 +73,10 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         )
 
         self.framework.observe(
+            self.on.mimir_cluster_relation_joined, self._on_mimir_cluster_joined
+        )
+
+        self.framework.observe(
             self.on.mimir_cluster_relation_changed,  # pyright: ignore
             self._on_mimir_cluster_changed,
         )
@@ -92,7 +98,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             self, relation_name="grafana-dashboards-provider"
         )
 
-        self.loki_consumer = LokiPushApiConsumer(self, relation_name="logging-consumer")
+        self.loki_consumer = LokiPushApiConsumer(self, relation_name=LOGGING_RELATION_NAME)
         self.framework.observe(
             self.loki_consumer.on.loki_push_api_endpoint_joined,  # pyright: ignore
             self._on_loki_relation_changed,
@@ -101,7 +107,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             self.loki_consumer.on.loki_push_api_endpoint_departed,  # pyright: ignore
             self._on_loki_relation_departed,
         )
-        self._loki_endpoints = {}
 
     @property
     def mimir_worker_relations(self) -> List[ops.Relation]:
@@ -120,8 +125,10 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
 
     def _on_config_changed(self, __: ops.ConfigChangedEvent):
         """Handle changed configuration."""
-        s3_config_data = self._get_s3_storage_config()
-        self.publish_config(s3_config_data, self._loki_endpoints)
+        self._process_cluster_and_s3_credentials_changes()
+
+    def _on_mimir_cluster_joined(self, _):
+        self._process_cluster_and_s3_credentials_changes()
 
     def _on_mimir_cluster_changed(self, _):
         self._process_cluster_and_s3_credentials_changes()
@@ -137,7 +144,8 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         if not s3_config_data and self.has_multiple_workers():
             logger.warning("Filesystem storage cannot be used with replicated mimir workers")
             return
-        self.publish_config(s3_config_data, self._loki_endpoints)
+        loki_endpoints = self._get_loki_endpoints()
+        self.publish_config(s3_config_data, loki_endpoints)
 
     def _on_s3_requirer_credentials_gone(self, _):
         if not self.coordinator.is_coherent():
@@ -146,7 +154,8 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         if self.has_multiple_workers():
             logger.warning("Filesystem storage cannot be used with replicated mimir workers")
             return
-        self.publish_config(None, self._loki_endpoints)
+        loki_endpoints = self._get_loki_endpoints()
+        self.publish_config(None, loki_endpoints)
 
     def publish_config(
         self, s3_config_data: Optional[_S3ConfigData], loki_endpoints: Dict[str, str]
@@ -193,19 +202,13 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         # TODO Update grafana-agent config file with the new external prometheus's endpoint
         pass
 
-    def _update_loki_endpoints(self, relation_name: str):
-        endpoints = self._get_loki_endpoints(relation_name)
-        self._loki_endpoints = endpoints if endpoints else {}
-
     def _on_loki_relation_changed(self, _: ops.RelationChangedEvent):
-        self._update_loki_endpoints("logging-consumer")
         self._process_cluster_and_s3_credentials_changes()
 
     def _on_loki_relation_departed(self, _: ops.RelationDepartedEvent):
-        self._update_loki_endpoints("logging-consumer")
         self._process_cluster_and_s3_credentials_changes()
 
-    def _get_loki_endpoints(self, relation_name: str) -> Dict[str, str]:
+    def _get_loki_endpoints(self, relation_name: str = LOGGING_RELATION_NAME) -> Dict[str, str]:
         """Fetch Loki Push API endpoints sent from LokiPushApiProvider through relation data.
 
         Returns:
