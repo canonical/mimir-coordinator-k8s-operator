@@ -21,7 +21,7 @@ class TestMimirConfig(unittest.TestCase):
 
     def test_build_alertmanager_storage_config(self):
         alertmanager_storage_config = self.coordinator._build_alertmanager_storage_config()
-        expected_config = {"filesystem": {"dir": "/data/data-alertmanager-recovery"}}
+        expected_config = {"filesystem": {"dir": "/recovery-data/data-alertmanager"}}
         self.assertEqual(alertmanager_storage_config, expected_config)
 
     def test_build_compactor_config(self):

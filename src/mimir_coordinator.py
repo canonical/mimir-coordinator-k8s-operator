@@ -7,7 +7,7 @@
 import logging
 from collections import Counter
 from pathlib import Path
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Dict, Iterable, Optional, Set
 
 from charms.mimir_coordinator_k8s.v0.mimir_cluster import (
     MIMIR_CERT_FILE,
@@ -64,17 +64,25 @@ class MimirCoordinator:
         tls_requirer: Any = None,
         # TODO: use and import s3 requirer obj
         s3_requirer: Any = None,
+        # root and recovery data need to be in distinct directories
         root_data_dir: Path = Path("/data"),
+        recovery_data_dir: Path = Path("/recovery-data"),
     ):
         self._cluster_provider = cluster_provider
         self._s3_requirer = s3_requirer  # type: ignore
         self._tls_requirer = tls_requirer  # type: ignore
         self._root_data_dir = root_data_dir
+        self._recovery_data_dir = recovery_data_dir
 
     def is_coherent(self) -> bool:
         """Return True if the roles list makes up a coherent mimir deployment."""
         roles: Iterable[MimirRole] = self._cluster_provider.gather_roles().keys()
         return set(roles).issuperset(MINIMAL_DEPLOYMENT)
+
+    def missing_roles(self) -> Set[MimirRole]:
+        """If the coordinator is incoherent, return the roles that are missing for it to become so."""
+        roles: Iterable[MimirRole] = self._cluster_provider.gather_roles().keys()
+        return set(MINIMAL_DEPLOYMENT).difference(roles)
 
     def is_recommended(self) -> bool:
         """Return True if is a superset of the minimal deployment.
@@ -143,7 +151,7 @@ class MimirCoordinator:
     def _build_alertmanager_storage_config(self) -> Dict[str, Any]:
         return {
             "filesystem": {
-                "dir": str(self._root_data_dir / "data-alertmanager-recovery"),
+                "dir": str(self._recovery_data_dir / "data-alertmanager"),
             },
         }
 
