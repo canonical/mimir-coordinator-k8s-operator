@@ -24,10 +24,14 @@ LIBID = "9818a8d44028454a94c6c3a01f4316d2"
 DEFAULT_ENDPOINT_NAME = "mimir-cluster"
 
 LIBAPI = 0
-LIBPATCH = 2
+LIBPATCH = 3
 
 BUILTIN_JUJU_KEYS = {"ingress-address", "private-address", "egress-subnets"}
 
+MIMIR_CONFIG_FILE = "/etc/mimir/mimir-config.yaml"
+MIMIR_CERT_FILE = "/etc/mimir/server.cert"
+MIMIR_KEY_FILE = "/etc/mimir/private.key"
+MIMIR_CLIENT_CA_FILE = "/etc/mimir/ca.cert"
 
 class MimirClusterError(Exception):
     """Base class for exceptions raised by this module."""
@@ -276,7 +280,7 @@ class MimirClusterProvider(Object):
         addresses_by_role = self.gather_addresses_by_role()
         for role, address_set in addresses_by_role.items():
             data.update(address_set)
-        
+
         return data
 
 
@@ -434,3 +438,8 @@ class MimirClusterRequirer(Object):
                 log.error(f"invalid databag contents: {e}")
                 return {}
         return data
+
+    def get_cert_secret_ids(self) -> Optional[str]:
+        """Fetch certificates secrets ids for the mimir config."""
+        if self.relation and self.relation.app:
+                return self.relation.data[self.relation.app].get("secrets", None)

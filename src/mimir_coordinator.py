@@ -7,9 +7,15 @@
 import logging
 from collections import Counter
 from pathlib import Path
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Dict, Iterable, Optional, Set
 
-from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirClusterProvider, MimirRole
+from charms.mimir_coordinator_k8s.v0.mimir_cluster import (
+    MIMIR_CERT_FILE,
+    MIMIR_CLIENT_CA_FILE,
+    MIMIR_KEY_FILE,
+    MimirClusterProvider,
+    MimirRole,
+)
 from mimir_config import _S3ConfigData
 
 logger = logging.getLogger(__name__)
@@ -58,17 +64,25 @@ class MimirCoordinator:
         tls_requirer: Any = None,
         # TODO: use and import s3 requirer obj
         s3_requirer: Any = None,
+        # root and recovery data need to be in distinct directories
         root_data_dir: Path = Path("/data"),
+        recovery_data_dir: Path = Path("/recovery-data"),
     ):
         self._cluster_provider = cluster_provider
         self._s3_requirer = s3_requirer  # type: ignore
         self._tls_requirer = tls_requirer  # type: ignore
         self._root_data_dir = root_data_dir
+        self._recovery_data_dir = recovery_data_dir
 
     def is_coherent(self) -> bool:
         """Return True if the roles list makes up a coherent mimir deployment."""
         roles: Iterable[MimirRole] = self._cluster_provider.gather_roles().keys()
         return set(roles).issuperset(MINIMAL_DEPLOYMENT)
+
+    def missing_roles(self) -> Set[MimirRole]:
+        """If the coordinator is incoherent, return the roles that are missing for it to become so."""
+        roles: Iterable[MimirRole] = self._cluster_provider.gather_roles().keys()
+        return set(MINIMAL_DEPLOYMENT).difference(roles)
 
     def is_recommended(self) -> bool:
         """Return True if is a superset of the minimal deployment.
@@ -82,7 +96,9 @@ class MimirCoordinator:
                 return False
         return True
 
-    def build_config(self, s3_config_data: Optional[_S3ConfigData]) -> Dict[str, Any]:
+    def build_config(
+        self, s3_config_data: Optional[_S3ConfigData], tls_enabled: bool = False
+    ) -> Dict[str, Any]:
         """Generate shared config file for mimir.
 
         Reference: https://grafana.com/docs/mimir/latest/configure/
@@ -104,10 +120,23 @@ class MimirCoordinator:
             self._update_s3_storage_config(mimir_config["ruler_storage"], "rules")
             self._update_s3_storage_config(mimir_config["alertmanager_storage"], "alerts")
 
-        if self._tls_requirer:
-            mimir_config.update(self._build_tls_config())
+        # todo: TLS config for memberlist
+        if tls_enabled:
+            mimir_config["server"] = self._build_tls_config()
 
         return mimir_config
+
+    def _build_tls_config(self) -> Dict[str, Any]:
+        tls_config = {
+            "cert_file": MIMIR_CERT_FILE,
+            "key_file": MIMIR_KEY_FILE,
+            "client_ca_file": MIMIR_CLIENT_CA_FILE,
+            "client_auth_type": "RequestClientCert",
+        }
+        return {
+            "http_tls_config": tls_config,
+            "grpc_tls_config": tls_config,
+        }
 
     # data_dir:
     # The Mimir Alertmanager stores the alerts state on local disk at the location configured using -alertmanager.storage.path.
@@ -122,7 +151,7 @@ class MimirCoordinator:
     def _build_alertmanager_storage_config(self) -> Dict[str, Any]:
         return {
             "filesystem": {
-                "dir": str(self._root_data_dir / "data-alertmanager-recovery"),
+                "dir": str(self._recovery_data_dir / "data-alertmanager"),
             },
         }
 
@@ -196,11 +225,3 @@ class MimirCoordinator:
 
     def _build_memberlist_config(self) -> Dict[str, Any]:
         return {"join_members": list(self._cluster_provider.gather_addresses())}
-
-    def _build_tls_config(self) -> Dict[str, Any]:
-        return {
-            "tls_enabled": True,
-            "tls_cert_path": self._tls_requirer.cacert,
-            "tls_key_path": self._tls_requirer.key,
-            "tls_ca_path": self._tls_requirer.capath,
-        }

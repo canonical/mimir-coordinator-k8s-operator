@@ -5,7 +5,7 @@
 
 import logging
 from dataclasses import asdict
-from typing import List, Literal, Optional, Union
+from typing import Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 from pydantic.dataclasses import dataclass as pydantic_dataclass
@@ -89,6 +89,13 @@ class Alertmanager(BaseModel):
     external_url: Optional[str]
 
 
+class Server(BaseModel):
+    """Server schema."""
+
+    http_tls_config: Dict[str, Dict[str, str]]
+    grpc_tls_config: Dict[str, Dict[str, str]]
+
+
 class _S3ConfigData(BaseModel):
     model_config = {"populate_by_name": True}
     access_key_id: str = Field(alias="access-key")
@@ -138,3 +145,4 @@ class MimirBaseConfig(BaseModel):
     ingester: Optional[Ingester]
     ruler: Optional[Ruler]
     alertmanager: Optional[Alertmanager]
+    server: Optional[Server]

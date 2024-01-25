@@ -13,10 +13,6 @@ containers:
   nginx:
     resource: nginx-image
 
-storage:
-  data:
-    type: filesystem
-
 resources:
   nginx-image:
     type: oci-image
@@ -55,6 +51,12 @@ requires:
     description: |
       Ingress-per-app, to load-balance across multiple units of the coordinator.
 
+  certificates:
+    interface: tls-certificates
+    limit: 1
+    description: |
+      Certificate and key files for securing Mimir communications with TLS.
+
   tracing:
     interface: tracing
     limit: 1
@@ -73,4 +75,3 @@ provides:
     description: |
       Forward workers' built-in dashboards to grafana
       (the coordinator, not the worker, owns all dashboards).
-
