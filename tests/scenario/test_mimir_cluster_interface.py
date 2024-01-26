@@ -117,7 +117,7 @@ def test_requirer_getters():
     lgs = {}
     relation = Relation(
         "mimir-cluster-require",
-        remote_app_data=MimirClusterProviderAppData(mimir_config=cfg, loki_endpoints=lgs).dump(),
+        remote_app_data=MimirClusterProviderAppData(mimir_config=cfg).dump(),
     )
 
     state = State(relations=[relation])

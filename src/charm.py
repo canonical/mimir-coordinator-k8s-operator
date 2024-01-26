@@ -166,9 +166,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         pass
 
     def _on_loki_relation_changed(self, _):
-        # TODO Update rules relation with the new list of Loki push-api endpoints
         self._update_mimir_cluster()
-        pass
 
     def _on_nginx_pebble_ready(self, _) -> None:
         self._ensure_pebble_layer()
@@ -239,13 +237,16 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     ###########################
 
     def _update_mimir_cluster(self):  # common exit hook
-        # TODO: does this prevent disabling log forwarding on relation-broken ???
+        """Build the config and publish everything to the application databag."""
+        # TODO: would checking coherence prevent disabling log forwarding on relation-broken ???
         # if not self.coordinator.is_coherent():
         #     return
         tls = self._is_cert_available
 
         s3_config_data = self._get_s3_storage_config()
 
+        # On every function call, we always publish everything to the databag; however, if there
+        # are no changes, Juju will safely ignore the updates
         self.cluster_provider.publish_data(
             mimir_config=self.coordinator.build_config(
                 s3_config_data=s3_config_data, tls_enabled=tls
