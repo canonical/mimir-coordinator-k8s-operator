@@ -98,24 +98,6 @@ class DatabagModel(BaseModel):
             databag[field.alias or key] = json.dumps(value)
         return databag
 
-    def update(self, **data: Any):
-        """Update in-place the contents of this databag model.
-
-        Note that this will not update the databag itself.
-
-        Usage:
-
-        >>> databag_contents = DatabagModel.load(relation.data[self.app])
-        >>> databag_contents.update(foo=42)
-        >>> databag_contents.dump(relation.data[self.app])
-        """
-
-        for key, value in data.items():
-            if key not in self.model_fields:
-                # this would set the attribute but not actually update the model!
-                raise ValueError(f"cannot update {key}: not declared in model")
-            setattr(self, key, value)
-
 
 class DataBagSchema(BaseModel):
     """Base class for relation interface databag schemas.
@@ -235,7 +217,7 @@ class MimirClusterProvider(Object):
 
     def publish_data(self,
                      mimir_config: Dict[str, Any],
-                     loki_endpoints: Optional[Dict[str, str]],
+                     loki_endpoints: Optional[Dict[str, str]] = None,
                      ) -> None:
         """Publish the mimir config and loki endpoints to all related mimir worker clusters."""
         for relation in self._relations:
@@ -430,33 +412,33 @@ class MimirClusterRequirer(Object):
             databag_model = MimirClusterRequirerAppData(roles=deduplicated_roles)
             databag_model.dump(relation.data[self.model.app])
 
-    def get_mimir_config(self) -> Dict[str, Any]:
-        """Fetch the mimir config from the coordinator databag."""
-        data = {}
+    def _get_data_from_coordinator(self) -> Optional[MimirClusterProviderAppData]:
+        """Fetch the contents of the doordinator databag."""
+        data: Optional[MimirClusterProviderAppData] = None
         relation = self.relation
         if relation:
             try:
                 databag = relation.data[relation.app]  # type: ignore # all checks are done in __init__
                 coordinator_databag = MimirClusterProviderAppData.load(databag)
-                data = coordinator_databag.mimir_config
+                data = coordinator_databag
             except DataValidationError as e:
                 log.info(f"invalid databag contents: {e}")
-                return {}
+
         return data
+
+    def get_mimir_config(self) -> Dict[str, Any]:
+        """Fetch the mimir config from the coordinator databag."""
+        data = self._get_data_from_coordinator()
+        if data:
+            return data.mimir_config
+        return {}
 
     def get_loki_endpoints(self) -> Dict[str, str]:
         """Fetch the loki endpoints from the coordinator databag."""
-        data = {}
-        relation = self.relation
-        if relation:
-            try:
-                databag = relation.data[relation.app]  # type: ignore # all checks are done in __init__
-                coordinator_databag = MimirClusterProviderAppData.load(databag)
-                data = coordinator_databag.loki_endpoints
-            except DataValidationError as e:
-                log.info(f"invalid databag contents: {e}")
-                return {}
-        return data or {}
+        data = self._get_data_from_coordinator()
+        if data:
+            return data.loki_endpoints or {}
+        return {}
 
     def get_cert_secret_ids(self) -> Optional[str]:
         """Fetch certificates secrets ids for the mimir config."""
