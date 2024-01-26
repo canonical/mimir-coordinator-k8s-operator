@@ -1,4 +1,5 @@
 ops
+cosl
 pydantic
 # crossplane is a package from nginxinc to interact with the Nginx config
 crossplane

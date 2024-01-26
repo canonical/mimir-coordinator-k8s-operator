@@ -45,6 +45,7 @@ class DatabagAccessPermissionError(MimirClusterError):
     """Raised when a follower attempts to write leader settings."""
 
 
+
 class DatabagModel(BaseModel):
     """Base databag model."""
     model_config = ConfigDict(
@@ -91,12 +92,29 @@ class DatabagModel(BaseModel):
         if nest_under:
             databag[nest_under] = self.json()
 
-        dct = self.model_dump()
+        dct = self.model_dump(by_alias=True)
         for key, field in self.model_fields.items():  # type: ignore
             value = dct[key]
             databag[field.alias or key] = json.dumps(value)
-
         return databag
+
+    def update(self, **data: Any):
+        """Update in-place the contents of this databag model.
+
+        Note that this will not update the databag itself.
+
+        Usage:
+
+        >>> databag_contents = DatabagModel.load(relation.data[self.app])
+        >>> databag_contents.update(foo=42)
+        >>> databag_contents.dump(relation.data[self.app])
+        """
+
+        for key, value in data.items():
+            if key not in self.model_fields:
+                # this would set the attribute but not actually update the model!
+                raise ValueError(f"cannot update {key}: not declared in model")
+            setattr(self, key, value)
 
 
 class DataBagSchema(BaseModel):
@@ -176,7 +194,7 @@ def expand_roles(roles: Iterable[MimirRole]) -> Set[MimirRole]:
 
 class MimirClusterProviderAppData(DatabagModel):
     mimir_config: Dict[str, Any]
-    loki_endpoints: Dict[str, str]
+    loki_endpoints: Optional[Dict[str, str]]
     # todo: validate with
     #  https://grafana.com/docs/mimir/latest/configure/about-configurations/#:~:text=Validate%20a%20configuration,or%20in%20a%20CI%20environment.
     #  caveat: only the requirer node can do it
@@ -217,17 +235,19 @@ class MimirClusterProvider(Object):
 
     def publish_configs(self,
                         mimir_config: Dict[str, Any],
-                        loki_endpoints: Dict[str, str],
                         ) -> None:
         """Publish the mimir config to all related mimir worker clusters."""
-        databag_model = MimirClusterProviderAppData(
-            mimir_config=mimir_config,
-            loki_endpoints=loki_endpoints
-        )
         for relation in self._relations:
             if relation:
-                local_app_databag = relation.data[self.model.app]
-                databag_model.dump(local_app_databag)
+                local_app_databag = MimirClusterProviderAppData.load(relation.data[self.model.app])
+                local_app_databag.update(mimir_config=mimir_config)
+
+    def publish_loki_endpoints(self, loki_endpoints: Dict[str, str]) -> None:
+        """Publish the loki endpoints to all related Mimir worker clusters."""
+        for relation in self._relations:
+            if relation:
+                local_app_databag = MimirClusterProviderAppData.load(relation.data[self.model.app])
+                local_app_databag.update(loki_endpoints=loki_endpoints)
 
     def gather_roles(self) -> Dict[MimirRole, int]:
         """Go through the worker's app databags and sum the available application roles."""
@@ -437,7 +457,7 @@ class MimirClusterRequirer(Object):
             except DataValidationError as e:
                 log.error(f"invalid databag contents: {e}")
                 return {}
-        return data
+        return data or {}
 
     def get_cert_secret_ids(self) -> Optional[str]:
         """Fetch certificates secrets ids for the mimir config."""

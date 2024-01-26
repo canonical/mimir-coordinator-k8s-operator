@@ -21,7 +21,7 @@ from charms.data_platform_libs.v0.s3 import (
     S3Requirer,
 )
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
-from charms.loki_k8s.v0.loki_push_api import LokiPushApiConsumer
+from charms.loki_k8s.v1.loki_push_api import LokiPushApiConsumer
 from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirClusterProvider
 from charms.observability_libs.v1.cert_handler import CertHandler
 from charms.prometheus_k8s.v0.prometheus_remote_write import (
@@ -33,12 +33,11 @@ from mimir_config import BUCKET_NAME, S3_RELATION_NAME, _S3ConfigData
 from mimir_coordinator import MimirCoordinator
 from nginx import CA_CERT_PATH, CERT_PATH, KEY_PATH, Nginx
 from ops.charm import CollectStatusEvent
+from ops.model import Relation
 from pydantic import ValidationError
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
-
-LOGGING_RELATION_NAME = "logging-consumer"
 
 
 @trace_charm(
@@ -87,16 +86,9 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
         self.framework.observe(self.on.nginx_pebble_ready, self._on_nginx_pebble_ready)
+        self.framework.observe(self.on.mimir_cluster_relation_joined, self._on_mimir_cluster_changed)
         self.framework.observe(
             self.on.mimir_cluster_relation_changed, self._on_mimir_cluster_changed
-        )
-        self.framework.observe(
-            self.on.mimir_cluster_relation_joined, self._on_mimir_cluster_joined
-        )
-
-        self.framework.observe(
-            self.on.mimir_cluster_relation_changed,  # pyright: ignore
-            self._on_mimir_cluster_changed,
         )
         self.framework.observe(
             self.on.mimir_cluster_relation_departed, self._on_mimir_cluster_departed
@@ -111,13 +103,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             self.remote_write_consumer.on.endpoints_changed,
             self._on_remote_write_endpoints_changed,
         )
-
-        self.grafana_dashboard_provider = GrafanaDashboardProvider(
-            self, relation_name="grafana-dashboards-provider"
-        )
-
-        self.loki_consumer = LokiPushApiConsumer(self, relation_name=LOGGING_RELATION_NAME)
-
         self.framework.observe(
             self.loki_consumer.on.loki_push_api_endpoint_joined, self._on_loki_relation_changed
         )
@@ -132,10 +117,8 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
 
     def _on_config_changed(self, _: ops.ConfigChangedEvent):
         """Handle changed configuration."""
-        self._process_cluster_and_s3_credentials_changes()
-
-    def _on_mimir_cluster_joined(self, _):
-        self._process_cluster_and_s3_credentials_changes()
+        s3_config_data = self._get_s3_storage_config()
+        self.publish_config(s3_config_data)
 
     def _on_server_cert_changed(self, _):
         self._update_cert()
@@ -145,21 +128,12 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     def _on_mimir_cluster_changed(self, _):
         self._process_cluster_and_s3_credentials_changes()
         self.publish_config(tls=self._is_cert_available)
+        self.cluster_provider.publish_loki_endpoints(self.loki_endpoints_by_unit)
 
     def _on_mimir_cluster_departed(self, _):
         self._process_cluster_and_s3_credentials_changes()
         self.publish_config()
-
-    def _process_cluster_and_s3_credentials_changes(self):
-        if not self.coordinator.is_coherent():
-            logger.warning("Incoherent deployment: Some required Mimir roles are missing.")
-            return
-        s3_config_data = self._get_s3_storage_config()
-        if not s3_config_data and self.has_multiple_workers():
-            logger.warning("Filesystem storage cannot be used with replicated mimir workers")
-            return
-        loki_endpoints = self._get_loki_endpoints()
-        self.publish_config(s3_config_data, loki_endpoints)
+        self.cluster_provider.publish_loki_endpoints({})
 
     def _on_s3_requirer_credentials_changed(self, _):
         self._process_cluster_and_s3_credentials_changes()
@@ -171,27 +145,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         if self.has_multiple_workers():
             logger.warning("Filesystem storage cannot be used with replicated mimir workers")
             return
-        loki_endpoints = self._get_loki_endpoints()
-        self.publish_config(None, loki_endpoints)
-
-    def publish_config(
-        self, s3_config_data: Optional[_S3ConfigData], loki_endpoints: Dict[str, str]
-    ):
-        """Generate config file and publish to all workers."""
-        mimir_config = self.coordinator.build_config(s3_config_data)
-        self.cluster_provider.publish_configs(mimir_config, loki_endpoints)
-
-    def _get_s3_storage_config(self):
-        """Retrieve S3 storage configuration."""
-        if not self.s3_requirer.relations:
-            return None
-        raw = self.s3_requirer.get_s3_connection_info()
-        try:
-            return _S3ConfigData(**raw)
-        except ValidationError:
-            msg = f"failed to validate s3 config data: {raw}"
-            logger.error(msg, exc_info=True)
-            return None
+        self.publish_config(None)
 
     def _on_collect_status(self, event: CollectStatusEvent):
         """Handle start event."""
@@ -221,31 +175,10 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         # TODO Update grafana-agent config file with the new external prometheus's endpoint
         pass
 
-    def _on_loki_relation_changed(self, _: ops.RelationChangedEvent):
-        self._process_cluster_and_s3_credentials_changes()
-
-    def _on_loki_relation_departed(self, _: ops.RelationDepartedEvent):
-        self._process_cluster_and_s3_credentials_changes()
-
-    def _get_loki_endpoints(self, relation_name: str = LOGGING_RELATION_NAME) -> Dict[str, str]:
-        """Fetch Loki Push API endpoints sent from LokiPushApiProvider through relation data.
-
-        Returns:
-            {
-                "loki/0": "http://loki1:3100/loki/api/v1/push",
-                "loki/1": "http://loki2:3100/loki/api/v1/push",
-            }
-        """
-        endpoints = {}
-        for relation in self.model.relations[relation_name]:
-            for unit in relation.units:
-                endpoint = relation.data[unit].get("endpoint")
-                if endpoint:
-                    deserialized_endpoint = json.loads(endpoint)
-                    url = deserialized_endpoint.get("url")
-                    if url:
-                        endpoints[unit.name] = url
-        return endpoints
+    def _on_loki_relation_changed(self, _):
+        # TODO Update rules relation with the new list of Loki push-api endpoints
+        self.cluster_provider.publish_loki_endpoints(self.loki_endpoints_by_unit)
+        pass
 
     def _on_nginx_pebble_ready(self, _) -> None:
         self._ensure_pebble_layer()
@@ -272,6 +205,33 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     def mimir_worker_relations(self) -> List[ops.Relation]:
         """Returns the list of worker relations."""
         return self.model.relations.get("mimir_worker", [])
+
+    @property
+    def loki_endpoints_by_unit(self) -> Dict[str, str]:
+        """Loki endpoints from relation data in the format needed for Pebble log forwarding.
+
+        Returns:
+            A dictionary of remote units and the respective Loki endpoint.
+            {
+                "loki/0": "http://loki:3100/loki/api/v1/push",
+                "another-loki/0": "http://another-loki:3100/loki/api/v1/push",
+            }
+        """
+        endpoints: Dict = {}
+        relations: List[Relation] = self.model.relations.get("logging-consumer", [])
+
+        logger.info(f"++++ getting loki endpoints by unit")
+
+        for relation in relations:
+            for unit in relation.units:
+                logger.info(f"++++++ unit: {unit}")
+                endpoint = relation.data[unit]["endpoint"]
+                deserialized_endpoint = json.loads(endpoint)
+                url = deserialized_endpoint["url"]
+                endpoints[unit.name] = url
+
+        logger.info(f"++++ endpoints: {endpoints}")
+        return endpoints
 
     @property
     def tempo_endpoint(self) -> Optional[str]:
