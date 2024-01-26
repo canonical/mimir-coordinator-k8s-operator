@@ -114,7 +114,6 @@ def test_address_collection(workers_addresses):
 
 def test_requirer_getters():
     cfg = {"a": "b"}
-    lgs = {}
     relation = Relation(
         "mimir-cluster-require",
         remote_app_data=MimirClusterProviderAppData(mimir_config=cfg).dump(),
