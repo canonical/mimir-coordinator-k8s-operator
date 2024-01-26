@@ -238,9 +238,8 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
 
     def _update_mimir_cluster(self):  # common exit hook
         """Build the config and publish everything to the application databag."""
-        # TODO: would checking coherence prevent disabling log forwarding on relation-broken ???
-        # if not self.coordinator.is_coherent():
-        #     return
+        if not self.coordinator.is_coherent():
+            return
         tls = self._is_cert_available
 
         s3_config_data = self._get_s3_storage_config()
