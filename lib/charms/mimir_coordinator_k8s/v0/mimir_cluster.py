@@ -274,8 +274,13 @@ class MimirClusterProvider(Object):
                 log.debug(f"skipped {relation} as .app is None")
                 continue
 
-            worker_app_data = MimirClusterRequirerAppData.load(relation.data[relation.app])
-            worker_roles = set(worker_app_data.roles)
+            try:
+                worker_app_data = MimirClusterRequirerAppData.load(relation.data[relation.app])
+                worker_roles = set(worker_app_data.roles)
+            except DataValidationError as e:
+                log.error(f"invalid databag contents: {e}")
+                continue
+
             for worker_unit in relation.units:
                 try:
                     worker_data = MimirClusterRequirerUnitData.load(relation.data[worker_unit])
