@@ -14,14 +14,14 @@ import logging
 import socket
 import subprocess
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 import ops
 from charms.data_platform_libs.v0.s3 import (
     S3Requirer,
 )
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
-from charms.loki_k8s.v0.loki_push_api import LokiPushApiConsumer
+from charms.loki_k8s.v1.loki_push_api import LokiPushApiConsumer
 from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirClusterProvider
 from charms.observability_libs.v1.cert_handler import CertHandler
 from charms.prometheus_k8s.v0.prometheus_remote_write import (
@@ -33,6 +33,7 @@ from mimir_config import BUCKET_NAME, S3_RELATION_NAME, _S3ConfigData
 from mimir_coordinator import MimirCoordinator
 from nginx import CA_CERT_PATH, CERT_PATH, KEY_PATH, Nginx
 from ops.charm import CollectStatusEvent
+from ops.model import Relation
 from pydantic import ValidationError
 
 # Log messages can be retrieved using juju debug-log
@@ -85,18 +86,24 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
         self.framework.observe(self.on.nginx_pebble_ready, self._on_nginx_pebble_ready)
+        self.framework.observe(self.server_cert.on.cert_changed, self._on_server_cert_changed)
+        # Mimir Cluster
+        self.framework.observe(
+            self.on.mimir_cluster_relation_joined, self._on_mimir_cluster_changed
+        )
         self.framework.observe(
             self.on.mimir_cluster_relation_changed, self._on_mimir_cluster_changed
         )
         self.framework.observe(
-            self.on.mimir_cluster_relation_departed, self._on_mimir_cluster_departed
+            self.on.mimir_cluster_relation_departed, self._on_mimir_cluster_changed
         )
         self.framework.observe(
-            self.s3_requirer.on.credentials_changed, self._on_s3_requirer_credentials_changed
+            self.on.mimir_cluster_relation_broken, self._on_mimir_cluster_changed
         )
-        self.framework.observe(
-            self.s3_requirer.on.credentials_gone, self._on_s3_requirer_credentials_gone
-        )
+        # S3 Requirer
+        self.framework.observe(self.s3_requirer.on.credentials_changed, self._on_s3_changed)
+        self.framework.observe(self.s3_requirer.on.credentials_gone, self._on_s3_changed)
+        # Self-monitoring
         self.framework.observe(
             self.remote_write_consumer.on.endpoints_changed,
             self._on_remote_write_endpoints_changed,
@@ -107,7 +114,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self.framework.observe(
             self.loki_consumer.on.loki_push_api_endpoint_departed, self._on_loki_relation_changed
         )
-        self.framework.observe(self.server_cert.on.cert_changed, self._on_server_cert_changed)
 
     ##########################
     # === EVENT HANDLERS === #
@@ -115,33 +121,21 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
 
     def _on_config_changed(self, _: ops.ConfigChangedEvent):
         """Handle changed configuration."""
-        s3_config_data = self._get_s3_storage_config()
-        self.publish_config(s3_config_data)
+        self._update_mimir_cluster()
 
     def _on_server_cert_changed(self, _):
         self._update_cert()
         self._ensure_pebble_layer()
-        self.publish_config(tls=self._is_cert_available)
+        self._update_mimir_cluster()
 
     def _on_mimir_cluster_changed(self, _):
-        self._process_cluster_and_s3_credentials_changes()
-        self.publish_config(tls=self._is_cert_available)
+        self._update_mimir_cluster()
 
     def _on_mimir_cluster_departed(self, _):
-        self._process_cluster_and_s3_credentials_changes()
-        self.publish_config()
+        self._update_mimir_cluster()
 
-    def _on_s3_requirer_credentials_changed(self, _):
-        self._process_cluster_and_s3_credentials_changes()
-
-    def _on_s3_requirer_credentials_gone(self, _):
-        if not self.coordinator.is_coherent():
-            logger.warning("Incoherent deployment: Some required Mimir roles are missing.")
-            return
-        if self.has_multiple_workers():
-            logger.warning("Filesystem storage cannot be used with replicated mimir workers")
-            return
-        self.publish_config(None)
+    def _on_s3_changed(self, _):
+        self._update_mimir_cluster()
 
     def _on_collect_status(self, event: CollectStatusEvent):
         """Handle start event."""
@@ -172,8 +166,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         pass
 
     def _on_loki_relation_changed(self, _):
-        # TODO Update rules relation with the new list of Loki push-api endpoints
-        pass
+        self._update_mimir_cluster()
 
     def _on_nginx_pebble_ready(self, _) -> None:
         self._ensure_pebble_layer()
@@ -202,6 +195,31 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         return self.model.relations.get("mimir_worker", [])
 
     @property
+    def loki_endpoints_by_unit(self) -> Dict[str, str]:
+        """Loki endpoints from relation data in the format needed for Pebble log forwarding.
+
+        Returns:
+            A dictionary of remote units and the respective Loki endpoint.
+            {
+                "loki/0": "http://loki:3100/loki/api/v1/push",
+                "another-loki/0": "http://another-loki:3100/loki/api/v1/push",
+            }
+        """
+        endpoints: Dict = {}
+        relations: List[Relation] = self.model.relations.get("logging-consumer", [])
+
+        for relation in relations:
+            for unit in relation.units:
+                if "endpoint" not in relation.data[unit]:
+                    continue
+                endpoint = relation.data[unit]["endpoint"]
+                deserialized_endpoint = json.loads(endpoint)
+                url = deserialized_endpoint["url"]
+                endpoints[unit.name] = url
+
+        return endpoints
+
+    @property
     def tempo_endpoint(self) -> Optional[str]:
         """Tempo endpoint for charm tracing."""
         if self.tracing.is_ready():
@@ -218,6 +236,26 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     # === UTILITY METHODS === #
     ###########################
 
+    def _update_mimir_cluster(self):  # common exit hook
+        """Build the config and publish everything to the application databag."""
+        if not self.coordinator.is_coherent():
+            return
+        tls = self._is_cert_available
+
+        s3_config_data = self._get_s3_storage_config()
+
+        # On every function call, we always publish everything to the databag; however, if there
+        # are no changes, Juju will safely ignore the updates
+        self.cluster_provider.publish_data(
+            mimir_config=self.coordinator.build_config(
+                s3_config_data=s3_config_data, tls_enabled=tls
+            ),
+            loki_endpoints=self.loki_endpoints_by_unit,
+        )
+
+        if tls:
+            self.publish_grant_secrets()
+
     def has_multiple_workers(self) -> bool:
         """Return True if there are multiple workers forming the Mimir cluster."""
         mimir_cluster_relations = self.model.relations.get("mimir-cluster", [])
@@ -227,16 +265,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             if relation.app != self.model.app
         )
         return remote_units_count > 1
-
-    def publish_config(self, s3_config_data: Optional[_S3ConfigData] = None, tls: bool = False):
-        """Generate config file and publish to all workers."""
-        mimir_config = self.coordinator.build_config(
-            s3_config_data=s3_config_data, tls_enabled=tls
-        )
-        self.cluster_provider.publish_configs(mimir_config)
-
-        if tls:
-            self.publish_grant_secrets()
 
     def publish_grant_secrets(self) -> None:
         """Publish and Grant secrets to the mimir-cluster relation."""
@@ -253,16 +281,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             for secret_id in secrets.values():
                 secret = self.model.get_secret(id=secret_id)
                 secret.grant(relation)
-
-    def _process_cluster_and_s3_credentials_changes(self):
-        if not self.coordinator.is_coherent():
-            logger.warning("Incoherent deployment: Some required Mimir roles are missing.")
-            return
-        s3_config_data = self._get_s3_storage_config()
-        if not s3_config_data and self.has_multiple_workers():
-            logger.warning("Filesystem storage cannot be used with replicated mimir workers")
-            return
-        self.publish_config(s3_config_data)
 
     def _get_s3_storage_config(self):
         """Retrieve S3 storage configuration."""
