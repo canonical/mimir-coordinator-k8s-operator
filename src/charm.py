@@ -128,7 +128,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self._ensure_pebble_layer()
         self._update_mimir_cluster()
 
-    def _on_mimir_cluster_changed(self, event):
+    def _on_mimir_cluster_changed(self, _):
         self._update_mimir_cluster()
 
     def _on_mimir_cluster_departed(self, _):
