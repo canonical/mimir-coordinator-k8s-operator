@@ -117,23 +117,40 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
 
     def _on_config_changed(self, _: ops.ConfigChangedEvent):
         """Handle changed configuration."""
-        s3_config_data = self._get_s3_storage_config()
-        self.publish_config(s3_config_data)
+        self._update_mimir_cluster()
 
     def _on_server_cert_changed(self, _):
         self._update_cert()
         self._ensure_pebble_layer()
-        self.publish_config(tls=self._is_cert_available)
+        self._update_mimir_cluster()
 
     def _on_mimir_cluster_changed(self, _):
         self._process_cluster_and_s3_credentials_changes()
-        self.publish_config(tls=self._is_cert_available)
-        self.cluster_provider.publish_loki_endpoints(self.loki_endpoints_by_unit)
+        self._update_mimir_cluster()
+
+    def _update_mimir_cluster(self):  # common exit hook
+        # needs to be there
+        # if not config published OR config changed:
+        #  publish config
+        # if not loki published OR loki endpoints have changed:
+        #  publish loki
+        tls = self._is_cert_available
+
+        s3_config_data = self._get_s3_storage_config()
+        self.cluster_provider.publish_data(
+            mimir_config=self.coordinator.build_config(
+                s3_config_data=s3_config_data,
+                tls_enabled=tls
+            ),
+            loki_endpoints=self.loki_endpoints_by_unit
+        )
+
+        if tls:
+            self.publish_grant_secrets()
 
     def _on_mimir_cluster_departed(self, _):
         self._process_cluster_and_s3_credentials_changes()
-        self.publish_config()
-        self.cluster_provider.publish_loki_endpoints({})
+        self.publish_loki_endpoints()
 
     def _on_s3_requirer_credentials_changed(self, _):
         self._process_cluster_and_s3_credentials_changes()
@@ -260,16 +277,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         )
         return remote_units_count > 1
 
-    def publish_config(self, s3_config_data: Optional[_S3ConfigData] = None, tls: bool = False):
-        """Generate config file and publish to all workers."""
-        mimir_config = self.coordinator.build_config(
-            s3_config_data=s3_config_data, tls_enabled=tls
-        )
-        self.cluster_provider.publish_configs(mimir_config)
-
-        if tls:
-            self.publish_grant_secrets()
-
     def publish_grant_secrets(self) -> None:
         """Publish and Grant secrets to the mimir-cluster relation."""
         secrets = {
@@ -294,7 +301,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         if not s3_config_data and self.has_multiple_workers():
             logger.warning("Filesystem storage cannot be used with replicated mimir workers")
             return
-        self.publish_config(s3_config_data)
+        self._update_mimir_cluster()
 
     def _get_s3_storage_config(self):
         """Retrieve S3 storage configuration."""

@@ -10,7 +10,7 @@ import json
 import logging
 from collections import defaultdict
 from enum import Enum
-from typing import Any, Dict, MutableMapping, Set, List, Iterable, TypeVar, Protocol, Union
+from typing import Any, Dict, MutableMapping, Set, List, Iterable
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -33,6 +33,7 @@ MIMIR_CERT_FILE = "/etc/mimir/server.cert"
 MIMIR_KEY_FILE = "/etc/mimir/private.key"
 MIMIR_CLIENT_CA_FILE = "/etc/mimir/ca.cert"
 
+
 class MimirClusterError(Exception):
     """Base class for exceptions raised by this module."""
 
@@ -43,7 +44,6 @@ class DataValidationError(MimirClusterError):
 
 class DatabagAccessPermissionError(MimirClusterError):
     """Raised when a follower attempts to write leader settings."""
-
 
 
 class DatabagModel(BaseModel):
@@ -233,21 +233,16 @@ class MimirClusterProvider(Object):
         self._charm = charm
         self._relations = self.model.relations[endpoint]
 
-    def publish_configs(self,
-                        mimir_config: Dict[str, Any],
-                        ) -> None:
-        """Publish the mimir config to all related mimir worker clusters."""
+    def publish_data(self,
+                     mimir_config: Dict[str, Any],
+                     loki_endpoints: Optional[Dict[str, str]],
+                     ) -> None:
+        """Publish the mimir config and loki endpoints to all related mimir worker clusters."""
         for relation in self._relations:
             if relation:
-                local_app_databag = MimirClusterProviderAppData.load(relation.data[self.model.app])
-                local_app_databag.update(mimir_config=mimir_config)
-
-    def publish_loki_endpoints(self, loki_endpoints: Dict[str, str]) -> None:
-        """Publish the loki endpoints to all related Mimir worker clusters."""
-        for relation in self._relations:
-            if relation:
-                local_app_databag = MimirClusterProviderAppData.load(relation.data[self.model.app])
-                local_app_databag.update(loki_endpoints=loki_endpoints)
+                local_app_databag = MimirClusterProviderAppData(mimir_config=mimir_config,
+                                                                loki_endpoints=loki_endpoints)
+                local_app_databag.dump(relation.data[self.model.app])
 
     def gather_roles(self) -> Dict[MimirRole, int]:
         """Go through the worker's app databags and sum the available application roles."""
@@ -292,7 +287,6 @@ class MimirClusterProvider(Object):
                     continue
 
         return data
-
 
     def gather_addresses(self) -> Set[str]:
         """Go through the worker's unit databags to collect all the addresses published by the units."""
@@ -462,4 +456,4 @@ class MimirClusterRequirer(Object):
     def get_cert_secret_ids(self) -> Optional[str]:
         """Fetch certificates secrets ids for the mimir config."""
         if self.relation and self.relation.app:
-                return self.relation.data[self.relation.app].get("secrets", None)
+            return self.relation.data[self.relation.app].get("secrets", None)
