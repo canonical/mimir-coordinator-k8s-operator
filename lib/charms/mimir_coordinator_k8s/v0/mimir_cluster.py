@@ -67,14 +67,14 @@ class DatabagModel(BaseModel):
             data = {k: json.loads(v) for k, v in databag.items() if k not in BUILTIN_JUJU_KEYS}
         except json.JSONDecodeError as e:
             msg = f"invalid databag contents: expecting json. {databag}"
-            log.error(msg)
+            log.info(msg)
             raise DataValidationError(msg) from e
 
         try:
             return cls.parse_raw(json.dumps(data))  # type: ignore
         except pydantic.ValidationError as e:
             msg = f"failed to validate databag: {databag}"
-            log.error(msg, exc_info=True)
+            log.info(msg, exc_info=True)
             raise DataValidationError(msg) from e
 
     def dump(self, databag: Optional[MutableMapping[str, str]] = None, clear: bool = True):
@@ -194,7 +194,7 @@ def expand_roles(roles: Iterable[MimirRole]) -> Set[MimirRole]:
 
 class MimirClusterProviderAppData(DatabagModel):
     mimir_config: Dict[str, Any]
-    loki_endpoints: Optional[Dict[str, str]]
+    loki_endpoints: Optional[Dict[str, str]] = None
     # todo: validate with
     #  https://grafana.com/docs/mimir/latest/configure/about-configurations/#:~:text=Validate%20a%20configuration,or%20in%20a%20CI%20environment.
     #  caveat: only the requirer node can do it
@@ -253,7 +253,7 @@ class MimirClusterProvider(Object):
                 try:
                     worker_roles: List[MimirRole] = MimirClusterRequirerAppData.load(remote_app_databag).roles
                 except DataValidationError as e:
-                    log.error(f"invalid databag contents: {e}")
+                    log.info(f"invalid databag contents: {e}")
                     worker_roles = []
 
                 # the number of units with each role is the number of remote units
@@ -278,7 +278,7 @@ class MimirClusterProvider(Object):
                 worker_app_data = MimirClusterRequirerAppData.load(relation.data[relation.app])
                 worker_roles = set(worker_app_data.roles)
             except DataValidationError as e:
-                log.error(f"invalid databag contents: {e}")
+                log.info(f"invalid databag contents: {e}")
                 continue
 
             for worker_unit in relation.units:
@@ -288,7 +288,7 @@ class MimirClusterProvider(Object):
                     for role in worker_roles:
                         data[role].add(unit_address)
                 except DataValidationError as e:
-                    log.error(f"invalid databag contents: {e}")
+                    log.info(f"invalid databag contents: {e}")
                     continue
 
         return data
@@ -398,7 +398,7 @@ class MimirClusterRequirer(Object):
             MimirClusterRequirerUnitData.load(unit_data)
             MimirClusterRequirerAppData.load(app_data)
         except DataValidationError as e:
-            log.error(f"invalid databag contents: {e}")
+            log.info(f"invalid databag contents: {e}")
             return False
         return True
 
@@ -440,7 +440,7 @@ class MimirClusterRequirer(Object):
                 coordinator_databag = MimirClusterProviderAppData.load(databag)
                 data = coordinator_databag.mimir_config
             except DataValidationError as e:
-                log.error(f"invalid databag contents: {e}")
+                log.info(f"invalid databag contents: {e}")
                 return {}
         return data
 
@@ -454,7 +454,7 @@ class MimirClusterRequirer(Object):
                 coordinator_databag = MimirClusterProviderAppData.load(databag)
                 data = coordinator_databag.loki_endpoints
             except DataValidationError as e:
-                log.error(f"invalid databag contents: {e}")
+                log.info(f"invalid databag contents: {e}")
                 return {}
         return data or {}
 
