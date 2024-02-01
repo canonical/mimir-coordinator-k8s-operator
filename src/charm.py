@@ -24,9 +24,6 @@ from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v1.loki_push_api import LokiPushApiConsumer
 from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirClusterProvider
 from charms.observability_libs.v1.cert_handler import CertHandler
-from charms.prometheus_k8s.v0.prometheus_remote_write import (
-    PrometheusRemoteWriteConsumer,
-)
 from charms.tempo_k8s.v1.charm_tracing import trace_charm
 from charms.tempo_k8s.v1.tracing import TracingEndpointRequirer
 from mimir_config import BUCKET_NAME, S3_RELATION_NAME, _S3ConfigData
@@ -74,7 +71,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         )
         self.nginx = Nginx(cluster_provider=self.cluster_provider, server_name=self.hostname)
         self.tracing = TracingEndpointRequirer(self)
-        self.remote_write_consumer = PrometheusRemoteWriteConsumer(self)
         self.grafana_dashboard_provider = GrafanaDashboardProvider(
             self, relation_name="grafana-dashboards-provider"
         )
@@ -104,10 +100,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self.framework.observe(self.s3_requirer.on.credentials_changed, self._on_s3_changed)
         self.framework.observe(self.s3_requirer.on.credentials_gone, self._on_s3_changed)
         # Self-monitoring
-        self.framework.observe(
-            self.remote_write_consumer.on.endpoints_changed,
-            self._on_remote_write_endpoints_changed,
-        )
         self.framework.observe(
             self.loki_consumer.on.loki_push_api_endpoint_joined, self._on_loki_relation_changed
         )
@@ -160,10 +152,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             event.add_status(ops.ActiveStatus("degraded"))
         else:
             event.add_status(ops.ActiveStatus())
-
-    def _on_remote_write_endpoints_changed(self, _):
-        # TODO Update grafana-agent config file with the new external prometheus's endpoint
-        pass
 
     def _on_loki_relation_changed(self, _):
         self._update_mimir_cluster()
