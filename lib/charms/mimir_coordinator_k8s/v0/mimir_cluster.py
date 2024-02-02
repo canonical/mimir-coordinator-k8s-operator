@@ -299,7 +299,7 @@ class MimirClusterProvider(Object):
                     continue
                 worker_topology = {
                     "unit": worker_unit.name,
-                    "app": worker_unit.app,
+                    "app": worker_unit.app.name,
                     "address": unit_address,
                 }
                 data.append(worker_topology)

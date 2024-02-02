@@ -193,16 +193,18 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             job = {
                 "static_configs": [
                     {
-                        "targets": [worker["address"]],
-                        "labels": {
-                            "juju_charm": "mimir-worker-k8s",
-                            "juju_unit": worker["unit"],
-                            "juju_application": worker["app"],
-                            "juju_model": self.model.name,
-                            "juju_model_uuid": self.model.uuid,
-                        },
+                        "targets": [f"{worker['address']}:8080"],
                     }
-                ]
+                ],
+                # setting these as "labels" in the static config gets some of them
+                # replaced by the coordinator topology
+                "relabel_configs": [
+                    {"target_label": "juju_charm", "replacement": "mimir-worker-k8s"},
+                    {"target_label": "juju_unit", "replacement": worker["unit"]},
+                    {"target_label": "juju_application", "replacement": worker["app"]},
+                    {"target_label": "juju_model", "replacement": self.model.name},
+                    {"target_label": "juju_model_uuid", "replacement": self.model.uuid},
+                ],
             }
             scrape_jobs.append(job)
         return scrape_jobs
