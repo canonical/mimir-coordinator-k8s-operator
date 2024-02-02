@@ -68,3 +68,8 @@ provides:
     description: |
       Forward workers' built-in dashboards to grafana
       (the coordinator, not the worker, owns all dashboards).
+
+  metrics-endpoint:
+    interface: prometheus_scrape
+    description: |
+      The coordinator provides scrape jobs for all the workers related to it.

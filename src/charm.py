@@ -24,6 +24,7 @@ from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.loki_k8s.v1.loki_push_api import LokiPushApiConsumer
 from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirClusterProvider
 from charms.observability_libs.v1.cert_handler import CertHandler
+from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.tempo_k8s.v1.charm_tracing import trace_charm
 from charms.tempo_k8s.v1.tracing import TracingEndpointRequirer
 from mimir_config import BUCKET_NAME, S3_RELATION_NAME, _S3ConfigData
@@ -75,6 +76,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             self, relation_name="grafana-dashboards-provider"
         )
         self.loki_consumer = LokiPushApiConsumer(self, relation_name="logging-consumer")
+        self.metrics_endpoints = MetricsEndpointProvider(self, jobs=self.workers_scrape_jobs)
 
         ######################################
         # === EVENT HANDLER REGISTRATION === #
@@ -181,6 +183,29 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     def mimir_worker_relations(self) -> List[ops.Relation]:
         """Returns the list of worker relations."""
         return self.model.relations.get("mimir_worker", [])
+
+    @property
+    def workers_scrape_jobs(self) -> List[Dict[str, str]]:
+        """Scrape jobs for the Mimir workers."""
+        scrape_jobs = []
+        worker_topologies = self.cluster_provider.gather_topology()
+        for worker in worker_topologies:
+            job = {
+                "static_configs": [
+                    {
+                        "targets": [worker["address"]],
+                        "labels": {
+                            "juju_charm": "mimir-worker-k8s",
+                            "juju_unit": worker["unit"],
+                            "juju_application": worker["app"],
+                            "juju_model": self.model.name,
+                            "juju_model_uuid": self.model.uuid,
+                        },
+                    }
+                ]
+            }
+            scrape_jobs.append(job)
+        return scrape_jobs
 
     @property
     def loki_endpoints_by_unit(self) -> Dict[str, str]:
