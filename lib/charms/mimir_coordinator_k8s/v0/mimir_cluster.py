@@ -283,6 +283,11 @@ class MimirClusterProvider(Object):
             data.update(address_set)
 
         return data
+    
+    def get_datasource_address(self) -> Optional[str]:
+        addresses_by_role = self.gather_addresses_by_role()
+        if address_set := addresses_by_role.get("ruler", None):
+            return address_set.pop()
 
 
 class MimirClusterRemovedEvent(ops.EventBase):

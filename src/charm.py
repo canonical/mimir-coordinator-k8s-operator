@@ -21,6 +21,7 @@ from charms.data_platform_libs.v0.s3 import (
     S3Requirer,
 )
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
+from charms.grafana_k8s.v0.grafana_source import GrafanaSourceProvider
 from charms.loki_k8s.v1.loki_push_api import LokiPushApiConsumer
 from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirClusterProvider
 from charms.observability_libs.v1.cert_handler import CertHandler
@@ -77,6 +78,12 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self.remote_write_consumer = PrometheusRemoteWriteConsumer(self)
         self.grafana_dashboard_provider = GrafanaDashboardProvider(
             self, relation_name="grafana-dashboards-provider"
+        )
+        self.grafana_source = GrafanaSourceProvider(
+            self,
+            source_type="prometheus",
+            source_port="9095",
+            source_url=self.cluster_provider.get_datasource_address(),
         )
         self.loki_consumer = LokiPushApiConsumer(self, relation_name="logging-consumer")
 
