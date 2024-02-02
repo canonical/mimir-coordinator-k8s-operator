@@ -198,6 +198,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                 ],
                 # setting these as "labels" in the static config gets some of them
                 # replaced by the coordinator topology
+                # https://github.com/canonical/prometheus-k8s-operator/issues/571
                 "relabel_configs": [
                     {"target_label": "juju_charm", "replacement": "mimir-worker-k8s"},
                     {"target_label": "juju_unit", "replacement": worker["unit"]},
