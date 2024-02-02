@@ -77,4 +77,4 @@ provides:
       (the coordinator, not the worker, owns all dashboards).
 
   grafana-source:
-    interface: grafana_source
+    interface: grafana_datasource
