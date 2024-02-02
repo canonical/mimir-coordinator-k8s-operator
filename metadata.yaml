@@ -75,3 +75,6 @@ provides:
     description: |
       Forward workers' built-in dashboards to grafana
       (the coordinator, not the worker, owns all dashboards).
+
+  grafana-source:
+    interface: grafana_source
