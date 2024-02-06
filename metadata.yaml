@@ -30,13 +30,6 @@ requires:
     description: |
       The coordinator obtains and shares storage details with workers, enabling Mimir's access to an S3 bucket for data storage.
 
-  send-remote-write:
-    interface: prometheus_remote_write
-    description: |
-      Forward workers' metrics and rules to the external prometheus
-      (the coordinator, not the worker, owns all rule files).
-      Obtain rule files to later send them to the mimir rules over another relation.
-
   logging-consumer:
     interface: loki_push_api
     description: |
@@ -78,3 +71,8 @@ provides:
 
   grafana-source:
     interface: grafana_datasource
+
+  metrics-endpoint:
+    interface: prometheus_scrape
+    description: |
+      The coordinator provides scrape jobs for all the workers related to it.

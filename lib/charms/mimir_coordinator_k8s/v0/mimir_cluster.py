@@ -289,6 +289,28 @@ class MimirClusterProvider(Object):
         if address_set := addresses_by_role.get("ruler", None):
             return address_set.pop()
 
+    def gather_topology(self) -> List[Dict[str,str]]:
+        data = []
+        for relation in self._relations:
+            if not relation.app:
+                continue
+
+            for worker_unit in relation.units:
+                try:
+                    worker_data = MimirClusterRequirerUnitData.load(relation.data[worker_unit])
+                    unit_address = worker_data.address
+                except DataValidationError as e:
+                    log.info(f"invalid databag contents: {e}")
+                    continue
+                worker_topology = {
+                    "unit": worker_unit.name,
+                    "app": worker_unit.app.name,
+                    "address": unit_address,
+                }
+                data.append(worker_topology)
+
+        return data
+
 
 class MimirClusterRemovedEvent(ops.EventBase):
     """Event emitted when the relation with the "mimir-cluster" provider has been severed.
