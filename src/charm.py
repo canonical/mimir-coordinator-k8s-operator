@@ -79,8 +79,10 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self.grafana_source = GrafanaSourceProvider(
             self,
             source_type="prometheus",
-            source_port="9095",
-            source_url=self.cluster_provider.get_datasource_address(),
+            source_port="8080",
+            source_url=f"{self.cluster_provider.get_datasource_address()}:8080/prometheus",
+            extra_fields={"httpHeaderName1": "X-Scope-OrgID"},
+            secure_extra_fields={"httpHeaderValue1": "anonymous"},
         )
         self.loki_consumer = LokiPushApiConsumer(self, relation_name="logging-consumer")
         self.metrics_endpoints = MetricsEndpointProvider(self, jobs=self.workers_scrape_jobs)
