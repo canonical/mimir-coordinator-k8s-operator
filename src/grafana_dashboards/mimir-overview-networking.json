@@ -39,7 +39,7 @@
                   "bars": false,
                   "dashLength": 10,
                   "dashes": false,
-                  "datasource": "$datasource",
+                  "datasource": "$prometheusds",
                   "fill": 10,
                   "id": 1,
                   "legend": {
@@ -66,10 +66,10 @@
                   "steppedLine": false,
                   "targets": [
                      {
-                        "expr": "sum by(pod) (rate(container_network_receive_bytes_total{cluster=~\"$cluster\", namespace=~\"$namespace\",pod=~\"(.*mimir-)?(distributor|ingester|mimir-write).*\"}[$__rate_interval]))",
+                        "expr": "sum by(juju_unit) (rate(container_network_receive_bytes_total{cluster=~\"$cluster\", namespace=~\"$namespace\",pod=~\"(.*mimir-)?(distributor|ingester|mimir-write).*\"}[$__rate_interval]))",
                         "format": "time_series",
                         "intervalFactor": 2,
-                        "legendFormat": "{{pod}}",
+                        "legendFormat": "{{juju_unit}}",
                         "legendLink": null,
                         "step": 10
                      }
@@ -115,7 +115,7 @@
                   "bars": false,
                   "dashLength": 10,
                   "dashes": false,
-                  "datasource": "$datasource",
+                  "datasource": "$prometheusds",
                   "fill": 10,
                   "id": 2,
                   "legend": {
@@ -142,10 +142,10 @@
                   "steppedLine": false,
                   "targets": [
                      {
-                        "expr": "sum by(pod) (rate(container_network_transmit_bytes_total{cluster=~\"$cluster\", namespace=~\"$namespace\",pod=~\"(.*mimir-)?(distributor|ingester|mimir-write).*\"}[$__rate_interval]))",
+                        "expr": "sum by(juju_unit) (rate(container_network_transmit_bytes_total{cluster=~\"$cluster\", namespace=~\"$namespace\",pod=~\"(.*mimir-)?(distributor|ingester|mimir-write).*\"}[$__rate_interval]))",
                         "format": "time_series",
                         "intervalFactor": 2,
-                        "legendFormat": "{{pod}}",
+                        "legendFormat": "{{juju_unit}}",
                         "legendLink": null,
                         "step": 10
                      }
@@ -191,7 +191,7 @@
                   "bars": false,
                   "dashLength": 10,
                   "dashes": false,
-                  "datasource": "$datasource",
+                  "datasource": "$prometheusds",
                   "fill": 0,
                   "id": 3,
                   "legend": {
@@ -237,7 +237,7 @@
                   "thresholds": [ ],
                   "timeFrom": null,
                   "timeShift": null,
-                  "title": "Inflight requests (per pod)",
+                  "title": "Inflight requests (per unit)",
                   "tooltip": {
                      "shared": false,
                      "sort": 0,
@@ -275,7 +275,7 @@
                   "bars": false,
                   "dashLength": 10,
                   "dashes": false,
-                  "datasource": "$datasource",
+                  "datasource": "$prometheusds",
                   "fill": 0,
                   "id": 4,
                   "legend": {
@@ -302,7 +302,7 @@
                   "steppedLine": false,
                   "targets": [
                      {
-                        "expr": "avg(sum by(pod) (cortex_tcp_connections{cluster=~\"$cluster\", namespace=~\"$namespace\",pod=~\"(.*mimir-)?(distributor|ingester|mimir-write).*\"}))",
+                        "expr": "avg(sum by(juju_unit) (cortex_tcp_connections{cluster=~\"$cluster\", namespace=~\"$namespace\",pod=~\"(.*mimir-)?(distributor|ingester|mimir-write).*\"}))",
                         "format": "time_series",
                         "intervalFactor": 2,
                         "legendFormat": "avg",
@@ -310,7 +310,7 @@
                         "step": 10
                      },
                      {
-                        "expr": "max(sum by(pod) (cortex_tcp_connections{cluster=~\"$cluster\", namespace=~\"$namespace\",pod=~\"(.*mimir-)?(distributor|ingester|mimir-write).*\"}))",
+                        "expr": "max(sum by(juju_unit) (cortex_tcp_connections{cluster=~\"$cluster\", namespace=~\"$namespace\",pod=~\"(.*mimir-)?(distributor|ingester|mimir-write).*\"}))",
                         "format": "time_series",
                         "intervalFactor": 2,
                         "legendFormat": "highest",
@@ -329,7 +329,7 @@
                   "thresholds": [ ],
                   "timeFrom": null,
                   "timeShift": null,
-                  "title": "TCP connections (per pod)",
+                  "title": "TCP connections (per unit)",
                   "tooltip": {
                      "shared": false,
                      "sort": 0,
@@ -379,7 +379,7 @@
                   "bars": false,
                   "dashLength": 10,
                   "dashes": false,
-                  "datasource": "$datasource",
+                  "datasource": "$prometheusds",
                   "fill": 10,
                   "id": 5,
                   "legend": {
@@ -406,10 +406,10 @@
                   "steppedLine": false,
                   "targets": [
                      {
-                        "expr": "sum by(pod) (rate(container_network_receive_bytes_total{cluster=~\"$cluster\", namespace=~\"$namespace\",pod=~\"(.*mimir-)?(query-frontend|querier|ruler-query-frontend|ruler-querier|mimir-read).*\"}[$__rate_interval]))",
+                        "expr": "sum by(juju_unit) (rate(container_network_receive_bytes_total{cluster=~\"$cluster\", namespace=~\"$namespace\",pod=~\"(.*mimir-)?(query-frontend|querier|ruler-query-frontend|ruler-querier|mimir-read).*\"}[$__rate_interval]))",
                         "format": "time_series",
                         "intervalFactor": 2,
-                        "legendFormat": "{{pod}}",
+                        "legendFormat": "{{juju_unit}}",
                         "legendLink": null,
                         "step": 10
                      }
@@ -455,7 +455,7 @@
                   "bars": false,
                   "dashLength": 10,
                   "dashes": false,
-                  "datasource": "$datasource",
+                  "datasource": "$prometheusds",
                   "fill": 10,
                   "id": 6,
                   "legend": {
@@ -482,10 +482,10 @@
                   "steppedLine": false,
                   "targets": [
                      {
-                        "expr": "sum by(pod) (rate(container_network_transmit_bytes_total{cluster=~\"$cluster\", namespace=~\"$namespace\",pod=~\"(.*mimir-)?(query-frontend|querier|ruler-query-frontend|ruler-querier|mimir-read).*\"}[$__rate_interval]))",
+                        "expr": "sum by(juju_unit) (rate(container_network_transmit_bytes_total{cluster=~\"$cluster\", namespace=~\"$namespace\",pod=~\"(.*mimir-)?(query-frontend|querier|ruler-query-frontend|ruler-querier|mimir-read).*\"}[$__rate_interval]))",
                         "format": "time_series",
                         "intervalFactor": 2,
-                        "legendFormat": "{{pod}}",
+                        "legendFormat": "{{juju_unit}}",
                         "legendLink": null,
                         "step": 10
                      }
@@ -531,7 +531,7 @@
                   "bars": false,
                   "dashLength": 10,
                   "dashes": false,
-                  "datasource": "$datasource",
+                  "datasource": "$prometheusds",
                   "fill": 0,
                   "id": 7,
                   "legend": {
@@ -577,7 +577,7 @@
                   "thresholds": [ ],
                   "timeFrom": null,
                   "timeShift": null,
-                  "title": "Inflight requests (per pod)",
+                  "title": "Inflight requests (per unit)",
                   "tooltip": {
                      "shared": false,
                      "sort": 0,
@@ -615,7 +615,7 @@
                   "bars": false,
                   "dashLength": 10,
                   "dashes": false,
-                  "datasource": "$datasource",
+                  "datasource": "$prometheusds",
                   "fill": 0,
                   "id": 8,
                   "legend": {
@@ -642,7 +642,7 @@
                   "steppedLine": false,
                   "targets": [
                      {
-                        "expr": "avg(sum by(pod) (cortex_tcp_connections{cluster=~\"$cluster\", namespace=~\"$namespace\",pod=~\"(.*mimir-)?(query-frontend|querier|ruler-query-frontend|ruler-querier|mimir-read).*\"}))",
+                        "expr": "avg(sum by(juju_unit) (cortex_tcp_connections{cluster=~\"$cluster\", namespace=~\"$namespace\",pod=~\"(.*mimir-)?(query-frontend|querier|ruler-query-frontend|ruler-querier|mimir-read).*\"}))",
                         "format": "time_series",
                         "intervalFactor": 2,
                         "legendFormat": "avg",
@@ -650,7 +650,7 @@
                         "step": 10
                      },
                      {
-                        "expr": "max(sum by(pod) (cortex_tcp_connections{cluster=~\"$cluster\", namespace=~\"$namespace\",pod=~\"(.*mimir-)?(query-frontend|querier|ruler-query-frontend|ruler-querier|mimir-read).*\"}))",
+                        "expr": "max(sum by(juju_unit) (cortex_tcp_connections{cluster=~\"$cluster\", namespace=~\"$namespace\",pod=~\"(.*mimir-)?(query-frontend|querier|ruler-query-frontend|ruler-querier|mimir-read).*\"}))",
                         "format": "time_series",
                         "intervalFactor": 2,
                         "legendFormat": "highest",
@@ -669,7 +669,7 @@
                   "thresholds": [ ],
                   "timeFrom": null,
                   "timeShift": null,
-                  "title": "TCP connections (per pod)",
+                  "title": "TCP connections (per unit)",
                   "tooltip": {
                      "shared": false,
                      "sort": 0,
@@ -719,7 +719,7 @@
                   "bars": false,
                   "dashLength": 10,
                   "dashes": false,
-                  "datasource": "$datasource",
+                  "datasource": "$prometheusds",
                   "fill": 10,
                   "id": 9,
                   "legend": {
@@ -746,10 +746,10 @@
                   "steppedLine": false,
                   "targets": [
                      {
-                        "expr": "sum by(pod) (rate(container_network_receive_bytes_total{cluster=~\"$cluster\", namespace=~\"$namespace\",pod=~\"(.*mimir-)?(query-scheduler|ruler-query-scheduler|ruler|store-gateway|compactor|alertmanager|overrides-exporter|mimir-backend).*\"}[$__rate_interval]))",
+                        "expr": "sum by(juju_unit) (rate(container_network_receive_bytes_total{cluster=~\"$cluster\", namespace=~\"$namespace\",pod=~\"(.*mimir-)?(query-scheduler|ruler-query-scheduler|ruler|store-gateway|compactor|alertmanager|overrides-exporter|mimir-backend).*\"}[$__rate_interval]))",
                         "format": "time_series",
                         "intervalFactor": 2,
-                        "legendFormat": "{{pod}}",
+                        "legendFormat": "{{juju_unit}}",
                         "legendLink": null,
                         "step": 10
                      }
@@ -795,7 +795,7 @@
                   "bars": false,
                   "dashLength": 10,
                   "dashes": false,
-                  "datasource": "$datasource",
+                  "datasource": "$prometheusds",
                   "fill": 10,
                   "id": 10,
                   "legend": {
@@ -822,10 +822,10 @@
                   "steppedLine": false,
                   "targets": [
                      {
-                        "expr": "sum by(pod) (rate(container_network_transmit_bytes_total{cluster=~\"$cluster\", namespace=~\"$namespace\",pod=~\"(.*mimir-)?(query-scheduler|ruler-query-scheduler|ruler|store-gateway|compactor|alertmanager|overrides-exporter|mimir-backend).*\"}[$__rate_interval]))",
+                        "expr": "sum by(juju_unit) (rate(container_network_transmit_bytes_total{cluster=~\"$cluster\", namespace=~\"$namespace\",pod=~\"(.*mimir-)?(query-scheduler|ruler-query-scheduler|ruler|store-gateway|compactor|alertmanager|overrides-exporter|mimir-backend).*\"}[$__rate_interval]))",
                         "format": "time_series",
                         "intervalFactor": 2,
-                        "legendFormat": "{{pod}}",
+                        "legendFormat": "{{juju_unit}}",
                         "legendLink": null,
                         "step": 10
                      }
@@ -871,7 +871,7 @@
                   "bars": false,
                   "dashLength": 10,
                   "dashes": false,
-                  "datasource": "$datasource",
+                  "datasource": "$prometheusds",
                   "fill": 0,
                   "id": 11,
                   "legend": {
@@ -917,7 +917,7 @@
                   "thresholds": [ ],
                   "timeFrom": null,
                   "timeShift": null,
-                  "title": "Inflight requests (per pod)",
+                  "title": "Inflight requests (per unit)",
                   "tooltip": {
                      "shared": false,
                      "sort": 0,
@@ -955,7 +955,7 @@
                   "bars": false,
                   "dashLength": 10,
                   "dashes": false,
-                  "datasource": "$datasource",
+                  "datasource": "$prometheusds",
                   "fill": 0,
                   "id": 12,
                   "legend": {
@@ -982,7 +982,7 @@
                   "steppedLine": false,
                   "targets": [
                      {
-                        "expr": "avg(sum by(pod) (cortex_tcp_connections{cluster=~\"$cluster\", namespace=~\"$namespace\",pod=~\"(.*mimir-)?(query-scheduler|ruler-query-scheduler|ruler|store-gateway|compactor|alertmanager|overrides-exporter|mimir-backend).*\"}))",
+                        "expr": "avg(sum by(juju_unit) (cortex_tcp_connections{cluster=~\"$cluster\", namespace=~\"$namespace\",pod=~\"(.*mimir-)?(query-scheduler|ruler-query-scheduler|ruler|store-gateway|compactor|alertmanager|overrides-exporter|mimir-backend).*\"}))",
                         "format": "time_series",
                         "intervalFactor": 2,
                         "legendFormat": "avg",
@@ -990,7 +990,7 @@
                         "step": 10
                      },
                      {
-                        "expr": "max(sum by(pod) (cortex_tcp_connections{cluster=~\"$cluster\", namespace=~\"$namespace\",pod=~\"(.*mimir-)?(query-scheduler|ruler-query-scheduler|ruler|store-gateway|compactor|alertmanager|overrides-exporter|mimir-backend).*\"}))",
+                        "expr": "max(sum by(juju_unit) (cortex_tcp_connections{cluster=~\"$cluster\", namespace=~\"$namespace\",pod=~\"(.*mimir-)?(query-scheduler|ruler-query-scheduler|ruler|store-gateway|compactor|alertmanager|overrides-exporter|mimir-backend).*\"}))",
                         "format": "time_series",
                         "intervalFactor": 2,
                         "legendFormat": "highest",
@@ -1009,7 +1009,7 @@
                   "thresholds": [ ],
                   "timeFrom": null,
                   "timeShift": null,
-                  "title": "TCP connections (per pod)",
+                  "title": "TCP connections (per unit)",
                   "tooltip": {
                      "shared": false,
                      "sort": 0,
@@ -1078,7 +1078,7 @@
                   "text": "prod",
                   "value": "prod"
                },
-               "datasource": "$datasource",
+               "datasource": "$prometheusds",
                "hide": 0,
                "includeAll": true,
                "label": "cluster",
@@ -1101,7 +1101,7 @@
                   "text": "prod",
                   "value": "prod"
                },
-               "datasource": "$datasource",
+               "datasource": "$prometheusds",
                "hide": 0,
                "includeAll": false,
                "label": "namespace",
