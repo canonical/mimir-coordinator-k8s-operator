@@ -24,7 +24,7 @@ LIBID = "9818a8d44028454a94c6c3a01f4316d2"
 DEFAULT_ENDPOINT_NAME = "mimir-cluster"
 
 LIBAPI = 0
-LIBPATCH = 3
+LIBPATCH = 2
 
 BUILTIN_JUJU_KEYS = {"ingress-address", "private-address", "egress-subnets"}
 
