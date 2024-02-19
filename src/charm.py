@@ -21,6 +21,7 @@ from charms.data_platform_libs.v0.s3 import (
     S3Requirer,
 )
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
+from charms.grafana_k8s.v0.grafana_source import GrafanaSourceProvider
 from charms.loki_k8s.v1.loki_push_api import LokiPushApiConsumer
 from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirClusterProvider
 from charms.observability_libs.v1.cert_handler import CertHandler
@@ -74,6 +75,14 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self.tracing = TracingEndpointRequirer(self)
         self.grafana_dashboard_provider = GrafanaDashboardProvider(
             self, relation_name="grafana-dashboards-provider"
+        )
+        self.grafana_source = GrafanaSourceProvider(
+            self,
+            source_type="prometheus",
+            source_port="8080",
+            source_url=f"{self.cluster_provider.get_datasource_address()}:8080/prometheus",
+            extra_fields={"httpHeaderName1": "X-Scope-OrgID"},
+            secure_extra_fields={"httpHeaderValue1": "anonymous"},
         )
         self.loki_consumer = LokiPushApiConsumer(self, relation_name="logging-consumer")
         self.metrics_endpoints = MetricsEndpointProvider(self, jobs=self.workers_scrape_jobs)

@@ -24,7 +24,7 @@ LIBID = "9818a8d44028454a94c6c3a01f4316d2"
 DEFAULT_ENDPOINT_NAME = "mimir-cluster"
 
 LIBAPI = 0
-LIBPATCH = 3
+LIBPATCH = 2
 
 BUILTIN_JUJU_KEYS = {"ingress-address", "private-address", "egress-subnets"}
 
@@ -283,6 +283,11 @@ class MimirClusterProvider(Object):
             data.update(address_set)
 
         return data
+    
+    def get_datasource_address(self) -> Optional[str]:
+        addresses_by_role = self.gather_addresses_by_role()
+        if address_set := addresses_by_role.get("ruler", None):
+            return address_set.pop()
 
     def gather_topology(self) -> List[Dict[str,str]]:
         data = []
