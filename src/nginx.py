@@ -6,7 +6,7 @@ import logging
 from typing import Any, Dict, List, Optional, Set
 
 import crossplane
-from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirClusterProvider
+from mimir_cluster import MimirClusterProvider
 from ops.pebble import Layer
 
 logger = logging.getLogger(__name__)

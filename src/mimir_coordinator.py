@@ -9,7 +9,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional, Set
 
-from charms.mimir_coordinator_k8s.v0.mimir_cluster import (
+from mimir_cluster import (
     MIMIR_CERT_FILE,
     MIMIR_CLIENT_CA_FILE,
     MIMIR_KEY_FILE,
