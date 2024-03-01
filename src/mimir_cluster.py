@@ -75,7 +75,7 @@ def expand_roles(roles: Iterable[MimirRole]) -> Set[MimirRole]:
 
 
 class MimirClusterProvider(Object):
-    """Mimir Cluster Provider side class."""
+    """``mimir-cluster`` provider endpoint wrapper."""
 
     def __init__(
         self,
