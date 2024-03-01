@@ -281,3 +281,7 @@ class MimirClusterError(Exception):
 
 class DataValidationError(MimirClusterError):
     """Raised when relation databag validation fails."""
+
+
+class DatabagAccessPermissionError(MimirClusterError):
+    """Raised when a follower attempts to write leader settings."""
