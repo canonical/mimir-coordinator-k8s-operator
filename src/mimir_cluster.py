@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 204 Canonical
+# Copyright 2024 Canonical
 # See LICENSE file for licensing details.
 
 """This module contains an endpoint wrapper class for the provider side of the ``mimir-cluster`` relation.
