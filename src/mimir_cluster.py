@@ -2,7 +2,10 @@
 # Copyright 204 Canonical
 # See LICENSE file for licensing details.
 
-"""Mimir cluster."""
+"""This module contains an endpoint wrapper class for the provider side of the ``mimir-cluster`` relation.
+
+As this relation is cluster-internal and not intended for third-party charms to interact with `mimir-coordinator-k8s`, its only user will be the mimir-coordinator-k8s charm. As such, it does not live in a charm lib as most other relation endpoint wrappers do.
+"""
 
 
 import json
