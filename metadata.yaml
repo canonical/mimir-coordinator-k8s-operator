@@ -63,6 +63,9 @@ provides:
       The coordinator sends the Mimir configuration to the workers, obtaining
       the roles they are configured to take on and their addressing information.
 
+  receive-remote-write:
+    interface: prometheus_remote_write
+
   grafana-dashboards-provider:
     interface: grafana_dashboard
     description: |
@@ -76,3 +79,4 @@ provides:
     interface: prometheus_scrape
     description: |
       The coordinator provides scrape jobs for all the workers related to it.
+
