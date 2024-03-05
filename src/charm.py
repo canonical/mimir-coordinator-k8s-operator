@@ -25,6 +25,7 @@ from charms.grafana_k8s.v0.grafana_source import GrafanaSourceProvider
 from charms.loki_k8s.v1.loki_push_api import LokiPushApiConsumer
 from charms.observability_libs.v1.cert_handler import CertHandler
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
+from charms.prometheus_k8s.v1.prometheus_remote_write import PrometheusRemoteWriteProvider
 from charms.tempo_k8s.v1.charm_tracing import trace_charm
 from charms.tempo_k8s.v1.tracing import TracingEndpointRequirer
 from mimir_cluster import MimirClusterProvider
@@ -72,6 +73,11 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             tls_requirer=self.server_cert,
         )
         self.nginx = Nginx(cluster_provider=self.cluster_provider, server_name=self.hostname)
+        self.remote_write_provider = PrometheusRemoteWriteProvider(
+            charm=self,
+            server_url_func=lambda: MimirCoordinatorK8SOperatorCharm.internal_url.fget(self),  # type: ignore
+            endpoint_path="/api/v1/push",
+        )
         self.tracing = TracingEndpointRequirer(self)
         self.grafana_dashboard_provider = GrafanaDashboardProvider(
             self, relation_name="grafana-dashboards-provider"
@@ -256,6 +262,12 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     def server_cert_path(self) -> Optional[str]:
         """Server certificate path for tls tracing."""
         return CERT_PATH
+
+    @property
+    def internal_url(self) -> str:
+        """Returns workload's FQDN. Used for ingress."""
+        scheme = "https" if self._is_cert_available else "http"
+        return f"{scheme}://{socket.getfqdn()}:8080"
 
     ###########################
     # === UTILITY METHODS === #
