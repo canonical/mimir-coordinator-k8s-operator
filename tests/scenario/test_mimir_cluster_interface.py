@@ -2,11 +2,8 @@ from itertools import chain
 
 import ops
 import pytest
-from charms.mimir_coordinator_k8s.v0.mimir_cluster import (
-    DatabagAccessPermissionError,
+from mimir_cluster import (
     MimirClusterProvider,
-    MimirClusterProviderAppData,
-    MimirClusterRequirer,
     MimirClusterRequirerAppData,
     MimirClusterRequirerUnitData,
     MimirRole,
@@ -24,7 +21,6 @@ class MyCharm(ops.CharmBase):
 
     def __init__(self, framework: Framework):
         super().__init__(framework)
-        self.requirer = MimirClusterRequirer(self, endpoint="mimir-cluster-require")
         self.provider = MimirClusterProvider(self, endpoint="mimir-cluster-provide")
 
 
@@ -110,60 +106,3 @@ def test_address_collection(workers_addresses):
         mgr.run()
         charm: MyCharm = mgr.charm
         assert charm.provider.gather_addresses() == expected
-
-
-def test_requirer_getters():
-    cfg = {"a": "b"}
-    relation = Relation(
-        "mimir-cluster-require",
-        remote_app_data=MimirClusterProviderAppData(mimir_config=cfg).dump(),
-    )
-
-    state = State(relations=[relation])
-
-    ctx = Context(MyCharm, meta=MyCharm.META)
-    with ctx.manager("start", state) as mgr:
-        mgr.run()
-        charm: MyCharm = mgr.charm
-        assert charm.requirer.get_mimir_config() == cfg
-
-
-@pytest.mark.parametrize(
-    "roles, address, valid",
-    (
-        ({MimirRole.querier: 3, MimirRole.alertmanager: 2}, "http://foo.com:24/bar", True),
-        ({MimirRole.querier: 1}, "https://foo.com", True),
-        ({"boo": 1}, "https://foo.com", False),
-        ([MimirRole.querier], "https://foo.com", False),
-        (["coup"], "https://foo.com", False),
-        ({MimirRole.querier: 1}, "//foo.com", False),
-    ),
-)
-def test_requirer_setters_leader(roles, address, valid):
-    relation = Relation("mimir-cluster-require")
-
-    state = State(relations=[relation], leader=True)
-
-    ctx = Context(MyCharm, meta=MyCharm.META)
-    with ctx.manager("start", state) as mgr:
-        mgr.run()
-        charm: MyCharm = mgr.charm
-        try:
-            charm.requirer.publish_app_roles(roles)
-            charm.requirer.publish_unit_address(address)
-        except Exception:
-            if valid:
-                raise
-
-
-def test_requirer_setters_follower():
-    relation = Relation("mimir-cluster-require")
-    state = State(relations=[relation])
-
-    ctx = Context(MyCharm, meta=MyCharm.META)
-    with ctx.manager("start", state) as mgr:
-        mgr.run()
-        charm: MyCharm = mgr.charm
-
-        with pytest.raises(DatabagAccessPermissionError):
-            charm.requirer.publish_app_roles({MimirRole.querier: 2})
