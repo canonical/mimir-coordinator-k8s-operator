@@ -23,11 +23,11 @@ from charms.data_platform_libs.v0.s3 import (
 from charms.grafana_k8s.v0.grafana_dashboard import GrafanaDashboardProvider
 from charms.grafana_k8s.v0.grafana_source import GrafanaSourceProvider
 from charms.loki_k8s.v1.loki_push_api import LokiPushApiConsumer
-from charms.mimir_coordinator_k8s.v0.mimir_cluster import MimirClusterProvider
 from charms.observability_libs.v1.cert_handler import CertHandler
 from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.tempo_k8s.v1.charm_tracing import trace_charm
 from charms.tempo_k8s.v1.tracing import TracingEndpointRequirer
+from mimir_cluster import MimirClusterProvider
 from mimir_config import BUCKET_NAME, S3_RELATION_NAME, _S3ConfigData
 from mimir_coordinator import MimirCoordinator
 from nginx import CA_CERT_PATH, CERT_PATH, KEY_PATH, Nginx
