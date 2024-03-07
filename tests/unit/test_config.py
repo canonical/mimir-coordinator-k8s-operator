@@ -110,8 +110,7 @@ class TestMimirConfig(unittest.TestCase):
         memberlist_config = self.coordinator._build_memberlist_config()
         expected_config = {"cluster_label": "something", "join_members": ["address1", "address2"]}
         self.assertIn("cluster_label", expected_config)
-        memberlist_config.pop("cluster_label")
-        expected_config.pop("cluster_label")
+        memberlist_config["cluster_label"] = "something"
         self.assertEqual(memberlist_config, expected_config)
 
     def test_build_tls_config(self):

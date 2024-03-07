@@ -53,6 +53,12 @@ RECOMMENDED_DEPLOYMENT = Counter(
 """The set of roles that need to be allocated for the
 deployment to be considered robust according to the official recommendations/guidelines."""
 
+# The minimum number of workers per role to enable replication
+REPLICATION_MIN_WORKERS = 3
+# The default amount of replicas to set when there are enough workers per role;
+# otherwise, replicas will be "disabled" by setting the amount to 1
+DEFAULT_REPLICATION = 3
+
 
 class MimirCoordinator:
     """Mimir coordinator."""
@@ -144,16 +150,19 @@ class MimirCoordinator:
     # The Mimir Alertmanager stores the alerts state on local disk at the location configured using -alertmanager.storage.path.
     # Should be persisted if not replicated
 
-    # sharding_ring.replication_factor:
+    # sharding_ring.replication_factor: int
     # (advanced) The replication factor to use when sharding the alertmanager.
-
     def _build_alertmanager_config(self) -> Dict[str, Any]:
         alertmanager_scale = len(
             self._cluster_provider.gather_addresses_by_role()[MimirRole.alertmanager]
         )
         return {
             "data_dir": str(self._root_data_dir / "data-alertmanager"),
-            "sharding_ring": {"replication_factor": 1 if alertmanager_scale < 3 else 3},
+            "sharding_ring": {
+                "replication_factor": 1
+                if alertmanager_scale < REPLICATION_MIN_WORKERS
+                else DEFAULT_REPLICATION
+            },
         }
 
     # filesystem: dir
@@ -179,7 +188,13 @@ class MimirCoordinator:
     # microservices mode.
     def _build_ingester_config(self) -> Dict[str, Any]:
         ingester_scale = len(self._cluster_provider.gather_addresses_by_role()[MimirRole.ingester])
-        return {"ring": {"replication_factor": 1 if ingester_scale < 3 else 3}}
+        return {
+            "ring": {
+                "replication_factor": 1
+                if ingester_scale < REPLICATION_MIN_WORKERS
+                else DEFAULT_REPLICATION
+            }
+        }
 
     # rule_path:
     # Directory to store temporary rule files loaded by the Prometheus rule managers.
@@ -197,7 +212,13 @@ class MimirCoordinator:
         store_gateway_scale = len(
             self._cluster_provider.gather_addresses_by_role()[MimirRole.store_gateway]
         )
-        return {"sharding_ring": {"replication_factor": 1 if store_gateway_scale < 3 else 3}}
+        return {
+            "sharding_ring": {
+                "replication_factor": 1
+                if store_gateway_scale < REPLICATION_MIN_WORKERS
+                else DEFAULT_REPLICATION
+            }
+        }
 
     # filesystem: dir
     # Storage backend reads Prometheus recording rules from the local filesystem.
