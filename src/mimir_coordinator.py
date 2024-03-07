@@ -53,6 +53,12 @@ RECOMMENDED_DEPLOYMENT = Counter(
 """The set of roles that need to be allocated for the
 deployment to be considered robust according to the official recommendations/guidelines."""
 
+# The minimum number of workers per role to enable replication
+REPLICATION_MIN_WORKERS = 3
+# The default amount of replicas to set when there are enough workers per role;
+# otherwise, replicas will be "disabled" by setting the amount to 1
+DEFAULT_REPLICATION = 3
+
 
 class MimirCoordinator:
     """Mimir coordinator."""
@@ -108,8 +114,10 @@ class MimirCoordinator:
             "alertmanager": self._build_alertmanager_config(),
             "alertmanager_storage": self._build_alertmanager_storage_config(),
             "compactor": self._build_compactor_config(),
+            "ingester": self._build_ingester_config(),
             "ruler": self._build_ruler_config(),
             "ruler_storage": self._build_ruler_storage_config(),
+            "store_gateway": self._build_store_gateway_config(),
             "blocks_storage": self._build_blocks_storage_config(),
             "memberlist": self._build_memberlist_config(),
         }
@@ -141,9 +149,20 @@ class MimirCoordinator:
     # data_dir:
     # The Mimir Alertmanager stores the alerts state on local disk at the location configured using -alertmanager.storage.path.
     # Should be persisted if not replicated
+
+    # sharding_ring.replication_factor: int
+    # (advanced) The replication factor to use when sharding the alertmanager.
     def _build_alertmanager_config(self) -> Dict[str, Any]:
+        alertmanager_scale = len(
+            self._cluster_provider.gather_addresses_by_role().get(MimirRole.alertmanager, [])
+        )
         return {
             "data_dir": str(self._root_data_dir / "data-alertmanager"),
+            "sharding_ring": {
+                "replication_factor": (
+                    1 if alertmanager_scale < REPLICATION_MIN_WORKERS else DEFAULT_REPLICATION
+                )
+            },
         }
 
     # filesystem: dir
@@ -163,12 +182,44 @@ class MimirCoordinator:
             "data_dir": str(self._root_data_dir / "data-compactor"),
         }
 
+    # ring.replication_factor: int
+    # Number of ingesters that each time series is replicated to. This option
+    # needs be set on ingesters, distributors, queriers and rulers when running in
+    # microservices mode.
+    def _build_ingester_config(self) -> Dict[str, Any]:
+        ingester_scale = len(
+            self._cluster_provider.gather_addresses_by_role().get(MimirRole.ingester, [])
+        )
+        return {
+            "ring": {
+                "replication_factor": (
+                    1 if ingester_scale < REPLICATION_MIN_WORKERS else DEFAULT_REPLICATION
+                )
+            }
+        }
+
     # rule_path:
     # Directory to store temporary rule files loaded by the Prometheus rule managers.
     # This directory is not required to be persisted between restarts.
     def _build_ruler_config(self) -> Dict[str, Any]:
         return {
             "rule_path": str(self._root_data_dir / "data-ruler"),
+        }
+
+    # sharding_ring.replication_factor:
+    # (advanced) The replication factor to use when sharding blocks. This option
+    # needs be set both on the store-gateway, querier and ruler when running in
+    # microservices mode.
+    def _build_store_gateway_config(self) -> Dict[str, Any]:
+        store_gateway_scale = len(
+            self._cluster_provider.gather_addresses_by_role().get(MimirRole.store_gateway, [])
+        )
+        return {
+            "sharding_ring": {
+                "replication_factor": (
+                    1 if store_gateway_scale < REPLICATION_MIN_WORKERS else DEFAULT_REPLICATION
+                )
+            }
         }
 
     # filesystem: dir
@@ -223,5 +274,13 @@ class MimirCoordinator:
             storage_config.pop("filesystem")
             storage_config["storage_prefix"] = prefix_name
 
+    # cluster_label:
+    # (advanced) The cluster label is an optional string to include in outbound
+    # packets and gossip streams. Other members in the memberlist cluster will
+    # discard any message whose label doesn't match the configured one, unless the
     def _build_memberlist_config(self) -> Dict[str, Any]:
-        return {"join_members": list(self._cluster_provider.gather_addresses())}
+        coordinator = self._cluster_provider._charm
+        return {
+            "cluster_label": f"{coordinator.model.name}_{coordinator.model.uuid}_{coordinator.app.name}",
+            "join_members": list(self._cluster_provider.gather_addresses()),
+        }
