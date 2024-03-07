@@ -25,6 +25,8 @@ class InvalidConfigurationError(Exception):
 class Memberlist(BaseModel):
     """Memberlist schema."""
 
+    cluster_label: str
+    cluster_label_verification_disabled: bool = False
     join_members: List[str]
 
 
@@ -61,6 +63,7 @@ class Ring(BaseModel):
     """Ring schema."""
 
     kvstore: Kvstore
+    replication_factor: int = 3
 
 
 class Distributor(BaseModel):

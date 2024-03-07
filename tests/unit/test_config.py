@@ -16,7 +16,10 @@ class TestMimirConfig(unittest.TestCase):
 
     def test_build_alertmanager_config(self):
         alertmanager_config = self.coordinator._build_alertmanager_config()
-        expected_config = {"data_dir": "/data/data-alertmanager"}
+        expected_config = {
+            "data_dir": "/data/data-alertmanager",
+            "sharding_ring": {"replication_factor": 1},
+        }
         self.assertEqual(alertmanager_config, expected_config)
 
     def test_build_alertmanager_storage_config(self):
@@ -105,7 +108,10 @@ class TestMimirConfig(unittest.TestCase):
     def test_build_memberlist_config(self):
         self.cluster_provider.gather_addresses.return_value = ["address1", "address2"]
         memberlist_config = self.coordinator._build_memberlist_config()
-        expected_config = {"join_members": ["address1", "address2"]}
+        expected_config = {"cluster_label": "something", "join_members": ["address1", "address2"]}
+        self.assertIn("cluster_label", expected_config)
+        memberlist_config.pop("cluster_label")
+        expected_config.pop("cluster_label")
         self.assertEqual(memberlist_config, expected_config)
 
     def test_build_tls_config(self):

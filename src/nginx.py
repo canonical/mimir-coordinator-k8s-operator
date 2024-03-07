@@ -219,7 +219,7 @@ class Nginx:
                         "args": ["$http_x_scope_orgid", "$ensured_x_scope_orgid"],
                         "block": [
                             {"directive": "default", "args": ["$http_x_scope_orgid"]},
-                            {"directive": "", "args": ["FIXMEnoAuthTenant?"]},  # FIXME
+                            {"directive": "", "args": ["anonymous"]},
                         ],
                     },
                     {"directive": "proxy_read_timeout", "args": ["300"]},
