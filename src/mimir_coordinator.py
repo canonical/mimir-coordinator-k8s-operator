@@ -154,7 +154,7 @@ class MimirCoordinator:
     # (advanced) The replication factor to use when sharding the alertmanager.
     def _build_alertmanager_config(self) -> Dict[str, Any]:
         alertmanager_scale = len(
-            self._cluster_provider.gather_addresses_by_role()[MimirRole.alertmanager]
+            self._cluster_provider.gather_addresses_by_role().get(MimirRole.alertmanager, [])
         )
         return {
             "data_dir": str(self._root_data_dir / "data-alertmanager"),
@@ -187,7 +187,9 @@ class MimirCoordinator:
     # needs be set on ingesters, distributors, queriers and rulers when running in
     # microservices mode.
     def _build_ingester_config(self) -> Dict[str, Any]:
-        ingester_scale = len(self._cluster_provider.gather_addresses_by_role()[MimirRole.ingester])
+        ingester_scale = len(
+            self._cluster_provider.gather_addresses_by_role().get(MimirRole.ingester, [])
+        )
         return {
             "ring": {
                 "replication_factor": 1
@@ -210,7 +212,7 @@ class MimirCoordinator:
     # microservices mode.
     def _build_store_gateway_config(self) -> Dict[str, Any]:
         store_gateway_scale = len(
-            self._cluster_provider.gather_addresses_by_role()[MimirRole.store_gateway]
+            self._cluster_provider.gather_addresses_by_role().get(MimirRole.store_gateway, [])
         )
         return {
             "sharding_ring": {
