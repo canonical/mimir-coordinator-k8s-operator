@@ -159,9 +159,9 @@ class MimirCoordinator:
         return {
             "data_dir": str(self._root_data_dir / "data-alertmanager"),
             "sharding_ring": {
-                "replication_factor": 1
-                if alertmanager_scale < REPLICATION_MIN_WORKERS
-                else DEFAULT_REPLICATION
+                "replication_factor": (
+                    1 if alertmanager_scale < REPLICATION_MIN_WORKERS else DEFAULT_REPLICATION
+                )
             },
         }
 
@@ -192,9 +192,9 @@ class MimirCoordinator:
         )
         return {
             "ring": {
-                "replication_factor": 1
-                if ingester_scale < REPLICATION_MIN_WORKERS
-                else DEFAULT_REPLICATION
+                "replication_factor": (
+                    1 if ingester_scale < REPLICATION_MIN_WORKERS else DEFAULT_REPLICATION
+                )
             }
         }
 
@@ -216,9 +216,9 @@ class MimirCoordinator:
         )
         return {
             "sharding_ring": {
-                "replication_factor": 1
-                if store_gateway_scale < REPLICATION_MIN_WORKERS
-                else DEFAULT_REPLICATION
+                "replication_factor": (
+                    1 if store_gateway_scale < REPLICATION_MIN_WORKERS else DEFAULT_REPLICATION
+                )
             }
         }
 
