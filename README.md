@@ -4,6 +4,8 @@
 [![Release](https://github.com/canonical/mimir-coordinator-k8s-operator/actions/workflows/release.yaml/badge.svg)](https://github.com/canonical/mimir-coordinator-k8s-operator/actions/workflows/release.yaml)
 [![Discourse Status](https://img.shields.io/discourse/status?server=https%3A%2F%2Fdiscourse.charmhub.io&style=flat&label=CharmHub%20Discourse)](https://discourse.charmhub.io)
 
+## Description
+
 This charm serves as a coordinator for a Mimir HA deployment, together with the [mimir-worker-k8s](https://github.com/canonical/mimir-worker-k8s-operator) charm.  
 
 ## Contributing
