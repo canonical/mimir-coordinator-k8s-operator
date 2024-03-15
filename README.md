@@ -1,16 +1,11 @@
-# mimir-coordinator-k8s-operator
+# Mimir Coordinator charm for Kubernetes
 
-Charmhub package name: operator-template
-More information: https://charmhub.io/mimir-coordinator-k8s-operator
+[![CharmHub Badge](https://charmhub.io/mimir-coordinator-k8s/badge.svg)](https://charmhub.io/mimir-coordinator-k8s)
+[![Release](https://github.com/canonical/mimir-coordinator-k8s-operator/actions/workflows/release.yaml/badge.svg)](https://github.com/canonical/mimir-coordinator-k8s-operator/actions/workflows/release.yaml)
+[![Discourse Status](https://img.shields.io/discourse/status?server=https%3A%2F%2Fdiscourse.charmhub.io&style=flat&label=CharmHub%20Discourse)](https://discourse.charmhub.io)
 
-Describe your charm in one or two sentences.
+This charm serves as a coordinator for a Mimir HA deployment, together with the [mimir-worker-k8s](https://github.com/canonical/mimir-worker-k8s-operator) charm.  
 
-## Other resources
+## Contributing
 
-<!-- If your charm is documented somewhere else other than Charmhub, provide a link separately. -->
-
-- [Read more](https://example.com)
-
-- [Contributing](CONTRIBUTING.md) <!-- or link to other contribution documentation -->
-
-- See the [Juju SDK documentation](https://juju.is/docs/sdk) for more information about developing and improving charms.
+See the [Juju SDK documentation](https://juju.is/docs/sdk) for more information about developing and improving charms.
