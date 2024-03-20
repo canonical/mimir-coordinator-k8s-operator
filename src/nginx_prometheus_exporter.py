@@ -9,7 +9,7 @@ from ops.pebble import Layer
 
 logger = logging.getLogger(__name__)
 
-NGINX_PROMETHEUS_EXPORTER_PORT: int = 9113
+NGINX_PROMETHEUS_EXPORTER_PORT = "9113"
 
 
 class NginxPrometheusExporter:

@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 NGINX_DIR = "/etc/nginx"
 NGINX_CONFIG = f"{NGINX_DIR}/nginx.conf"
-NGINX_PORT = 8080
+NGINX_PORT = "8080"
 KEY_PATH = f"{NGINX_DIR}/certs/server.key"
 CERT_PATH = f"{NGINX_DIR}/certs/server.cert"
 CA_CERT_PATH = f"{NGINX_DIR}/certs/ca.cert"
