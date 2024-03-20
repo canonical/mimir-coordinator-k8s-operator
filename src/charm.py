@@ -94,7 +94,18 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             secure_extra_fields={"httpHeaderValue1": "anonymous"},
         )
         self.loki_consumer = LokiPushApiConsumer(self, relation_name="logging-consumer")
-        self.metrics_endpoints = MetricsEndpointProvider(self, jobs=self.scrape_jobs)
+        self.worker_metrics_endpoints = MetricsEndpointProvider(
+            self,
+            relation_name="workers-metrics-endpoint",
+            alert_rules_path="./src/prometheus_alert_rules/mimir_workers",
+            jobs=self.workers_scrape_jobs,
+        )
+        self.coordinator_metrics_endpoints = MetricsEndpointProvider(
+            self,
+            relation_name="metrics-endpoint",
+            alert_rules_path="./src/prometheus_alert_rules/nginx",
+            jobs=self.coordinator_scrape_jobs,
+        )
 
         ######################################
         # === EVENT HANDLER REGISTRATION === #
@@ -208,11 +219,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     def mimir_worker_relations(self) -> List[ops.Relation]:
         """Returns the list of worker relations."""
         return self.model.relations.get("mimir_worker", [])
-
-    @property
-    def scrape_jobs(self) -> List[Dict[str, Any]]:
-        """Scrape jobs for the Workers and the coordinator."""
-        return self.workers_scrape_jobs + self.coordinator_scrape_jobs
 
     @property
     def workers_scrape_jobs(self) -> List[Dict[str, Any]]:
