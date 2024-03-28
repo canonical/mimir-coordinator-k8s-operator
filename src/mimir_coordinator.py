@@ -8,6 +8,7 @@ import logging
 from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional, Set
+from urllib.parse import urlparse
 
 from mimir_cluster import (
     MIMIR_CERT_FILE,
@@ -259,6 +260,11 @@ class MimirCoordinator:
         }
 
     def _build_s3_storage_config(self, s3_config_data: _S3ConfigData) -> Dict[str, Any]:
+        # Remove the scheme from the s3 endpoint for the Mimir config
+        parsed_url = urlparse(s3_config_data.endpoint)
+        scheme = "%s://" % parsed_url.scheme
+        s3_config_data.endpoint = parsed_url.geturl().replace(scheme, "", 1)
+        # Return the s3 configuration
         return {
             "backend": "s3",
             "s3": s3_config_data.model_dump(),
