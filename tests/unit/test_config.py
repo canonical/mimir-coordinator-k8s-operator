@@ -73,7 +73,7 @@ class TestMimirConfig(unittest.TestCase):
 
     def test_build_s3_storage_config(self):
         raw_s3_config_data = {
-            "endpoint": "s3.com:port",
+            "endpoint": "http://s3.com:port",
             "access-key": "your_access_key",
             "secret-key": "your_secret_key",
             "bucket": "your_bucket",
