@@ -4,10 +4,12 @@
 """Helper module for interacting with the Mimir configuration."""
 
 import logging
+import re
 from dataclasses import asdict
 from typing import Dict, List, Literal, Optional, Union
+from urllib.parse import urlparse
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 
 S3_RELATION_NAME = "s3"
@@ -106,6 +108,11 @@ class _S3ConfigData(BaseModel):
     secret_access_key: str = Field(alias="secret-key")
     bucket_name: str = Field(alias="bucket")
     region: str = ""
+
+    @validator("endpoint")
+    def remove_scheme(cls, v: str) -> str:
+        """Remove the scheme from the s3 endpoint."""
+        return re.sub(rf"^{urlparse(v).scheme}://", "", v)
 
 
 class _FilesystemStorageBackend(BaseModel):

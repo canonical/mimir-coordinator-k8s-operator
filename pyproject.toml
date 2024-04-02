@@ -38,6 +38,10 @@ per-file-ignores = {"tests/*" = ["D100","D101","D102","D103","D104"]}
 [tool.ruff.mccabe]
 max-complexity = 15
 
+[tool.ruff.pep8-naming]
+# Allow Pydantic's `@validator` decorator to trigger class method treatment.
+classmethod-decorators = ["classmethod", "pydantic.validator"]
+
 [tool.pyright]
 include = ["src"]
 extraPaths = ["lib"]

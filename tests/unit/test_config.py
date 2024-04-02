@@ -73,7 +73,7 @@ class TestMimirConfig(unittest.TestCase):
 
     def test_build_s3_storage_config(self):
         raw_s3_config_data = {
-            "endpoint": "http://s3.com:port",
+            "endpoint": "s3.com:port",
             "access-key": "your_access_key",
             "secret-key": "your_secret_key",
             "bucket": "your_bucket",
@@ -91,6 +91,10 @@ class TestMimirConfig(unittest.TestCase):
                 "region": "your_region",
             },
         }
+        self.assertEqual(s3_storage_config, expected_config)
+        raw_s3_config_data["endpoint"] = "http://s3.com:port"
+        s3_config_data = _S3ConfigData(**raw_s3_config_data)
+        s3_storage_config = self.coordinator._build_s3_storage_config(s3_config_data)
         self.assertEqual(s3_storage_config, expected_config)
 
     def test_update_s3_storage_config(self):
