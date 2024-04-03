@@ -92,6 +92,10 @@ class TestMimirConfig(unittest.TestCase):
             },
         }
         self.assertEqual(s3_storage_config, expected_config)
+        raw_s3_config_data["endpoint"] = "http://s3.com:port"
+        s3_config_data = _S3ConfigData(**raw_s3_config_data)
+        s3_storage_config = self.coordinator._build_s3_storage_config(s3_config_data)
+        self.assertEqual(s3_storage_config, expected_config)
 
     def test_update_s3_storage_config(self):
         storage_config = {"filesystem": {"dir": "/data/blocks"}}
