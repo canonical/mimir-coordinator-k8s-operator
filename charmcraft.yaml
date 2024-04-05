@@ -18,3 +18,12 @@ parts:
       # For v2.tls_certificates
       - cryptography
       - jsonschema
+
+  cos-tool:
+    plugin: dump
+    source: .
+    build-packages:
+      - curl
+    override-pull: |
+      curl -L -O https://github.com/canonical/cos-tool/releases/latest/download/cos-tool-${CRAFT_TARGET_ARCH}
+      chmod +x cos-tool-*

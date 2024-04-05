@@ -11,12 +11,14 @@ https://discourse.charmhub.io/t/4208
 """
 import json
 import logging
+import os
 import socket
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import ops
+import yaml
 from charms.data_platform_libs.v0.s3 import (
     S3Requirer,
 )
@@ -28,6 +30,9 @@ from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.prometheus_k8s.v1.prometheus_remote_write import PrometheusRemoteWriteProvider
 from charms.tempo_k8s.v1.charm_tracing import trace_charm
 from charms.tempo_k8s.v1.tracing import TracingEndpointRequirer
+from cosl import JujuTopology
+from cosl.cos_tool import CosTool
+from cosl.rules import AlertRules
 from mimir_cluster import MimirClusterProvider
 from mimir_config import BUCKET_NAME, S3_RELATION_NAME, _S3ConfigData
 from mimir_coordinator import MimirCoordinator
@@ -40,6 +45,8 @@ from pydantic import ValidationError
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
 
+WORKER_ORIGINAL_ALERT_RULES_PATH = "./src/prometheus_alert_rules/mimir_workers"
+WORKER_RENDERED_ALERT_RULES_PATH = "./src/prometheus_alert_rules/mimir_workers_rendered"
 
 @trace_charm(
     tracing_endpoint="tempo_endpoint",
@@ -60,7 +67,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         # TODO: On any worker relation-joined/departed, need to updade grafana agent's scrape
         #  targets with the new memberlist.
         #  (Remote write would still be the same nginx-proxied endpoint.)
-
         self._nginx_container = self.unit.get_container("nginx")
         self._nginx_prometheus_exporter_container = self.unit.get_container(
             "nginx-prometheus-exporter"
@@ -71,6 +77,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             sans=[self.hostname],
         )
         self.s3_requirer = S3Requirer(self, S3_RELATION_NAME, BUCKET_NAME)
+        self._costool = CosTool(self)
         self.cluster_provider = MimirClusterProvider(self)
         self.coordinator = MimirCoordinator(
             cluster_provider=self.cluster_provider,
@@ -103,8 +110,11 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self.worker_metrics_endpoints = MetricsEndpointProvider(
             self,
             relation_name="workers-metrics-endpoint",
-            alert_rules_path="./src/prometheus_alert_rules/mimir_workers",
+            alert_rules_path=WORKER_RENDERED_ALERT_RULES_PATH,
             jobs=self.workers_scrape_jobs,
+            # refresh_event=[
+            #     self.on.mimir_cluster_relation_changed,
+            # ]
         )
         self.nginx_metrics_endpoints = MetricsEndpointProvider(
             self,
@@ -126,7 +136,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self.framework.observe(self.server_cert.on.cert_changed, self._on_server_cert_changed)
         # Mimir Cluster
         self.framework.observe(
-            self.on.mimir_cluster_relation_joined, self._on_mimir_cluster_changed
+            self.on.mimir_cluster_relation_joined, self._on_mimir_cluster_joined
         )
         self.framework.observe(
             self.on.mimir_cluster_relation_changed, self._on_mimir_cluster_changed
@@ -161,7 +171,12 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self.nginx.configure_pebble_layer(tls=self._is_tls_ready)
         self._update_mimir_cluster()
 
+    def _on_mimir_cluster_joined(self, _):
+        self._render_alert_rules()
+        self._update_mimir_cluster()
+
     def _on_mimir_cluster_changed(self, _):
+        self._render_alert_rules()
         self._update_mimir_cluster()
 
     def _on_mimir_cluster_departed(self, _):
@@ -316,6 +331,33 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     ###########################
     # === UTILITY METHODS === #
     ###########################
+
+    def _render_alert_rules(self):
+        if not os.path.exists(WORKER_RENDERED_ALERT_RULES_PATH):
+            os.makedirs(WORKER_RENDERED_ALERT_RULES_PATH)
+
+        apps = set()
+        for worker in self.cluster_provider.gather_topology():
+            if worker["app"] in apps:
+                continue
+
+            apps.add(worker["app"])
+            topology_dict = {
+                "model": self.model.name,
+                "model_uuid": self.model.uuid,
+                "application": worker["app"],
+                "unit": worker["unit"],
+                "charm_name": "mimir-worker-k8s",
+            }
+            topology = JujuTopology.from_dict(topology_dict)
+            alert_rules = AlertRules(query_type="promql", topology=topology)
+            alert_rules.add_path(WORKER_ORIGINAL_ALERT_RULES_PATH, recursive=True)
+            alert_rules_contents = yaml.dump(alert_rules.as_dict())
+
+            file_name = f"{WORKER_RENDERED_ALERT_RULES_PATH}/{worker['app']}.rules"
+            with open(file_name, 'w') as writer:
+                writer.write(alert_rules_contents)
+
 
     def _update_mimir_cluster(self):  # common exit hook
         """Build the config and publish everything to the application databag."""
