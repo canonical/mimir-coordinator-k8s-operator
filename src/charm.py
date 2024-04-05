@@ -80,7 +80,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             self,
             cluster_provider=self.cluster_provider,
             server_name=self.hostname,
-            tls=self._is_tls_ready,
         )
         self.nginx_prometheus_exporter = NginxPrometheusExporter(self)
         self.remote_write_provider = PrometheusRemoteWriteProvider(
@@ -159,7 +158,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
 
     def _on_server_cert_changed(self, _):
         self._update_cert()
-        self.nginx.configure_pebble_layer()
+        self.nginx.configure_pebble_layer(tls=self._is_tls_ready)
         self._update_mimir_cluster()
 
     def _on_mimir_cluster_changed(self, _):
@@ -199,7 +198,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self._update_mimir_cluster()
 
     def _on_nginx_pebble_ready(self, _) -> None:
-        self.nginx.configure_pebble_layer()
+        self.nginx.configure_pebble_layer(tls=self._is_tls_ready)
 
     def _on_nginx_prometheus_exporter_pebble_ready(self, _) -> None:
         self.nginx_prometheus_exporter.configure_pebble_layer()
