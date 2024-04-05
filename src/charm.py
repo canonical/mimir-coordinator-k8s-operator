@@ -75,7 +75,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             tls_requirer=self.server_cert,
         )
         self.nginx = Nginx(cluster_provider=self.cluster_provider, server_name=self.hostname)
-        self.nginx_prometheus_exporter = NginxPrometheusExporter()
+        self.nginx_prometheus_exporter = NginxPrometheusExporter(self)
         self.remote_write_provider = PrometheusRemoteWriteProvider(
             charm=self,
             server_url_func=lambda: MimirCoordinatorK8SOperatorCharm.internal_url.fget(self),  # type: ignore
