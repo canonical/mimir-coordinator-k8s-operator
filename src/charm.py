@@ -62,7 +62,9 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         #  (Remote write would still be the same nginx-proxied endpoint.)
 
         self._nginx_container = self.unit.get_container("nginx")
-        self._prometheus_exporter_container = self.unit.get_container("nginx-prometheus-exporter")
+        self._nginx_prometheus_exporter_container = self.unit.get_container(
+            "nginx-prometheus-exporter"
+        )
         self.server_cert = CertHandler(
             charm=self,
             key="mimir-server-cert",
@@ -74,7 +76,11 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             cluster_provider=self.cluster_provider,
             tls_requirer=self.server_cert,
         )
-        self.nginx = Nginx(cluster_provider=self.cluster_provider, server_name=self.hostname)
+        self.nginx = Nginx(
+            self,
+            cluster_provider=self.cluster_provider,
+            server_name=self.hostname,
+        )
         self.nginx_prometheus_exporter = NginxPrometheusExporter(self)
         self.remote_write_provider = PrometheusRemoteWriteProvider(
             charm=self,
@@ -100,11 +106,11 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             alert_rules_path="./src/prometheus_alert_rules/mimir_workers",
             jobs=self.workers_scrape_jobs,
         )
-        self.coordinator_metrics_endpoints = MetricsEndpointProvider(
+        self.nginx_metrics_endpoints = MetricsEndpointProvider(
             self,
             relation_name="metrics-endpoint",
             alert_rules_path="./src/prometheus_alert_rules/nginx",
-            jobs=self.coordinator_scrape_jobs,
+            jobs=self.nginx_scrape_jobs,
         )
 
         ######################################
@@ -152,7 +158,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
 
     def _on_server_cert_changed(self, _):
         self._update_cert()
-        self._ensure_nginx_pebble_layer()
+        self.nginx.configure_pebble_layer()
         self._update_mimir_cluster()
 
     def _on_mimir_cluster_changed(self, _):
@@ -192,10 +198,10 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self._update_mimir_cluster()
 
     def _on_nginx_pebble_ready(self, _) -> None:
-        self._ensure_nginx_pebble_layer()
+        self.nginx.configure_pebble_layer()
 
     def _on_nginx_prometheus_exporter_pebble_ready(self, _) -> None:
-        self._ensure_nginx_prometheus_exporter_pebble_layer()
+        self.nginx_prometheus_exporter.configure_pebble_layer()
 
     ######################
     # === PROPERTIES === #
@@ -247,7 +253,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         return scrape_jobs
 
     @property
-    def coordinator_scrape_jobs(self) -> List[Dict[str, Any]]:
+    def nginx_scrape_jobs(self) -> List[Dict[str, Any]]:
         """Scrape jobs for the Mimir Coordinator."""
         job: Dict[str, Any] = {
             "static_configs": [{"targets": [f"{self.hostname}:{NGINX_PROMETHEUS_EXPORTER_PORT}"]}]
@@ -359,19 +365,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             msg = f"failed to validate s3 config data: {raw}"
             logger.error(msg, exc_info=True)
             return None
-
-    def _ensure_nginx_pebble_layer(self) -> None:
-        self._nginx_container.push(
-            self.nginx.config_path, self.nginx.config(tls=self._is_cert_available), make_dirs=True
-        )
-        self._nginx_container.add_layer("nginx", self.nginx.layer, combine=True)
-        self._nginx_container.autostart()
-
-    def _ensure_nginx_prometheus_exporter_pebble_layer(self) -> None:
-        self._prometheus_exporter_container.add_layer(
-            "nginx-prometheus-exporter", self.nginx_prometheus_exporter.layer, combine=True
-        )
-        self._prometheus_exporter_container.autostart()
 
     def _update_cert(self):
         if not self._nginx_container.can_connect():

@@ -18,11 +18,17 @@ class NginxPrometheusExporter:
 
     def __init__(self, charm: CharmBase) -> None:
         self._charm = charm
+        self._container = self._charm.unit.get_container("nginx-prometheus-exporter")
+
+    def configure_pebble_layer(self) -> None:
+        """Configure pebble layer."""
+        self._container.add_layer("nginx-prometheus-exporter", self.layer, combine=True)
+        self._container.autostart()
 
     @property
     def layer(self) -> Layer:
         """Return the Pebble layer for Nginx Prometheus exporter."""
-        scheme = "https" if self._charm._is_cert_available else "http"
+        scheme = "https" if self._charm._is_cert_available else "http"  # type: ignore
         return Layer(
             {
                 "summary": "nginx prometheus exporter layer",
