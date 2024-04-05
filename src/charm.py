@@ -80,6 +80,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             self,
             cluster_provider=self.cluster_provider,
             server_name=self.hostname,
+            tls=self._is_tls_ready,
         )
         self.nginx_prometheus_exporter = NginxPrometheusExporter(self)
         self.remote_write_provider = PrometheusRemoteWriteProvider(
@@ -222,6 +223,15 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         )
 
     @property
+    def _is_tls_ready(self) -> bool:
+        return (
+            self._nginx_container.can_connect()
+            and self._nginx_container.exists(CERT_PATH)
+            and self._nginx_container.exists(KEY_PATH)
+            and self._nginx_container.exists(CA_CERT_PATH)
+        )
+
+    @property
     def mimir_worker_relations(self) -> List[ops.Relation]:
         """Returns the list of worker relations."""
         return self.model.relations.get("mimir_worker", [])
@@ -301,7 +311,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     @property
     def internal_url(self) -> str:
         """Returns workload's FQDN. Used for ingress."""
-        scheme = "https" if self._is_cert_available else "http"
+        scheme = "https" if self._is_tls_ready else "http"
         return f"{scheme}://{self.hostname}:8080"
 
     ###########################
@@ -312,7 +322,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         """Build the config and publish everything to the application databag."""
         if not self.coordinator.is_coherent():
             return
-        tls = self._is_cert_available
+        tls = self._is_tls_ready
 
         s3_config_data = self._get_s3_storage_config()
 

@@ -187,8 +187,11 @@ class Nginx:
 
     config_path = NGINX_CONFIG
 
-    def __init__(self, charm: CharmBase, cluster_provider: MimirClusterProvider, server_name: str):
+    def __init__(
+        self, charm: CharmBase, cluster_provider: MimirClusterProvider, server_name: str, tls: bool
+    ):
         self._charm = charm
+        self._tls = tls
         self.cluster_provider = cluster_provider
         self.server_name = server_name
         self._container = self._charm.unit.get_container("nginx")
@@ -196,7 +199,7 @@ class Nginx:
     def configure_pebble_layer(self) -> None:
         """Configure pebble layer."""
         self._container.push(
-            self.config_path, self.config(tls=self._charm._is_cert_available), make_dirs=True  # type: ignore
+            self.config_path, self.config(tls=self._tls), make_dirs=True  # type: ignore
         )
         self._container.add_layer("nginx", self.layer, combine=True)
         self._container.autostart()
