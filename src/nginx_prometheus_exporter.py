@@ -37,7 +37,7 @@ class NginxPrometheusExporter:
                     "nginx": {
                         "override": "replace",
                         "summary": "nginx prometheus exporter",
-                        "command": f"nginx-prometheus-exporter --no-nginx.ssl-verify --nginx.scrape-uri={scheme}://127.0.0.1:{NGINX_PORT}/status",
+                        "command": f"nginx-prometheus-exporter --no-nginx.ssl-verify --web.listen-address=:{NGINX_PROMETHEUS_EXPORTER_PORT}  --nginx.scrape-uri={scheme}://127.0.0.1:{NGINX_PORT}/status",
                         "startup": "enabled",
                     }
                 },
