@@ -32,6 +32,7 @@ from mimir_cluster import MimirClusterProvider
 from mimir_config import BUCKET_NAME, S3_RELATION_NAME, _S3ConfigData
 from mimir_coordinator import MimirCoordinator
 from nginx import CA_CERT_PATH, CERT_PATH, KEY_PATH, Nginx
+from nginx_prometheus_exporter import NGINX_PROMETHEUS_EXPORTER_PORT, NginxPrometheusExporter
 from ops.charm import CollectStatusEvent
 from ops.model import Relation
 from pydantic import ValidationError
@@ -61,6 +62,9 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         #  (Remote write would still be the same nginx-proxied endpoint.)
 
         self._nginx_container = self.unit.get_container("nginx")
+        self._nginx_prometheus_exporter_container = self.unit.get_container(
+            "nginx-prometheus-exporter"
+        )
         self.server_cert = CertHandler(
             charm=self,
             key="mimir-server-cert",
@@ -72,7 +76,12 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             cluster_provider=self.cluster_provider,
             tls_requirer=self.server_cert,
         )
-        self.nginx = Nginx(cluster_provider=self.cluster_provider, server_name=self.hostname)
+        self.nginx = Nginx(
+            self,
+            cluster_provider=self.cluster_provider,
+            server_name=self.hostname,
+        )
+        self.nginx_prometheus_exporter = NginxPrometheusExporter(self)
         self.remote_write_provider = PrometheusRemoteWriteProvider(
             charm=self,
             server_url_func=lambda: MimirCoordinatorK8SOperatorCharm.internal_url.fget(self),  # type: ignore
@@ -91,7 +100,18 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             secure_extra_fields={"httpHeaderValue1": "anonymous"},
         )
         self.loki_consumer = LokiPushApiConsumer(self, relation_name="logging-consumer")
-        self.metrics_endpoints = MetricsEndpointProvider(self, jobs=self.workers_scrape_jobs)
+        self.worker_metrics_endpoints = MetricsEndpointProvider(
+            self,
+            relation_name="workers-metrics-endpoint",
+            alert_rules_path="./src/prometheus_alert_rules/mimir_workers",
+            jobs=self.workers_scrape_jobs,
+        )
+        self.nginx_metrics_endpoints = MetricsEndpointProvider(
+            self,
+            relation_name="metrics-endpoint",
+            alert_rules_path="./src/prometheus_alert_rules/nginx",
+            jobs=self.nginx_scrape_jobs,
+        )
 
         ######################################
         # === EVENT HANDLER REGISTRATION === #
@@ -99,6 +119,10 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.collect_unit_status, self._on_collect_status)
         self.framework.observe(self.on.nginx_pebble_ready, self._on_nginx_pebble_ready)
+        self.framework.observe(
+            self.on.nginx_prometheus_exporter_pebble_ready,
+            self._on_nginx_prometheus_exporter_pebble_ready,
+        )
         self.framework.observe(self.server_cert.on.cert_changed, self._on_server_cert_changed)
         # Mimir Cluster
         self.framework.observe(
@@ -134,7 +158,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
 
     def _on_server_cert_changed(self, _):
         self._update_cert()
-        self._ensure_pebble_layer()
+        self.nginx.configure_pebble_layer(tls=self._is_tls_ready)
         self._update_mimir_cluster()
 
     def _on_mimir_cluster_changed(self, _):
@@ -174,7 +198,10 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self._update_mimir_cluster()
 
     def _on_nginx_pebble_ready(self, _) -> None:
-        self._ensure_pebble_layer()
+        self.nginx.configure_pebble_layer(tls=self._is_tls_ready)
+
+    def _on_nginx_prometheus_exporter_pebble_ready(self, _) -> None:
+        self.nginx_prometheus_exporter.configure_pebble_layer()
 
     ######################
     # === PROPERTIES === #
@@ -195,12 +222,21 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         )
 
     @property
+    def _is_tls_ready(self) -> bool:
+        return (
+            self._nginx_container.can_connect()
+            and self._nginx_container.exists(CERT_PATH)
+            and self._nginx_container.exists(KEY_PATH)
+            and self._nginx_container.exists(CA_CERT_PATH)
+        )
+
+    @property
     def mimir_worker_relations(self) -> List[ops.Relation]:
         """Returns the list of worker relations."""
         return self.model.relations.get("mimir_worker", [])
 
     @property
-    def workers_scrape_jobs(self) -> List[Dict[str, str]]:
+    def workers_scrape_jobs(self) -> List[Dict[str, Any]]:
         """Scrape jobs for the Mimir workers."""
         scrape_jobs = []
         worker_topologies = self.cluster_provider.gather_topology()
@@ -224,6 +260,14 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             }
             scrape_jobs.append(job)
         return scrape_jobs
+
+    @property
+    def nginx_scrape_jobs(self) -> List[Dict[str, Any]]:
+        """Scrape jobs for the Mimir Coordinator."""
+        job: Dict[str, Any] = {
+            "static_configs": [{"targets": [f"{self.hostname}:{NGINX_PROMETHEUS_EXPORTER_PORT}"]}]
+        }
+        return [job]
 
     @property
     def loki_endpoints_by_unit(self) -> Dict[str, str]:
@@ -266,8 +310,8 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     @property
     def internal_url(self) -> str:
         """Returns workload's FQDN. Used for ingress."""
-        scheme = "https" if self._is_cert_available else "http"
-        return f"{scheme}://{socket.getfqdn()}:8080"
+        scheme = "https" if self._is_tls_ready else "http"
+        return f"{scheme}://{self.hostname}:8080"
 
     ###########################
     # === UTILITY METHODS === #
@@ -277,7 +321,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         """Build the config and publish everything to the application databag."""
         if not self.coordinator.is_coherent():
             return
-        tls = self._is_cert_available
+        tls = self._is_tls_ready
 
         s3_config_data = self._get_s3_storage_config()
 
@@ -330,13 +374,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             msg = f"failed to validate s3 config data: {raw}"
             logger.error(msg, exc_info=True)
             return None
-
-    def _ensure_pebble_layer(self) -> None:
-        self._nginx_container.push(
-            self.nginx.config_path, self.nginx.config(tls=self._is_cert_available), make_dirs=True
-        )
-        self._nginx_container.add_layer("nginx", self.nginx.layer, combine=True)
-        self._nginx_container.autostart()
 
     def _update_cert(self):
         if not self._nginx_container.can_connect():

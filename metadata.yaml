@@ -12,12 +12,18 @@ description: |
 containers:
   nginx:
     resource: nginx-image
+  nginx-prometheus-exporter:
+    resource: nginx-prometheus-exporter-image
 
 resources:
   nginx-image:
     type: oci-image
     description: OCI image for nginx
     upstream-source: ubuntu/nginx:1.18-22.04_beta
+  nginx-prometheus-exporter-image:
+    type: oci-image
+    description: OCI image for nginx-prometheus-exporter
+    upstream-source: nginx/nginx-prometheus-exporter:1.1.0
 #  agent-image:
 #    type: oci-image
 #    upstream-source: ghcr.io/canonical/grafana-agent:latest
@@ -78,5 +84,9 @@ provides:
   metrics-endpoint:
     interface: prometheus_scrape
     description: |
-      The coordinator provides scrape jobs for all the workers related to it.
+      The coordinator provides scrape jobs for itself.
 
+  workers-metrics-endpoint:
+    interface: prometheus_scrape
+    description: |
+      The coordinator provides scrape jobs for all the workers related to it.

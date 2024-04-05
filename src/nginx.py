@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Set
 
 import crossplane
 from mimir_cluster import MimirClusterProvider
+from ops import CharmBase
 from ops.pebble import Layer
 
 logger = logging.getLogger(__name__)
@@ -14,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 NGINX_DIR = "/etc/nginx"
 NGINX_CONFIG = f"{NGINX_DIR}/nginx.conf"
+NGINX_PORT = "8080"
 KEY_PATH = f"{NGINX_DIR}/certs/server.key"
 CERT_PATH = f"{NGINX_DIR}/certs/server.cert"
 CA_CERT_PATH = f"{NGINX_DIR}/certs/ca.cert"
@@ -161,15 +163,43 @@ LOCATIONS_COMPACTOR: List[Dict] = [
     },
 ]
 
+LOCATIONS_BASIC: List[Dict] = [
+    {
+        "directive": "location",
+        "args": ["=", "/"],
+        "block": [
+            {"directive": "return", "args": ["200", "'OK'"]},
+            {"directive": "auth_basic", "args": ["off"]},
+        ],
+    },
+    {  # Location to be used by nginx-prometheus-exporter
+        "directive": "location",
+        "args": ["=", "/status"],
+        "block": [
+            {"directive": "stub_status", "args": []},
+        ],
+    },
+]
+
 
 class Nginx:
     """Helper class to manage the nginx workload."""
 
     config_path = NGINX_CONFIG
 
-    def __init__(self, cluster_provider: MimirClusterProvider, server_name: str):
+    def __init__(self, charm: CharmBase, cluster_provider: MimirClusterProvider, server_name: str):
+        self._charm = charm
         self.cluster_provider = cluster_provider
         self.server_name = server_name
+        self._container = self._charm.unit.get_container("nginx")
+
+    def configure_pebble_layer(self, tls: bool) -> None:
+        """Configure pebble layer."""
+        self._container.push(
+            self.config_path, self.config(tls=tls), make_dirs=True  # type: ignore
+        )
+        self._container.add_layer("nginx", self.layer, combine=True)
+        self._container.autostart()
 
     def config(self, tls: bool = False) -> str:
         """Build and return the Nginx configuration."""
@@ -272,7 +302,8 @@ class Nginx:
                     "directive": "upstream",
                     "args": [role],
                     "block": [
-                        {"directive": "server", "args": [f"{addr}:8080"]} for addr in address_set
+                        {"directive": "server", "args": [f"{addr}:{NGINX_PORT}"]}
+                        for addr in address_set
                     ],
                 }
             )
@@ -280,8 +311,9 @@ class Nginx:
         return nginx_upstreams
 
     def _locations(self, addresses_by_role: Dict[str, Set[str]]) -> List[Dict[str, Any]]:
-        nginx_locations = []
+        nginx_locations = LOCATIONS_BASIC.copy()
         roles = addresses_by_role.keys()
+
         if "distributor" in roles:
             nginx_locations.extend(LOCATIONS_DISTRIBUTOR)
         if "alertmanager" in roles:
@@ -322,14 +354,6 @@ class Nginx:
                     {"directive": "listen", "args": ["[::]:443", "ssl"]},
                     *self._basic_auth(auth_enabled),
                     {
-                        "directive": "location",
-                        "args": ["=", "/"],
-                        "block": [
-                            {"directive": "return", "args": ["200", "'OK'"]},
-                            {"directive": "auth_basic", "args": ["off"]},
-                        ],
-                    },
-                    {
                         "directive": "proxy_set_header",
                         "args": ["X-Scope-OrgID", "$ensured_x_scope_orgid"],
                     },
@@ -347,17 +371,9 @@ class Nginx:
             "directive": "server",
             "args": [],
             "block": [
-                {"directive": "listen", "args": ["8080"]},
-                {"directive": "listen", "args": ["[::]:8080"]},
+                {"directive": "listen", "args": [NGINX_PORT]},
+                {"directive": "listen", "args": [f"[::]:{NGINX_PORT}"]},
                 *self._basic_auth(auth_enabled),
-                {
-                    "directive": "location",
-                    "args": ["=", "/"],
-                    "block": [
-                        {"directive": "return", "args": ["200", "'OK'"]},
-                        {"directive": "auth_basic", "args": ["off"]},
-                    ],
-                },
                 {
                     "directive": "proxy_set_header",
                     "args": ["X-Scope-OrgID", "$ensured_x_scope_orgid"],

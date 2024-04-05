@@ -34,7 +34,12 @@ async def test_nginx_config_has_ssl(ops_test: OpsTest):
     await asyncio.gather(
         ops_test.model.deploy(
             mimir_charm,
-            resources={"nginx-image": oci_image("./metadata.yaml", "nginx-image")},
+            resources={
+                "nginx-image": oci_image("./metadata.yaml", "nginx-image"),
+                "nginx-prometheus-exporter-image": oci_image(
+                    "./metadata.yaml", "nginx-prometheus-exporter-image"
+                ),
+            },
             application_name="coordinator",
             trust=True,  # otherwise errors on ghwf (persistentvolumeclaims ... is forbidden)
         ),

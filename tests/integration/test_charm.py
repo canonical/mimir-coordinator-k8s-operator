@@ -35,6 +35,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
             trust: true
             resources:
               nginx-image: {METADATA["resources"]["nginx-image"]["upstream-source"]}
+              nginx-prometheus-exporter-image: {METADATA["resources"]["nginx-prometheus-exporter-image"]["upstream-source"]}
             scale: 1
           loki:
             charm: loki-k8s
