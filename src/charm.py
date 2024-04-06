@@ -9,6 +9,7 @@ develop a new k8s charm using the Operator Framework:
 
 https://discourse.charmhub.io/t/4208
 """
+import glob
 import json
 import logging
 import os
@@ -48,6 +49,7 @@ logger = logging.getLogger(__name__)
 WORKER_ORIGINAL_ALERT_RULES_PATH = "./src/prometheus_alert_rules/mimir_workers"
 WORKER_RENDERED_ALERT_RULES_PATH = "./src/prometheus_alert_rules/mimir_workers_rendered"
 
+
 @trace_charm(
     tracing_endpoint="tempo_endpoint",
     server_cert="server_cert_path",
@@ -77,7 +79,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             sans=[self.hostname],
         )
         self.s3_requirer = S3Requirer(self, S3_RELATION_NAME, BUCKET_NAME)
-        self._costool = CosTool(self)
+        self._costool = CosTool("promql")
         self.cluster_provider = MimirClusterProvider(self)
         self.coordinator = MimirCoordinator(
             cluster_provider=self.cluster_provider,
@@ -107,14 +109,18 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             secure_extra_fields={"httpHeaderValue1": "anonymous"},
         )
         self.loki_consumer = LokiPushApiConsumer(self, relation_name="logging-consumer")
+
         self.worker_metrics_endpoints = MetricsEndpointProvider(
             self,
             relation_name="workers-metrics-endpoint",
             alert_rules_path=WORKER_RENDERED_ALERT_RULES_PATH,
             jobs=self.workers_scrape_jobs,
-            # refresh_event=[
-            #     self.on.mimir_cluster_relation_changed,
-            # ]
+            refresh_event=[
+                self.on.mimir_cluster_relation_joined,
+                self.on.mimir_cluster_relation_changed,
+                self.on.mimir_cluster_relation_departed,
+                self.on.mimir_cluster_relation_broken,
+            ],
         )
         self.nginx_metrics_endpoints = MetricsEndpointProvider(
             self,
@@ -180,6 +186,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self._update_mimir_cluster()
 
     def _on_mimir_cluster_departed(self, _):
+        self._render_alert_rules()
         self._update_mimir_cluster()
 
     def _on_s3_changed(self, _):
@@ -255,6 +262,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         """Scrape jobs for the Mimir workers."""
         scrape_jobs = []
         worker_topologies = self.cluster_provider.gather_topology()
+
         for worker in worker_topologies:
             job = {
                 "static_configs": [
@@ -333,8 +341,8 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     ###########################
 
     def _render_alert_rules(self):
-        if not os.path.exists(WORKER_RENDERED_ALERT_RULES_PATH):
-            os.makedirs(WORKER_RENDERED_ALERT_RULES_PATH)
+        self._ensure_rendered_rules_dir()
+        self._remove_rendered_rules()
 
         apps = set()
         for worker in self.cluster_provider.gather_topology():
@@ -355,9 +363,17 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             alert_rules_contents = yaml.dump(alert_rules.as_dict())
 
             file_name = f"{WORKER_RENDERED_ALERT_RULES_PATH}/{worker['app']}.rules"
-            with open(file_name, 'w') as writer:
+            with open(file_name, "w") as writer:
                 writer.write(alert_rules_contents)
 
+    def _ensure_rendered_rules_dir(self):
+        if not os.path.exists(WORKER_RENDERED_ALERT_RULES_PATH):
+            os.makedirs(WORKER_RENDERED_ALERT_RULES_PATH)
+
+    def _remove_rendered_rules(self):
+        files = glob.glob(f"{WORKER_RENDERED_ALERT_RULES_PATH}/*")
+        for f in files:
+            os.remove(f)
 
     def _update_mimir_cluster(self):  # common exit hook
         """Build the config and publish everything to the application databag."""
