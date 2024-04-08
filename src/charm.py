@@ -13,6 +13,7 @@ import glob
 import json
 import logging
 import os
+import shutil
 import socket
 import subprocess
 from pathlib import Path
@@ -46,8 +47,9 @@ from pydantic import ValidationError
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
 
+NGINX_ORIGINAL_ALERT_RULES_PATH = "./src/prometheus_alert_rules/nginx"
 WORKER_ORIGINAL_ALERT_RULES_PATH = "./src/prometheus_alert_rules/mimir_workers"
-WORKER_RENDERED_ALERT_RULES_PATH = "./src/prometheus_alert_rules/mimir_workers_rendered"
+CONSOLIDATED_ALERT_RULES_PATH = "./src/prometheus_alert_rules/consolidated_rules"
 
 
 @trace_charm(
@@ -110,23 +112,19 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         )
         self.loki_consumer = LokiPushApiConsumer(self, relation_name="logging-consumer")
 
-        self.worker_metrics_endpoints = MetricsEndpointProvider(
+        self._ensure_consolidated_rules_dir()
+        self._consolidate_nginx_rules()
+        self.metrics_endpoints = MetricsEndpointProvider(
             self,
-            relation_name="workers-metrics-endpoint",
-            alert_rules_path=WORKER_RENDERED_ALERT_RULES_PATH,
-            jobs=self.workers_scrape_jobs,
+            relation_name="metrics-endpoint",
+            alert_rules_path=CONSOLIDATED_ALERT_RULES_PATH,
+            jobs=self._scrape_jobs,
             refresh_event=[
                 self.on.mimir_cluster_relation_joined,
                 self.on.mimir_cluster_relation_changed,
                 self.on.mimir_cluster_relation_departed,
                 self.on.mimir_cluster_relation_broken,
             ],
-        )
-        self.nginx_metrics_endpoints = MetricsEndpointProvider(
-            self,
-            relation_name="metrics-endpoint",
-            alert_rules_path="./src/prometheus_alert_rules/nginx",
-            jobs=self.nginx_scrape_jobs,
         )
 
         ######################################
@@ -178,15 +176,15 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self._update_mimir_cluster()
 
     def _on_mimir_cluster_joined(self, _):
-        self._render_alert_rules()
+        self._render_workers_alert_rules()
         self._update_mimir_cluster()
 
     def _on_mimir_cluster_changed(self, _):
-        self._render_alert_rules()
+        self._render_workers_alert_rules()
         self._update_mimir_cluster()
 
     def _on_mimir_cluster_departed(self, _):
-        self._render_alert_rules()
+        self._render_workers_alert_rules()
         self._update_mimir_cluster()
 
     def _on_s3_changed(self, _):
@@ -258,8 +256,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         return self.model.relations.get("mimir_worker", [])
 
     @property
-    def workers_scrape_jobs(self) -> List[Dict[str, Any]]:
-        """Scrape jobs for the Mimir workers."""
+    def _workers_scrape_jobs(self) -> List[Dict[str, Any]]:
         scrape_jobs = []
         worker_topologies = self.cluster_provider.gather_topology()
 
@@ -285,12 +282,15 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         return scrape_jobs
 
     @property
-    def nginx_scrape_jobs(self) -> List[Dict[str, Any]]:
-        """Scrape jobs for the Mimir Coordinator."""
+    def _nginx_scrape_jobs(self) -> List[Dict[str, Any]]:
         job: Dict[str, Any] = {
             "static_configs": [{"targets": [f"{self.hostname}:{NGINX_PROMETHEUS_EXPORTER_PORT}"]}]
         }
         return [job]
+
+    @property
+    def _scrape_jobs(self) -> List[Dict[str, Any]]:
+        return self._workers_scrape_jobs + self._nginx_scrape_jobs
 
     @property
     def loki_endpoints_by_unit(self) -> Dict[str, str]:
@@ -340,8 +340,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     # === UTILITY METHODS === #
     ###########################
 
-    def _render_alert_rules(self):
-        self._ensure_rendered_rules_dir()
+    def _render_workers_alert_rules(self):
         self._remove_rendered_rules()
 
         apps = set()
@@ -362,18 +361,22 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             alert_rules.add_path(WORKER_ORIGINAL_ALERT_RULES_PATH, recursive=True)
             alert_rules_contents = yaml.dump(alert_rules.as_dict())
 
-            file_name = f"{WORKER_RENDERED_ALERT_RULES_PATH}/{worker['app']}.rules"
+            file_name = f"{CONSOLIDATED_ALERT_RULES_PATH}/rendered_{worker['app']}.rules"
             with open(file_name, "w") as writer:
                 writer.write(alert_rules_contents)
 
-    def _ensure_rendered_rules_dir(self):
-        if not os.path.exists(WORKER_RENDERED_ALERT_RULES_PATH):
-            os.makedirs(WORKER_RENDERED_ALERT_RULES_PATH)
+    def _ensure_consolidated_rules_dir(self):
+        if not os.path.exists(CONSOLIDATED_ALERT_RULES_PATH):
+            os.makedirs(CONSOLIDATED_ALERT_RULES_PATH)
 
     def _remove_rendered_rules(self):
-        files = glob.glob(f"{WORKER_RENDERED_ALERT_RULES_PATH}/*")
+        files = glob.glob(f"{CONSOLIDATED_ALERT_RULES_PATH}/rendered_*")
         for f in files:
             os.remove(f)
+
+    def _consolidate_nginx_rules(self):
+        for filename in glob.glob(os.path.join(NGINX_ORIGINAL_ALERT_RULES_PATH, "*.*")):
+            shutil.copy(filename, f"{CONSOLIDATED_ALERT_RULES_PATH}/")
 
     def _update_mimir_cluster(self):  # common exit hook
         """Build the config and publish everything to the application databag."""
