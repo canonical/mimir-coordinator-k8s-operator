@@ -84,7 +84,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
         timeout=600,
         idle_period=30,
     )
-    breakpoint()
+
     await ops_test.model.wait_for_idle(
         apps=[coord.name], status="blocked", raise_on_error=False, timeout=600, idle_period=30
     )
