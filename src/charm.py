@@ -166,6 +166,8 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
 
     def _on_config_changed(self, _: ops.ConfigChangedEvent):
         """Handle changed configuration."""
+        self.nginx.configure_pebble_layer(tls=self._is_tls_ready)
+        self._render_workers_alert_rules()
         self._update_mimir_cluster()
 
     def _on_server_cert_changed(self, _):
@@ -174,14 +176,17 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self._update_mimir_cluster()
 
     def _on_mimir_cluster_joined(self, _):
+        self.nginx.configure_pebble_layer(tls=self._is_tls_ready)
         self._render_workers_alert_rules()
         self._update_mimir_cluster()
 
     def _on_mimir_cluster_changed(self, _):
+        self.nginx.configure_pebble_layer(tls=self._is_tls_ready)
         self._render_workers_alert_rules()
         self._update_mimir_cluster()
 
     def _on_mimir_cluster_departed(self, _):
+        self.nginx.configure_pebble_layer(tls=self._is_tls_ready)
         self._render_workers_alert_rules()
         self._update_mimir_cluster()
 
