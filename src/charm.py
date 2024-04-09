@@ -28,13 +28,14 @@ from charms.prometheus_k8s.v0.prometheus_scrape import MetricsEndpointProvider
 from charms.prometheus_k8s.v1.prometheus_remote_write import PrometheusRemoteWriteProvider
 from charms.tempo_k8s.v1.charm_tracing import trace_charm
 from charms.tempo_k8s.v1.tracing import TracingEndpointRequirer
+from charms.traefik_k8s.v2.ingress import IngressPerAppReadyEvent, IngressPerAppRequirer
 from mimir_cluster import MimirClusterProvider
 from mimir_config import BUCKET_NAME, S3_RELATION_NAME, _S3ConfigData
 from mimir_coordinator import MimirCoordinator
 from nginx import CA_CERT_PATH, CERT_PATH, KEY_PATH, Nginx
 from nginx_prometheus_exporter import NGINX_PROMETHEUS_EXPORTER_PORT, NginxPrometheusExporter
 from ops.charm import CollectStatusEvent
-from ops.model import Relation
+from ops.model import ModelError, Relation
 from pydantic import ValidationError
 
 # Log messages can be retrieved using juju debug-log
@@ -84,7 +85,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self.nginx_prometheus_exporter = NginxPrometheusExporter(self)
         self.remote_write_provider = PrometheusRemoteWriteProvider(
             charm=self,
-            server_url_func=lambda: MimirCoordinatorK8SOperatorCharm.internal_url.fget(self),  # type: ignore
+            server_url_func=lambda: MimirCoordinatorK8SOperatorCharm.external_url.fget(self),  # type: ignore
             endpoint_path="/api/v1/push",
         )
         self.tracing = TracingEndpointRequirer(self)
@@ -112,6 +113,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             alert_rules_path="./src/prometheus_alert_rules/nginx",
             jobs=self.nginx_scrape_jobs,
         )
+        self.ingress = IngressPerAppRequirer(charm=self, strip_prefix=True)
 
         ######################################
         # === EVENT HANDLER REGISTRATION === #
@@ -147,6 +149,8 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self.framework.observe(
             self.loki_consumer.on.loki_push_api_endpoint_departed, self._on_loki_relation_changed
         )
+        self.framework.observe(self.ingress.on.ready, self._on_ingress_ready)
+        self.framework.observe(self.ingress.on.revoked, self._on_ingress_revoked)
 
     ##########################
     # === EVENT HANDLERS === #
@@ -162,9 +166,11 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self._update_mimir_cluster()
 
     def _on_mimir_cluster_changed(self, _):
+        self.nginx.configure_pebble_layer(tls=self._is_tls_ready)
         self._update_mimir_cluster()
 
     def _on_mimir_cluster_departed(self, _):
+        self.nginx.configure_pebble_layer(tls=self._is_tls_ready)
         self._update_mimir_cluster()
 
     def _on_s3_changed(self, _):
@@ -202,6 +208,20 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
 
     def _on_nginx_prometheus_exporter_pebble_ready(self, _) -> None:
         self.nginx_prometheus_exporter.configure_pebble_layer()
+
+    def _on_ingress_ready(self, event: IngressPerAppReadyEvent):
+        """Log the obtained ingress address.
+
+        This event refreshes the PrometheusRemoteWriteProvider address.
+        """
+        logger.info("Ingress for app ready on '%s'", event.url)
+
+    def _on_ingress_revoked(self, _) -> None:
+        """Log the ingress address being revoked.
+
+        This event refreshes the PrometheusRemoteWriteProvider address.
+        """
+        logger.info("Ingress for app revoked")
 
     ######################
     # === PROPERTIES === #
@@ -312,6 +332,16 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         """Returns workload's FQDN. Used for ingress."""
         scheme = "https" if self._is_tls_ready else "http"
         return f"{scheme}://{self.hostname}:8080"
+
+    @property
+    def external_url(self) -> str:
+        """Return the external hostname to be passed to ingress via the relation."""
+        try:
+            if ingress_url := self.ingress.url:
+                return ingress_url
+        except ModelError as e:
+            logger.error("Failed obtaining external url: %s.", e)
+        return self.internal_url
 
     ###########################
     # === UTILITY METHODS === #
