@@ -110,7 +110,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         )
         self.loki_consumer = LokiPushApiConsumer(self, relation_name="logging-consumer")
 
-        self._ensure_consolidated_rules_dir()
         self._consolidate_nginx_rules()
         self.metrics_endpoints = MetricsEndpointProvider(
             self,
@@ -368,16 +367,13 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             with open(file_name, "w") as writer:
                 writer.write(alert_rules_contents)
 
-    def _ensure_consolidated_rules_dir(self):
-        if not os.path.exists(CONSOLIDATED_ALERT_RULES_PATH):
-            os.makedirs(CONSOLIDATED_ALERT_RULES_PATH)
-
     def _remove_rendered_rules(self):
         files = glob.glob(f"{CONSOLIDATED_ALERT_RULES_PATH}/rendered_*")
         for f in files:
             os.remove(f)
 
     def _consolidate_nginx_rules(self):
+        os.makedirs(CONSOLIDATED_ALERT_RULES_PATH, exist_ok=True)
         for filename in glob.glob(os.path.join(NGINX_ORIGINAL_ALERT_RULES_PATH, "*.*")):
             shutil.copy(filename, f"{CONSOLIDATED_ALERT_RULES_PATH}/")
 
