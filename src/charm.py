@@ -33,7 +33,6 @@ from charms.prometheus_k8s.v1.prometheus_remote_write import PrometheusRemoteWri
 from charms.tempo_k8s.v1.charm_tracing import trace_charm
 from charms.tempo_k8s.v1.tracing import TracingEndpointRequirer
 from cosl import JujuTopology
-from cosl.cos_tool import CosTool
 from cosl.rules import AlertRules
 from mimir_cluster import MimirClusterProvider
 from mimir_config import BUCKET_NAME, S3_RELATION_NAME, _S3ConfigData
@@ -81,7 +80,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             sans=[self.hostname],
         )
         self.s3_requirer = S3Requirer(self, S3_RELATION_NAME, BUCKET_NAME)
-        self._costool = CosTool("promql")
         self.cluster_provider = MimirClusterProvider(self)
         self.coordinator = MimirCoordinator(
             cluster_provider=self.cluster_provider,
