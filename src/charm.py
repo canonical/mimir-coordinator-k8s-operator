@@ -114,7 +114,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self._consolidate_nginx_rules()
         self.metrics_endpoints = MetricsEndpointProvider(
             self,
-            relation_name="metrics-endpoint",
+            relation_name="self-metrics-endpoint",
             alert_rules_path=CONSOLIDATED_ALERT_RULES_PATH,
             jobs=self._scrape_jobs,
             refresh_event=[
