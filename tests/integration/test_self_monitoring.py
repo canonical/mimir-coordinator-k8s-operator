@@ -2,6 +2,7 @@
 # Copyright 2024 Ubuntu
 # See LICENSE file for licensing details.
 
+import json
 import logging
 from pathlib import Path
 from textwrap import dedent
@@ -9,13 +10,14 @@ from types import SimpleNamespace
 
 import pytest
 import yaml
-from helpers import deploy_literal_bundle
+from helpers import deploy_literal_bundle, run_command
 from pytest_operator.plugin import OpsTest
 
 logger = logging.getLogger(__name__)
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 coord = SimpleNamespace(name="coord")
+apps = ["coord", "write", "read", "prom"]
 
 
 @pytest.mark.abort_on_fail
@@ -67,7 +69,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
             trust: true
         relations:
         - - prom:metrics-endpoint
-          - coord:metrics-endpoint
+          - coord:self-metrics-endpoint
         - - coord:mimir-cluster
           - read:mimir-cluster
         - - coord:mimir-cluster
@@ -89,8 +91,28 @@ async def test_build_and_deploy(ops_test: OpsTest):
         apps=[coord.name], status="blocked", raise_on_error=False, timeout=600, idle_period=30
     )
 
-    # TODO: Once we close this issue in cos-lib: https://github.com/canonical/cos-lib/issues/24
-    #
-    # - Verify that the scrape jobs for nginx and the workers are in Prometheus
-    # - Verify the alert rules from nginx, and the workers are in Prometheus
-    # - Verify the record rules from nginx, and the workers are in Prometheus
+
+@pytest.mark.abort_on_fail
+async def test_scrape_jobs(ops_test: OpsTest):
+    # Check scrape jobs
+    cmd = ["curl", "http://localhost:9090/api/v1/targets"]
+    result = await run_command(ops_test.model_name, "prom", 0, command=cmd)
+    result_json = json.loads(result.decode("utf-8"))
+
+    active_targets = result_json["data"]["activeTargets"]
+
+    for at in active_targets:
+        assert at["labels"]["juju_application"] in apps
+
+
+@pytest.mark.abort_on_fail
+async def test_rules(ops_test: OpsTest):
+    # Check Rules
+    cmd = ["curl", "http://localhost:9090/api/v1/rules"]
+    result = await run_command(ops_test.model_name, "prom", 0, command=cmd)
+    result_json = json.loads(result.decode("utf-8"))
+    groups = result_json["data"]["groups"]
+
+    for group in groups:
+        for rule in group["rules"]:
+            assert rule["labels"]["juju_application"] in apps

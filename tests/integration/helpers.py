@@ -79,3 +79,13 @@ def get_workload_file(
         logger.error(e.stdout.decode())
         raise e
     return res.stdout
+
+
+async def run_command(model_name: str, app_name: str, unit_num: int, command: list) -> bytes:
+    cmd = ["juju", "ssh", "--model", model_name, f"{app_name}/{unit_num}", *command]
+    try:
+        res = subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as e:
+        logger.error(e.stdout.decode())
+        raise e
+    return res.stdout
