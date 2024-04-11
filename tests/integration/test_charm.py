@@ -55,7 +55,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
 
         relations:
         - [mc:logging-consumer, loki:logging]
-        - [mc:metrics-endpoint, prometheus:metrics-endpoint]
+        - [mc:self-metrics-endpoint, prometheus:metrics-endpoint]
         - [mc:grafana-dashboards-provider, grafana:grafana-dashboard]
     """
     )
