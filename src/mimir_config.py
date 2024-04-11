@@ -6,10 +6,10 @@
 import logging
 import re
 from dataclasses import asdict
-from typing import Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union
 from urllib.parse import urlparse
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, model_validator, validator
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 
 S3_RELATION_NAME = "s3"
@@ -108,6 +108,14 @@ class _S3ConfigData(BaseModel):
     secret_access_key: str = Field(alias="secret-key")
     bucket_name: str = Field(alias="bucket")
     region: str = ""
+    insecure: str = "false"
+
+    @model_validator(mode="before")  # pyright: ignore
+    @classmethod
+    def set_insecure(cls, data: Any) -> Any:
+        if isinstance(data, dict) and data.get("endpoint", None):
+            data["insecure"] = "true" if data["endpoint"].startswith("http://") else "false"
+        return data
 
     @validator("endpoint")
     def remove_scheme(cls, v: str) -> str:
