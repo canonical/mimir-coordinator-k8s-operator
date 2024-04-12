@@ -114,7 +114,7 @@ class _S3ConfigData(BaseModel):
     @classmethod
     def set_insecure(cls, data: Any) -> Any:
         if isinstance(data, dict) and data.get("endpoint", None):
-            data["insecure"] = "true" if data["endpoint"].startswith("http://") else "false"
+            data["insecure"] = "false" if data["endpoint"].startswith("https://") else "true"
         return data
 
     @validator("endpoint")
