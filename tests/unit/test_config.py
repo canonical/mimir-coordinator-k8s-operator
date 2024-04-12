@@ -1,6 +1,7 @@
 import unittest
 from unittest.mock import MagicMock
 
+from deepdiff import DeepDiff
 from mimir_config import _S3ConfigData
 from mimir_coordinator import MimirCoordinator
 
@@ -73,7 +74,7 @@ class TestMimirConfig(unittest.TestCase):
 
     def test_build_s3_storage_config(self):
         raw_s3_config_data = {
-            "endpoint": "s3.com:port",
+            "endpoint": "https://s3.com:port",
             "access-key": "your_access_key",
             "secret-key": "your_secret_key",
             "bucket": "your_bucket",
@@ -81,7 +82,7 @@ class TestMimirConfig(unittest.TestCase):
         }
         s3_config_data = _S3ConfigData(**raw_s3_config_data)
         s3_storage_config = self.coordinator._build_s3_storage_config(s3_config_data)
-        expected_config = {
+        expected_config_https = {
             "backend": "s3",
             "s3": {
                 "endpoint": "s3.com:port",
@@ -89,13 +90,27 @@ class TestMimirConfig(unittest.TestCase):
                 "secret_access_key": "your_secret_key",
                 "bucket_name": "your_bucket",
                 "region": "your_region",
+                "insecure": "false",
             },
         }
-        self.assertEqual(s3_storage_config, expected_config)
+        self.assertEqual(DeepDiff(s3_storage_config, expected_config_https), {})
+
+        expected_config_http = {
+            "backend": "s3",
+            "s3": {
+                "endpoint": "s3.com:port",
+                "access_key_id": "your_access_key",
+                "secret_access_key": "your_secret_key",
+                "bucket_name": "your_bucket",
+                "region": "your_region",
+                "insecure": "true",
+            },
+        }
+
         raw_s3_config_data["endpoint"] = "http://s3.com:port"
         s3_config_data = _S3ConfigData(**raw_s3_config_data)
         s3_storage_config = self.coordinator._build_s3_storage_config(s3_config_data)
-        self.assertEqual(s3_storage_config, expected_config)
+        self.assertEqual(DeepDiff(s3_storage_config, expected_config_http), {})
 
     def test_update_s3_storage_config(self):
         storage_config = {"filesystem": {"dir": "/data/blocks"}}
