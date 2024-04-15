@@ -97,6 +97,8 @@ async def test_scrape_jobs(ops_test: OpsTest):
     # Check scrape jobs
     cmd = ["curl", "http://localhost:9090/api/v1/targets"]
     result = await run_command(ops_test.model_name, "prom", 0, command=cmd)
+    logger.info(result)
+    logger.info(result.decode("utf-8"))
     result_json = json.loads(result.decode("utf-8"))
 
     active_targets = result_json["data"]["activeTargets"]
