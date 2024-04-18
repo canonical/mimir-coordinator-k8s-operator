@@ -109,8 +109,9 @@ async def test_scrape_jobs(ops_test: OpsTest):
 @pytest.mark.abort_on_fail
 async def test_rules(ops_test: OpsTest):
     # Check Rules
-    cmd = ["curl", "http://localhost:9090/api/v1/rules"]
+    cmd = ["curl", "-sS", "http://localhost:9090/api/v1/rules"]
     result = await run_command(ops_test.model_name, "prom", 0, command=cmd)
+    logger.info(result)
     result_json = json.loads(result.decode("utf-8"))
     groups = result_json["data"]["groups"]
 
