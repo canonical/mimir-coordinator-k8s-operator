@@ -85,6 +85,7 @@ async def run_command(model_name: str, app_name: str, unit_num: int, command: li
     cmd = ["juju", "ssh", "--model", model_name, f"{app_name}/{unit_num}", *command]
     try:
         res = subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        logger.info(res)
     except subprocess.CalledProcessError as e:
         logger.error(e.stdout.decode())
         raise e
