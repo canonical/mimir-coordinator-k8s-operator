@@ -95,7 +95,7 @@ async def test_build_and_deploy(ops_test: OpsTest):
 @pytest.mark.abort_on_fail
 async def test_scrape_jobs(ops_test: OpsTest):
     # Check scrape jobs
-    cmd = ["curl", "http://localhost:9090/api/v1/targets"]
+    cmd = ["curl", "-sS", "http://localhost:9090/api/v1/targets"]
     result = await run_command(ops_test.model_name, "prom", 0, command=cmd)
     logger.info(result)
     result_json = json.loads(result.decode("utf-8"))
