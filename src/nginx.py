@@ -195,11 +195,12 @@ class Nginx:
 
     def configure_pebble_layer(self, tls: bool) -> None:
         """Configure pebble layer."""
-        self._container.push(
-            self.config_path, self.config(tls=tls), make_dirs=True  # type: ignore
-        )
-        self._container.add_layer("nginx", self.layer, combine=True)
-        self._container.autostart()
+        if self._container.can_connect():
+            self._container.push(
+                self.config_path, self.config(tls=tls), make_dirs=True  # type: ignore
+            )
+            self._container.add_layer("nginx", self.layer, combine=True)
+            self._container.autostart()
 
     def config(self, tls: bool = False) -> str:
         """Build and return the Nginx configuration."""

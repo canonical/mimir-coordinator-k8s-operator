@@ -15,6 +15,7 @@ class TestCharm(unittest.TestCase):
     def setUp(self):
         os.environ["JUJU_VERSION"] = "3.0.3"
         self.harness = Harness(MimirCoordinatorK8SOperatorCharm)
+        self.harness.set_can_connect("nginx", True)
         self.addCleanup(self.harness.cleanup)
         self.harness.begin_with_initial_hooks()
 

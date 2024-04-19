@@ -81,12 +81,7 @@ provides:
   grafana-source:
     interface: grafana_datasource
 
-  metrics-endpoint:
+  self-metrics-endpoint:
     interface: prometheus_scrape
     description: |
-      The coordinator provides scrape jobs for itself.
-
-  workers-metrics-endpoint:
-    interface: prometheus_scrape
-    description: |
-      The coordinator provides scrape jobs for all the workers related to it.
+      The coordinator provides scrape jobs for itself and for the workers.
