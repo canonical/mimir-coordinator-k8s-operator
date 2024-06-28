@@ -273,7 +273,7 @@ class Nginx:
                     "nginx": {
                         "override": "replace",
                         "summary": "nginx",
-                        "command": "nginx",
+                        "command": "nginx -g 'daemon off;'",
                         "startup": "enabled",
                     }
                 },

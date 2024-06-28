@@ -19,7 +19,7 @@ resources:
   nginx-image:
     type: oci-image
     description: OCI image for nginx
-    upstream-source: ubuntu/nginx:1.18-22.04_beta
+    upstream-source: ubuntu/nginx:1.24-24.04_beta
   nginx-prometheus-exporter-image:
     type: oci-image
     description: OCI image for nginx-prometheus-exporter
