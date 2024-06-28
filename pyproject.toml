@@ -42,6 +42,12 @@ max-complexity = 15
 # Allow Pydantic's `@validator` decorator to trigger class method treatment.
 classmethod-decorators = ["classmethod", "pydantic.validator"]
 
+[tool.codespell]
+skip = ".eggs,.tox,.git,.venv,venv,build,.build,lib,report,docs"
+quiet-level = 3
+check-filenames = true
+ignore-words-list = "assertIn"
+
 [tool.pyright]
 include = ["src"]
 extraPaths = ["lib"]
