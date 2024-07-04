@@ -65,11 +65,13 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             server_url_func=lambda: MimirCoordinatorK8SOperatorCharm.external_url.fget(self),  # type: ignore
             endpoint_path="/api/v1/push",
         )
+
+        grafana_source_scheme = "https" if self.coordinator.cert_handler.available else "http"
+        grafana_source_url = self.coordinator.cluster.get_address_from_role("ruler")
         self.grafana_source = GrafanaSourceProvider(
             self,
             source_type="prometheus",
-            source_port="8080",
-            source_url=f"{self.coordinator.cluster.get_address_from_role('ruler')}:8080/prometheus",
+            source_url=f"{grafana_source_scheme}://{grafana_source_url}:8080/prometheus",
             extra_fields={"httpHeaderName1": "X-Scope-OrgID"},
             secure_extra_fields={"httpHeaderValue1": "anonymous"},
         )
