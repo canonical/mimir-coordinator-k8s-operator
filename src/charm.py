@@ -13,18 +13,20 @@ import logging
 import socket
 from typing import Any, Optional
 
+import cosl.coordinated_workers.nginx
 import ops
 from charms.grafana_k8s.v0.grafana_source import GrafanaSourceProvider
 from charms.prometheus_k8s.v1.prometheus_remote_write import PrometheusRemoteWriteProvider
 from charms.tempo_k8s.v1.charm_tracing import trace_charm
 from charms.traefik_k8s.v2.ingress import IngressPerAppReadyEvent, IngressPerAppRequirer
-from cosl.distributed.coordinator import Coordinator
+from cosl.coordinated_workers.coordinator import Coordinator
 from mimir_config import MimirConfig, MimirRolesConfig
-from nginx_config import NginxConfig, CERT_PATH
+from nginx_config import NginxConfig
 from ops.model import ModelError
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
+
 
 @trace_charm(
     tracing_endpoint="tempo_endpoint",
@@ -54,7 +56,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             workers_config=MimirConfig().config,
             endpoints={
                 "cluster": "mimir-cluster",
-                "grafana-dashboards":"grafana-dashboards-provider",
+                "grafana-dashboards": "grafana-dashboards-provider",
                 "metrics": "self-metrics-endpoint",
                 "logging": "logging-consumer",
             },
@@ -113,20 +115,20 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     def tempo_endpoint(self) -> Optional[str]:
         """Tempo endpoint for charm tracing."""
         if self.coordinator.tracing.is_ready():
-            return self.coordinator.tracing.otlp_http_endpoint()
+            return self.coordinator.tracing.get_endpoint(protocol="otlp_http")
         else:
             return None
 
     @property
     def server_cert_path(self) -> Optional[str]:
         """Server certificate path for tls tracing."""
-        return CERT_PATH
+        return cosl.coordinated_workers.nginx.CERT_PATH
 
     @property
     def internal_url(self) -> str:
         """Returns workload's FQDN. Used for ingress."""
         scheme = "http"
-        if hasattr(self, 'coordinator') and self.coordinator.nginx.are_certificates_on_disk:
+        if hasattr(self, "coordinator") and self.coordinator.nginx.are_certificates_on_disk:
             scheme = "https"
         return f"{scheme}://{self.hostname}:8080"
 

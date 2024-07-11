@@ -17,28 +17,30 @@ target-version = ["py38"]
 # Linting tools configuration
 [tool.ruff]
 line-length = 99
-select = ["E", "W", "F", "C", "N", "D", "I001"]
-extend-ignore = [
-    "D203",
-    "D204",
-    "D213",
-    "D215",
-    "D400",
-    "D404",
-    "D406",
-    "D407",
-    "D408",
-    "D409",
-    "D413",
-]
-ignore = ["E501", "D107"]
 extend-exclude = ["__pycache__", "*.egg_info"]
+
+[tool.ruff.lint]
+ignore = ["E501", "D107"]
+extend-ignore = [
+  "D203",
+  "D204",
+  "D213",
+  "D215",
+  "D400",
+  "D404",
+  "D406",
+  "D407",
+  "D408",
+  "D409",
+  "D413",
+]
+select = ["E", "W", "F", "C", "N", "D", "I001"]
 per-file-ignores = {"tests/*" = ["D100","D101","D102","D103","D104"]}
 
-[tool.ruff.mccabe]
+[tool.ruff.lint.mccabe]
 max-complexity = 15
 
-[tool.ruff.pep8-naming]
+[tool.ruff.lint.pep8-naming]
 # Allow Pydantic's `@validator` decorator to trigger class method treatment.
 classmethod-decorators = ["classmethod", "pydantic.validator"]
 
@@ -48,3 +50,7 @@ extraPaths = ["lib"]
 pythonVersion = "3.8"
 pythonPlatform = "Linux"
 reportUnknownParameterType = true
+
+[tool.codespell]
+skip = ".git,.tox,build,venv*"
+ignore-words-list = "assertIn,aNULL"

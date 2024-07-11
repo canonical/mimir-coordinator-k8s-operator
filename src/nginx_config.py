@@ -6,8 +6,8 @@ import logging
 from typing import Any, Dict, List, Optional, Set
 
 import crossplane
-from cosl.distributed.coordinator import Coordinator
-from cosl.distributed.nginx import NGINX_PORT, KEY_PATH, CERT_PATH
+from cosl.coordinated_workers.coordinator import Coordinator
+from cosl.coordinated_workers.nginx import CERT_PATH, KEY_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -175,6 +175,7 @@ LOCATIONS_BASIC: List[Dict] = [
 
 class NginxConfig:
     """Helper class to manage the nginx workload."""
+
     def config(self, coordinator: Coordinator) -> str:
         """Build and return the Nginx configuration."""
         log_level = "error"
@@ -196,7 +197,7 @@ class NginxConfig:
                 "args": [],
                 "block": [
                     # upstreams (load balancing)
-                    *self._upstreams(addresses_by_role),
+                    *self._upstreams(addresses_by_role, coordinator.nginx.options["nginx_port"]),
                     # temp paths
                     {"directive": "client_body_temp_path", "args": ["/tmp/client_temp"]},
                     {"directive": "proxy_temp_path", "args": ["/tmp/proxy_temp_path"]},
@@ -231,6 +232,7 @@ class NginxConfig:
                     self._server(
                         server_name=coordinator.hostname,
                         addresses_by_role=addresses_by_role,
+                        nginx_port=coordinator.nginx.options["nginx_port"],
                         tls=coordinator.nginx.are_certificates_on_disk,
                     ),
                 ],
@@ -254,7 +256,9 @@ class NginxConfig:
             {"directive": "access_log", "args": ["/dev/stderr"]},
         ]
 
-    def _upstreams(self, addresses_by_role: Dict[str, Set[str]]) -> List[Dict[str, Any]]:
+    def _upstreams(
+        self, addresses_by_role: Dict[str, Set[str]], nginx_port: int
+    ) -> List[Dict[str, Any]]:
         nginx_upstreams = []
         for role, address_set in addresses_by_role.items():
             nginx_upstreams.append(
@@ -262,7 +266,7 @@ class NginxConfig:
                     "directive": "upstream",
                     "args": [role],
                     "block": [
-                        {"directive": "server", "args": [f"{addr}:{NGINX_PORT}"]}
+                        {"directive": "server", "args": [f"{addr}:{nginx_port}"]}
                         for addr in address_set
                     ],
                 }
@@ -302,7 +306,13 @@ class NginxConfig:
             ]
         return []
 
-    def _server(self, server_name: str, addresses_by_role: Dict[str, Set[str]], tls: bool = False) -> Dict[str, Any]:
+    def _server(
+        self,
+        server_name: str,
+        addresses_by_role: Dict[str, Set[str]],
+        nginx_port: int,
+        tls: bool = False,
+    ) -> Dict[str, Any]:
         auth_enabled = False
 
         if tls:
@@ -331,8 +341,8 @@ class NginxConfig:
             "directive": "server",
             "args": [],
             "block": [
-                {"directive": "listen", "args": [NGINX_PORT]},
-                {"directive": "listen", "args": [f"[::]:{NGINX_PORT}"]},
+                {"directive": "listen", "args": [nginx_port]},
+                {"directive": "listen", "args": [f"[::]:{nginx_port}"]},
                 *self._basic_auth(auth_enabled),
                 {
                     "directive": "proxy_set_header",

@@ -5,15 +5,14 @@
 """Mimir coordinator."""
 
 import logging
-import yaml
 from pathlib import Path
 from typing import Any, Dict, Iterable, Mapping
 
-from cosl.distributed.coordinator import Coordinator
-from cosl.distributed.cluster import ClusterProvider
-from cosl.distributed.worker import CERT_FILE, CLIENT_CA_FILE, KEY_FILE
+import yaml
 from cosl import JujuTopology
-
+from cosl.coordinated_workers.coordinator import Coordinator
+from cosl.coordinated_workers.interface import ClusterProvider
+from cosl.coordinated_workers.worker import CERT_FILE, CLIENT_CA_FILE, KEY_FILE
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +39,14 @@ ROLES = {
 META_ROLES = {
     "read": {"query_frontend", "querier"},
     "write": {"distributor", "ingester"},
-    "backend": {"store_gateway", "compactor", "ruler", "alertmanager", "query_scheduler", "overrides_exporter"},
+    "backend": {
+        "store_gateway",
+        "compactor",
+        "ruler",
+        "alertmanager",
+        "query_scheduler",
+        "overrides_exporter",
+    },
     "all": set(ROLES),
 }
 
@@ -75,8 +81,10 @@ RECOMMENDED_DEPLOYMENT = {
 """The set of roles that need to be allocated for the
 deployment to be considered robust according to the official recommendations/guidelines."""
 
+
 class MimirRolesConfig:
     """Define the configuration for Mimir roles."""
+
     roles: Iterable[str] = ROLES
     meta_roles: Mapping[str, Iterable[str]] = META_ROLES
     minimal_deployment: Iterable[str] = MINIMAL_DEPLOYMENT
@@ -88,6 +96,7 @@ REPLICATION_MIN_WORKERS = 3
 # The default amount of replicas to set when there are enough workers per role;
 # otherwise, replicas will be "disabled" by setting the amount to 1
 DEFAULT_REPLICATION = 3
+
 
 class MimirConfig:
     """Config builder for the Mimir Coordinator."""
@@ -119,7 +128,9 @@ class MimirConfig:
         }
 
         if coordinator.s3_ready:
-            mimir_config["common"]["storage"] = self._build_s3_storage_config(coordinator._s3_config)
+            mimir_config["common"]["storage"] = self._build_s3_storage_config(
+                coordinator._s3_config
+            )
             self._update_s3_storage_config(mimir_config["blocks_storage"], "blocks")
             self._update_s3_storage_config(mimir_config["ruler_storage"], "rules")
             self._update_s3_storage_config(mimir_config["alertmanager_storage"], "alerts")
@@ -268,7 +279,9 @@ class MimirConfig:
     # (advanced) The cluster label is an optional string to include in outbound
     # packets and gossip streams. Other members in the memberlist cluster will
     # discard any message whose label doesn't match the configured one, unless the
-    def _build_memberlist_config(self, topology: JujuTopology, cluster: ClusterProvider) -> Dict[str, Any]:
+    def _build_memberlist_config(
+        self, topology: JujuTopology, cluster: ClusterProvider
+    ) -> Dict[str, Any]:
         top = topology.as_dict()
         return {
             "cluster_label": f"{top['model']}_{top['model_uuid']}_{top['application']}",
