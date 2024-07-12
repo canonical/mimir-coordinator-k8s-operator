@@ -51,15 +51,18 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             roles_config=MimirRolesConfig(),
             s3_bucket_name="mimir",
             external_url=self.external_url,
-            metrics_port="8080",
-            nginx_config=NginxConfig().config,
-            workers_config=MimirConfig().config,
+            worker_metrics_port="8080",
             endpoints={
+                "certificates": "certificates",
                 "cluster": "mimir-cluster",
                 "grafana-dashboards": "grafana-dashboards-provider",
-                "metrics": "self-metrics-endpoint",
                 "logging": "logging-consumer",
+                "metrics": "self-metrics-endpoint",
+                "tracing": "tracing",
+                "s3": "s3",
             },
+            nginx_config=NginxConfig().config,
+            workers_config=MimirConfig().config,
         )
 
         self.remote_write_provider = PrometheusRemoteWriteProvider(
