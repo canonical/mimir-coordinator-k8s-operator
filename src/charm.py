@@ -51,7 +51,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             roles_config=MimirRolesConfig(),
             s3_bucket_name="mimir",
             external_url=self.external_url,
-            worker_metrics_port="8080",
+            worker_metrics_port=8080,
             endpoints={
                 "certificates": "certificates",
                 "cluster": "mimir-cluster",
