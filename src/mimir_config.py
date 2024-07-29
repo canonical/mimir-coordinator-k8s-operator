@@ -1,166 +1,289 @@
+#!/usr/bin/env python3
 # Copyright 2023 Canonical
 # See LICENSE file for licensing details.
 
-"""Helper module for interacting with the Mimir configuration."""
+"""Mimir coordinator."""
 
 import logging
-import re
-from dataclasses import asdict
-from typing import Any, Dict, List, Literal, Optional, Union
-from urllib.parse import urlparse
+from pathlib import Path
+from typing import Any, Dict, Iterable, Mapping
 
-from pydantic import BaseModel, Field, model_validator, validator
-from pydantic.dataclasses import dataclass as pydantic_dataclass
-
-S3_RELATION_NAME = "s3"
-BUCKET_NAME = "mimir"
+import yaml
+from cosl import JujuTopology
+from cosl.coordinated_workers.coordinator import Coordinator
+from cosl.coordinated_workers.interface import ClusterProvider
+from cosl.coordinated_workers.worker import CERT_FILE, CLIENT_CA_FILE, KEY_FILE
 
 logger = logging.getLogger(__name__)
 
+ROLES = {
+    "overrides_exporter",
+    "query_scheduler",
+    "flusher",
+    "query_frontend",
+    "querier",
+    "store_gateway",
+    "ingester",
+    "distributor",
+    "ruler",
+    "alertmanager",
+    "compactor",
+    # meta-roles
+    "read",
+    "write",
+    "backend",
+    "all",
+}
+"""Mimir component role names."""
 
-class InvalidConfigurationError(Exception):
-    """Invalid configuration."""
+META_ROLES = {
+    "read": {"query_frontend", "querier"},
+    "write": {"distributor", "ingester"},
+    "backend": {
+        "store_gateway",
+        "compactor",
+        "ruler",
+        "alertmanager",
+        "query_scheduler",
+        "overrides_exporter",
+    },
+    "all": set(ROLES) - {"read", "write", "backend", "all"},
+}
 
-    pass
+MINIMAL_DEPLOYMENT = {
+    # from official docs:
+    "compactor",
+    "distributor",
+    "ingester",
+    "querier",
+    "query_frontend",
+    "query_scheduler",
+    "store_gateway",
+    # we add:
+    "ruler",
+    "alertmanager",
+}
+"""The minimal set of roles that need to be allocated for the
+deployment to be considered consistent (otherwise we set blocked). On top of what mimir itself lists as required,
+we add alertmanager."""
 
-
-class Memberlist(BaseModel):
-    """Memberlist schema."""
-
-    cluster_label: str
-    cluster_label_verification_disabled: bool = False
-    join_members: List[str]
-
-
-class Tsdb(BaseModel):
-    """Tsdb schema."""
-
-    dir: str = "/data/ingester"
-
-
-class BlocksStorage(BaseModel):
-    """Blocks storage schema."""
-
-    storage_prefix: str = "blocks"
-    tsdb: Tsdb
-
-
-class Limits(BaseModel):
-    """Limits schema."""
-
-    ingestion_rate: int = 0
-    ingestion_burst_size: int = 0
-    max_global_series_per_user: int = 0
-    ruler_max_rules_per_rule_group: int = 0
-    ruler_max_rule_groups_per_tenant: int = 0
-
-
-class Kvstore(BaseModel):
-    """Kvstore schema."""
-
-    store: str = "memberlist"
-
-
-class Ring(BaseModel):
-    """Ring schema."""
-
-    kvstore: Kvstore
-    replication_factor: int = 3
-
-
-class Distributor(BaseModel):
-    """Distributor schema."""
-
-    ring: Ring
-
-
-class Ingester(BaseModel):
-    """Ingester schema."""
-
-    ring: Ring
-
-
-class Ruler(BaseModel):
-    """Ruler schema."""
-
-    rule_path: str = "/data/ruler"
-    alertmanager_url: Optional[str]
+RECOMMENDED_DEPLOYMENT = {
+    "ingester": 3,
+    "querier": 2,
+    "query_scheduler": 2,
+    "alertmanager": 1,
+    "query_frontend": 1,
+    "ruler": 1,
+    "store_gateway": 1,
+    "compactor": 1,
+    "distributor": 1,
+}
+"""The set of roles that need to be allocated for the
+deployment to be considered robust according to the official recommendations/guidelines."""
 
 
-class Alertmanager(BaseModel):
-    """Alertmanager schema."""
+class MimirRolesConfig:
+    """Define the configuration for Mimir roles."""
 
-    data_dir: str = "/data/alertmanager"
-    external_url: Optional[str]
-
-
-class Server(BaseModel):
-    """Server schema."""
-
-    http_tls_config: Dict[str, Dict[str, str]]
-    grpc_tls_config: Dict[str, Dict[str, str]]
+    roles: Iterable[str] = ROLES
+    meta_roles: Mapping[str, Iterable[str]] = META_ROLES
+    minimal_deployment: Iterable[str] = MINIMAL_DEPLOYMENT
+    recommended_deployment: Dict[str, int] = RECOMMENDED_DEPLOYMENT
 
 
-class _S3ConfigData(BaseModel):
-    model_config = {"populate_by_name": True}
-    access_key_id: str = Field(alias="access-key")
-    endpoint: str
-    secret_access_key: str = Field(alias="secret-key")
-    bucket_name: str = Field(alias="bucket")
-    region: str = ""
-    insecure: str = "false"
-
-    @model_validator(mode="before")  # pyright: ignore
-    @classmethod
-    def set_insecure(cls, data: Any) -> Any:
-        if isinstance(data, dict) and data.get("endpoint", None):
-            data["insecure"] = "false" if data["endpoint"].startswith("https://") else "true"
-        return data
-
-    @validator("endpoint")
-    def remove_scheme(cls, v: str) -> str:
-        """Remove the scheme from the s3 endpoint."""
-        return re.sub(rf"^{urlparse(v).scheme}://", "", v)
+# The minimum number of workers per role to enable replication
+REPLICATION_MIN_WORKERS = 3
+# The default amount of replicas to set when there are enough workers per role;
+# otherwise, replicas will be "disabled" by setting the amount to 1
+DEFAULT_REPLICATION = 3
 
 
-class _FilesystemStorageBackend(BaseModel):
-    dir: str
+class MimirConfig:
+    """Config builder for the Mimir Coordinator."""
 
+    def __init__(
+        self,
+        root_data_dir: Path = Path("/data"),
+        recovery_data_dir: Path = Path("/recovery-data"),
+    ):
+        self._root_data_dir = root_data_dir
+        self._recovery_data_dir = recovery_data_dir
 
-_StorageBackend = Union[_S3ConfigData, _FilesystemStorageBackend]
-_StorageKey = Union[Literal["filesystem"], Literal["s3"]]
+    def config(self, coordinator: Coordinator) -> str:
+        """Generate shared config file for mimir.
 
+        Reference: https://grafana.com/docs/mimir/latest/configure/
+        """
+        mimir_config: Dict[str, Any] = {
+            "common": {},
+            "alertmanager": self._build_alertmanager_config(coordinator.cluster),
+            "alertmanager_storage": self._build_alertmanager_storage_config(),
+            "compactor": self._build_compactor_config(),
+            "ingester": self._build_ingester_config(coordinator.cluster),
+            "ruler": self._build_ruler_config(),
+            "ruler_storage": self._build_ruler_storage_config(),
+            "store_gateway": self._build_store_gateway_config(coordinator.cluster),
+            "blocks_storage": self._build_blocks_storage_config(),
+            "memberlist": self._build_memberlist_config(coordinator.topology, coordinator.cluster),
+        }
 
-@pydantic_dataclass
-class CommonConfig:
-    """Common config schema."""
-
-    backend: _StorageKey
-    _StorageKey: _StorageBackend
-
-    def __post_init__(self):
-        """Verify the backend variable typing is correct."""
-        if not asdict(self).get("s3", "") and not asdict(self).get("s3", ""):
-            raise InvalidConfigurationError("Common storage configuration must specify a type!")
-        elif (asdict(self).get("filesystem", "") and not self.backend != "filesystem") or (
-            asdict(self).get("s3", "") and not self.backend != "s3"
-        ):
-            raise InvalidConfigurationError(
-                "Mimir `backend` type must include a configuration block which matches that type"
+        if coordinator.s3_ready:
+            mimir_config["common"]["storage"] = self._build_s3_storage_config(
+                coordinator._s3_config
             )
+            self._update_s3_storage_config(mimir_config["blocks_storage"], "blocks")
+            self._update_s3_storage_config(mimir_config["ruler_storage"], "rules")
+            self._update_s3_storage_config(mimir_config["alertmanager_storage"], "alerts")
 
+        # todo: TLS config for memberlist
+        if coordinator.nginx.are_certificates_on_disk:
+            mimir_config["server"] = self._build_tls_config()
 
-class MimirBaseConfig(BaseModel):
-    """Base class for mimir config schema."""
+        return yaml.dump(mimir_config)
 
-    target: str
-    memberlist: Memberlist
-    multitenancy_enabled: bool = True
-    common: CommonConfig
-    limits: Limits
-    blocks_storage: Optional[BlocksStorage]
-    distributor: Optional[Distributor]
-    ingester: Optional[Ingester]
-    ruler: Optional[Ruler]
-    alertmanager: Optional[Alertmanager]
-    server: Optional[Server]
+    def _build_tls_config(self) -> Dict[str, Any]:
+        tls_config = {
+            "cert_file": CERT_FILE,
+            "key_file": KEY_FILE,
+            "client_ca_file": CLIENT_CA_FILE,
+            "client_auth_type": "RequestClientCert",
+        }
+        return {
+            "http_tls_config": tls_config,
+            "grpc_tls_config": tls_config,
+        }
+
+    # data_dir:
+    # The Mimir Alertmanager stores the alerts state on local disk at the location configured using -alertmanager.storage.path.
+    # Should be persisted if not replicated
+
+    # sharding_ring.replication_factor: int
+    # (advanced) The replication factor to use when sharding the alertmanager.
+    def _build_alertmanager_config(self, cluster: ClusterProvider) -> Dict[str, Any]:
+        alertmanager_scale = len(cluster.gather_addresses_by_role().get("alertmanager", []))
+        return {
+            "data_dir": str(self._root_data_dir / "data-alertmanager"),
+            "sharding_ring": {
+                "replication_factor": (
+                    1 if alertmanager_scale < REPLICATION_MIN_WORKERS else DEFAULT_REPLICATION
+                )
+            },
+        }
+
+    # filesystem: dir
+    # The Mimir Alertmanager also periodically stores the alert state in the storage backend configured with -alertmanager-storage.backend (For Recovery)
+    def _build_alertmanager_storage_config(self) -> Dict[str, Any]:
+        return {
+            "filesystem": {
+                "dir": str(self._recovery_data_dir / "data-alertmanager"),
+            },
+        }
+
+    # data_dir:
+    # Directory to temporarily store blocks during compaction.
+    # This directory is not required to be persisted between restarts.
+    def _build_compactor_config(self) -> Dict[str, Any]:
+        return {
+            "data_dir": str(self._root_data_dir / "data-compactor"),
+        }
+
+    # ring.replication_factor: int
+    # Number of ingesters that each time series is replicated to. This option
+    # needs be set on ingesters, distributors, queriers and rulers when running in
+    # microservices mode.
+    def _build_ingester_config(self, cluster: ClusterProvider) -> Dict[str, Any]:
+        ingester_scale = len(cluster.gather_addresses_by_role().get("ingester", []))
+        return {
+            "ring": {
+                "replication_factor": (
+                    1 if ingester_scale < REPLICATION_MIN_WORKERS else DEFAULT_REPLICATION
+                )
+            }
+        }
+
+    # rule_path:
+    # Directory to store temporary rule files loaded by the Prometheus rule managers.
+    # This directory is not required to be persisted between restarts.
+    def _build_ruler_config(self) -> Dict[str, Any]:
+        return {
+            "rule_path": str(self._root_data_dir / "data-ruler"),
+        }
+
+    # sharding_ring.replication_factor:
+    # (advanced) The replication factor to use when sharding blocks. This option
+    # needs be set both on the store-gateway, querier and ruler when running in
+    # microservices mode.
+    def _build_store_gateway_config(self, cluster: ClusterProvider) -> Dict[str, Any]:
+        store_gateway_scale = len(cluster.gather_addresses_by_role().get("store_gateway", []))
+        return {
+            "sharding_ring": {
+                "replication_factor": (
+                    1 if store_gateway_scale < REPLICATION_MIN_WORKERS else DEFAULT_REPLICATION
+                )
+            }
+        }
+
+    # filesystem: dir
+    # Storage backend reads Prometheus recording rules from the local filesystem.
+    # The ruler looks for tenant rules in the self._root_data_dir/rules/<TENANT ID> directory. The ruler requires rule files to be in the Prometheus format.
+    def _build_ruler_storage_config(self) -> Dict[str, Any]:
+        return {
+            "filesystem": {
+                "dir": str(self._root_data_dir / "rules"),
+            },
+        }
+
+    # bucket_store: sync_dir
+    # Directory to store synchronized TSDB index headers. This directory is not
+    # required to be persisted between restarts, but it's highly recommended
+
+    # filesystem: dir
+    # Mimir upload blocks (of metrics) to the object storage at period interval.
+
+    # tsdb: dir
+    # Directory to store TSDBs (including WAL) in the ingesters.
+    #  This directory is required to be persisted between restarts.
+
+    # The TSDB dir is used by ingesters, while the filesystem: dir is the "object storage"
+    # Ingesters are expected to upload TSDB blocks to filesystem: dir every 2h.
+    def _build_blocks_storage_config(self) -> Dict[str, Any]:
+        return {
+            "bucket_store": {
+                "sync_dir": str(self._root_data_dir / "tsdb-sync"),
+            },
+            "filesystem": {
+                "dir": str(self._root_data_dir / "blocks"),
+            },
+            "tsdb": {
+                "dir": str(self._root_data_dir / "tsdb"),
+            },
+        }
+
+    def _build_s3_storage_config(self, s3_config_data: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "backend": "s3",
+            "s3": s3_config_data,
+        }
+
+    def _update_s3_storage_config(self, storage_config: Dict[str, Any], prefix_name: str) -> None:
+        """Update S3 storage configuration in `storage_config`.
+
+        If the key 'filesystem' is present in `storage_config`, remove it and add a new key
+        'storage_prefix' with the value of `prefix_name` for the S3 bucket.
+        """
+        if "filesystem" in storage_config:
+            storage_config.pop("filesystem")
+            storage_config["storage_prefix"] = prefix_name
+
+    # cluster_label:
+    # (advanced) The cluster label is an optional string to include in outbound
+    # packets and gossip streams. Other members in the memberlist cluster will
+    # discard any message whose label doesn't match the configured one, unless the
+    def _build_memberlist_config(
+        self, topology: JujuTopology, cluster: ClusterProvider
+    ) -> Dict[str, Any]:
+        top = topology.as_dict()
+        return {
+            "cluster_label": f"{top['model']}_{top['model_uuid']}_{top['application']}",
+            "join_members": list(cluster.gather_addresses()),
+        }
