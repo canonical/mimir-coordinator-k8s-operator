@@ -1,12 +1,5 @@
 import json
 import logging
-import os
-import shlex
-import subprocess
-import tempfile
-from dataclasses import dataclass
-from minio import Minio
-from pathlib import Path
 from time import sleep
 from typing import Dict, List, Literal
 
@@ -32,12 +25,12 @@ from pytest_operator.plugin import OpsTest
 logger = logging.getLogger(__name__)
 
 
-def charm_resources(metadata_file="metadata.yaml") -> Dict[str,str]:
+def charm_resources(metadata_file="metadata.yaml") -> Dict[str, str]:
     with open(metadata_file, "r") as file:
         metadata = yaml.safe_load(file)
     resources = {}
     for res, data in metadata["resources"].items():
-        resources[res] = data['upstream-source']
+        resources[res] = data["upstream-source"]
     return resources
 
 
@@ -55,9 +48,12 @@ def _check_idle(apps: List[str], model: str, status: Literal["active", "blocked"
             ]["current"]
             if workload_status != status or unit_status != "idle":
                 success = False
-                logger.info(f"{app}/{unit_number} are in {workload_status}/{unit_status} (expected {status}/idle)")
+                logger.info(
+                    f"{app}/{unit_number} are in {workload_status}/{unit_status} (expected {status}/idle)"
+                )
 
     return success
+
 
 def wait_for_idle(
     apps: List[str],
@@ -77,6 +73,7 @@ def wait_for_idle(
         sleep(float(idle_period))
     return False
 
+
 # def run_seaweed(app: str, model: str):
 #     # TODO: get the binary for the correct architecture
 #     seaweed_url = (
@@ -94,13 +91,14 @@ def wait_for_idle(
 #         _bg=True,
 #     )
 
+
 async def configure_minio(ops_test: OpsTest):
     bucket_name = "mimir"
     minio_addr = await get_unit_address(ops_test, "minio", 0)
     mc_client = Minio(
         f"{minio_addr}:9000",
         access_key="access",
-        secret_key="secret",
+        secret_key="secretsecret",
         secure=False,
     )
     # create bucket
@@ -114,7 +112,7 @@ async def configure_s3_integrator(ops_test: OpsTest):
     bucket_name = "mimir"
     config = {
         "access-key": "access",
-        "secret-key": "secret",
+        "secret-key": "secretsecret",
     }
     s3_integrator_app: Application = ops_test.model.applications["s3"]  # type: ignore
     s3_integrator_leader: Unit = s3_integrator_app.units[0]
@@ -129,7 +127,8 @@ async def configure_s3_integrator(ops_test: OpsTest):
     action_result = await action.wait()
     assert action_result.status == "completed"
 
-async def get_unit_address(ops_test: OpsTest, app_name:  str, unit_no: int):
+
+async def get_unit_address(ops_test: OpsTest, app_name: str, unit_no: int):
     assert ops_test.model is not None
     status = await ops_test.model.get_status()
     app = status["applications"][app_name]
