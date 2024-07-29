@@ -1,2 +1,2 @@
 # master is used in Minio configuration
-master
+tests/integration
