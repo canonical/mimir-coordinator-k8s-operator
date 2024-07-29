@@ -47,7 +47,7 @@ META_ROLES = {
         "query_scheduler",
         "overrides_exporter",
     },
-    "all": set(ROLES),
+    "all": set(ROLES) - {"read", "write", "backend", "all"},
 }
 
 MINIMAL_DEPLOYMENT = {

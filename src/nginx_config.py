@@ -341,7 +341,7 @@ class NginxConfig:
             "directive": "server",
             "args": [],
             "block": [
-                {"directive": "listen", "args": [nginx_port]},
+                {"directive": "listen", "args": [f"{nginx_port}"]},
                 {"directive": "listen", "args": [f"[::]:{nginx_port}"]},
                 *self._basic_auth(auth_enabled),
                 {
