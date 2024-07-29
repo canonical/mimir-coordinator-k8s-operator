@@ -13,7 +13,6 @@ import requests
 import sh
 import yaml
 from helpers import charm_resources, configure_minio, configure_s3_integrator, get_unit_address
-from juju.unit import Unit
 from pytest_operator.plugin import OpsTest
 
 logger = logging.getLogger(__name__)
