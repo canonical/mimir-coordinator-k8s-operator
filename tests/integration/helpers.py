@@ -1,7 +1,9 @@
 import logging
-from typing import Dict
+from typing import Any, Dict
 
+from tenacity import retry, wait_fixed, stop_after_attempt
 import yaml
+import requests
 from juju.application import Application
 from juju.unit import Unit
 from minio import Minio
@@ -65,3 +67,17 @@ async def get_unit_address(ops_test: OpsTest, app_name: str, unit_no: int):
     if unit is None:
         assert False, f"no unit exists in app {app_name} with index {unit_no}"
     return unit["address"]
+
+@retry(wait=wait_fixed(10), stop=stop_after_attempt(10))
+async def check_agent_data_in_mimir(ops_test: OpsTest, coordinator_app: str) -> Dict[str, Any]:
+    mimir_url = await get_unit_address(ops_test, coordinator_app, 0)
+    response = requests.get(f"http://{mimir_url}:8080/status")
+    assert response.status_code == 200
+
+    response = requests.get(
+        f"http://{mimir_url}:8080/prometheus/api/v1/query",
+        params={"query": 'up{juju_charm=~"grafana-agent-k8s"}'},
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "success"  # the query was successful
+    assert response.json()["data"]["result"]

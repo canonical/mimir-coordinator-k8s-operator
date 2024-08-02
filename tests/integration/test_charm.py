@@ -14,6 +14,7 @@ import requests
 import yaml
 from helpers import (
     charm_resources,
+    check_agent_data_in_mimir,
     configure_minio,
     configure_s3_integrator,
     get_unit_address,
@@ -59,8 +60,16 @@ async def test_build_and_deploy(ops_test: OpsTest, mimir_charm: str):
     # Configure Minio
     await configure_minio(ops_test)
     await configure_s3_integrator(ops_test)
-
     await ops_test.model.wait_for_idle(apps=["s3"], status="active")
+
+    # Deploy Grafana agent to test the Mimir workload
+    await ops_test.model.deploy("grafana-agent-k8s", "agent")
+    await ops_test.model.integrate("grafana:metrics-endpoint", "agent")
+    await ops_test.model.integrate("mimir:receive-remote-write", "agent")
+    await ops_test.model.integrate("mimir:s3", "s3")
+
+    await ops_test.model.wait_for_idle(apps=["mimir", "grafana", "agent", "s3"], status="active")
+
 
 
 @retry(wait=wait_fixed(10), stop=stop_after_attempt(10))
@@ -90,7 +99,7 @@ async def test_metrics_endpoint(ops_test: OpsTest):
     assert mimir_targets
 
 
-async def test_mimir_cluster(ops_test: OpsTest):
+async def test_mimir_monolithic(ops_test: OpsTest):
     assert ops_test.model is not None
     await ops_test.model.deploy(
         "mimir-worker-k8s",
@@ -98,30 +107,20 @@ async def test_mimir_cluster(ops_test: OpsTest):
         channel="latest/edge",
         config={"role-all": True, "role-query-frontend": True},
     )
-    await ops_test.model.deploy("grafana-agent-k8s", "agent")
-
     await ops_test.model.integrate("mimir:mimir-cluster", "worker")
-    await ops_test.model.integrate("grafana:metrics-endpoint", "agent")
-    await ops_test.model.integrate("mimir:receive-remote-write", "agent")
-    await ops_test.model.integrate("mimir:s3", "s3")
-
     await ops_test.model.wait_for_idle(apps=["mimir", "worker", "agent", "s3"], status="active")
+    await check_agent_data_in_mimir(ops_test, "mimir")
+    await ops_test.model.remove_application(app_name="worker", destroy_storage=True)
 
 
-@retry(wait=wait_fixed(10), stop=stop_after_attempt(10))
-async def test_mimir_data(ops_test: OpsTest):
-    mimir_url = await get_unit_address(ops_test, "mimir", 0)
-    response = requests.get(f"http://{mimir_url}:8080/status")
-    assert response.status_code == 200
+async def test_mimir_....()
+    # deploy 3 different workers applications
+    # relate
+    # test
 
-    response = requests.get(
-        f"http://{mimir_url}:8080/prometheus/api/v1/query",
-        params={"query": 'up{juju_charm=~"grafana-agent-k8s"}'},
-    )
-    assert response.status_code == 200
-    assert response.json()["status"] == "success"  # the query was successful
-    assert response.json()["data"]["result"]  # grafana agent's data is in Mimir
-
+async def test mimir () ..
+   # scale those applications up
+   # test
 
 async def test_traefik(ops_test: OpsTest):
     assert ops_test.model is not None
