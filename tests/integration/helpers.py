@@ -1,13 +1,13 @@
 import logging
 from typing import Any, Dict
 
-from tenacity import retry, wait_fixed, stop_after_attempt
-import yaml
 import requests
+import yaml
 from juju.application import Application
 from juju.unit import Unit
 from minio import Minio
 from pytest_operator.plugin import OpsTest
+from tenacity import retry, stop_after_attempt, wait_fixed
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +67,7 @@ async def get_unit_address(ops_test: OpsTest, app_name: str, unit_no: int):
     if unit is None:
         assert False, f"no unit exists in app {app_name} with index {unit_no}"
     return unit["address"]
+
 
 @retry(wait=wait_fixed(10), stop=stop_after_attempt(10))
 async def check_agent_data_in_mimir(ops_test: OpsTest, coordinator_app: str) -> Dict[str, Any]:

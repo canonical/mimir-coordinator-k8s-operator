@@ -72,7 +72,6 @@ async def test_build_and_deploy(ops_test: OpsTest, mimir_charm: str):
     await ops_test.model.wait_for_idle(apps=["mimir", "grafana", "agent", "s3"], status="active")
 
 
-
 @retry(wait=wait_fixed(10), stop=stop_after_attempt(10))
 async def test_grafana_source(ops_test: OpsTest):
     assert ops_test.model is not None
@@ -116,15 +115,26 @@ async def test_mimir_monolithic(ops_test: OpsTest):
 
 async def test_mimir_multiple_workers(ops_test: OpsTest):
     assert ops_test.model is not None
-    await ops_test.model.deploy("mimir-worker-k8s", "worker-read", channel="latest/edge", config={"role-read": True})
-    await ops_test.model.deploy("mimir-worker-k8s", "worker-write", channel="latest/edge", config={"role-write": True})
-    await ops_test.model.deploy("mimir-worker-k8s", "worker-backend", channel="latest/edge", config={"role-backend": True, "role-alertmanager": True})
+    await ops_test.model.deploy(
+        "mimir-worker-k8s", "worker-read", channel="latest/edge", config={"role-read": True}
+    )
+    await ops_test.model.deploy(
+        "mimir-worker-k8s", "worker-write", channel="latest/edge", config={"role-write": True}
+    )
+    await ops_test.model.deploy(
+        "mimir-worker-k8s",
+        "worker-backend",
+        channel="latest/edge",
+        config={"role-backend": True, "role-alertmanager": True},
+    )
 
     await ops_test.model.integrate("mimir:mimir-cluster", "worker-read")
     await ops_test.model.integrate("mimir:mimir-cluster", "worker-write")
     await ops_test.model.integrate("mimir:mimir-cluster", "worker-backend")
 
-    await ops_test.model.wait_for_idle(apps=["mimir", "worker-read", "worker-write", "worker-backend"], status="active")
+    await ops_test.model.wait_for_idle(
+        apps=["mimir", "worker-read", "worker-write", "worker-backend"], status="active"
+    )
     await check_agent_data_in_mimir(ops_test, "mimir")
 
 
