@@ -19,6 +19,7 @@ from helpers import (
     configure_s3_integrator,
     get_unit_address,
 )
+from juju.application import Application
 from juju.unit import Unit
 from pytest_operator.plugin import OpsTest
 from tenacity import retry, stop_after_attempt, wait_fixed
@@ -113,14 +114,30 @@ async def test_mimir_monolithic(ops_test: OpsTest):
     await ops_test.model.remove_application(app_name="worker", destroy_storage=True)
 
 
-async def test_mimir_....()
-    # deploy 3 different workers applications
-    # relate
-    # test
+async def test_mimir_multiple_workers(ops_test: OpsTest):
+    assert ops_test.model is not None
+    await ops_test.model.deploy("mimir-worker-k8s", "worker-read", channel="latest/edge", config={"role-read": True})
+    await ops_test.model.deploy("mimir-worker-k8s", "worker-write", channel="latest/edge", config={"role-write": True})
+    await ops_test.model.deploy("mimir-worker-k8s", "worker-backend", channel="latest/edge", config={"role-backend": True, "role-alertmanager": True})
 
-async def test mimir () ..
-   # scale those applications up
-   # test
+    await ops_test.model.integrate("mimir:mimir-cluster", "worker-read")
+    await ops_test.model.integrate("mimir:mimir-cluster", "worker-write")
+    await ops_test.model.integrate("mimir:mimir-cluster", "worker-backend")
+
+    await ops_test.model.wait_for_idle(apps=["mimir", "worker-read", "worker-write", "worker-backend"], status="active")
+    await check_agent_data_in_mimir(ops_test, "mimir")
+
+
+async def test_mimir_scaled_workers(ops_test: OpsTest):
+    assert ops_test.model is not None
+    worker_read: Application = ops_test.model.applications["worker-read"]  # type: ignore
+    worker_write: Application = ops_test.model.applications["worker-write"]  # type: ignore
+    worker_backend: Application = ops_test.model.applications["worker-backend"]  # type: ignore
+    await worker_read.scale(3)
+    await worker_write.scale(3)
+    await worker_backend.scale(3)
+    await check_agent_data_in_mimir(ops_test, "mimir")
+
 
 async def test_traefik(ops_test: OpsTest):
     assert ops_test.model is not None
