@@ -11,7 +11,6 @@ from types import SimpleNamespace
 
 import pytest
 import requests
-import sh
 import yaml
 from helpers import (
     charm_resources,
