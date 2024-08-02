@@ -1,9 +1,6 @@
-import json
 import logging
-from time import sleep
-from typing import Dict, List, Literal
+from typing import Dict
 
-import sh
 import yaml
 from juju.application import Application
 from juju.unit import Unit
@@ -34,62 +31,44 @@ def charm_resources(metadata_file="metadata.yaml") -> Dict[str, str]:
     return resources
 
 
-def _check_idle(apps: List[str], model: str, status: Literal["active", "blocked"]) -> bool:
-    juju_status = json.loads(sh.juju.status(format="json", no_color=True, model=model))
-    success = True
-    for app in apps:
-        scale = juju_status["applications"][app]["scale"]
-        for unit_number in range(0, scale):
-            workload_status = juju_status["applications"][app]["units"][f"{app}/{unit_number}"][
-                "workload-status"
-            ]["current"]
-            unit_status = juju_status["applications"][app]["units"][f"{app}/{unit_number}"][
-                "juju-status"
-            ]["current"]
-            if workload_status != status or unit_status != "idle":
-                success = False
-                logger.info(
-                    f"{app}/{unit_number} are in {workload_status}/{unit_status} (expected {status}/idle)"
-                )
+# def _check_idle(apps: List[str], model: str, status: Literal["active", "blocked"]) -> bool:
+#     juju_status = json.loads(sh.juju.status(format="json", no_color=True, model=model))
+#     success = True
+#     for app in apps:
+#         scale = juju_status["applications"][app]["scale"]
+#         for unit_number in range(0, scale):
+#             workload_status = juju_status["applications"][app]["units"][f"{app}/{unit_number}"][
+#                 "workload-status"
+#             ]["current"]
+#             unit_status = juju_status["applications"][app]["units"][f"{app}/{unit_number}"][
+#                 "juju-status"
+#             ]["current"]
+#             if workload_status != status or unit_status != "idle":
+#                 success = False
+#                 logger.info(
+#                     f"{app}/{unit_number} are in {workload_status}/{unit_status} (expected {status}/idle)"
+#                 )
 
-    return success
-
-
-def wait_for_idle(
-    apps: List[str],
-    status: Literal["active", "blocked"],
-    model: str,
-    attempts: int = 10,
-    idle_period: int = 30,
-) -> bool:
-    time_before_next_check = 10  # TODO: make this a function opt arg
-    for attempt in range(0, attempts):
-        if _check_idle(apps, model, status):
-            sleep(float(time_before_next_check))
-            if _check_idle(apps, model, status):
-                logger.info(f"{apps} is in the desired status")
-                return True
-        print(f"Waiting for {apps} to settle... ({attempt+1})")
-        sleep(float(idle_period))
-    return False
+#     return success
 
 
-# def run_seaweed(app: str, model: str):
-#     # TODO: get the binary for the correct architecture
-#     seaweed_url = (
-#         "https://github.com/seaweedfs/seaweedfs/releases/download/3.71/linux_amd64.tar.gz"
-#     )
-#     unit = f"{app}/0"
-#     sh.juju.ssh(f"--model={model}", unit, f"curl -L {seaweed_url} --output seaweedfs.tar.gz")
-#     sh.juju.ssh(f"--model={model}", unit, "tar -xzf seaweedfs.tar.gz")
-#     sh.juju.ssh(f"--model={model}", unit, "echo", '{"identities":[{"name":"me","credentials":[{"accessKey":"access","secretKey":"secret"}],"actions":["Read","Write","List","Tagging","Admin"]}]}', _out="s3_config.json")
-#     sh.juju.ssh(f"--model={model}", unit, "mkdir s3")
-#     sh.juju.ssh(
-#         f"--model={model}",
-#         unit,
-#         "./weed server -dir=s3 -master.volumeSizeLimitMB=1024 -master.volumePreallocate=false -s3 -s3.port=8333 -s3.config=s3_config.json",
-#         _bg=True,
-#     )
+# def wait_for_idle(
+#     apps: List[str],
+#     status: Literal["active", "blocked"],
+#     model: str,
+#     attempts: int = 10,
+#     idle_period: int = 30,
+# ) -> bool:
+#     time_before_next_check = 10  # TODO: make this a function opt arg
+#     for attempt in range(0, attempts):
+#         if _check_idle(apps, model, status):
+#             sleep(float(time_before_next_check))
+#             if _check_idle(apps, model, status):
+#                 logger.info(f"{apps} is in the desired status")
+#                 return True
+#         print(f"Waiting for {apps} to settle... ({attempt+1})")
+#         sleep(float(idle_period))
+#     return False
 
 
 async def configure_minio(ops_test: OpsTest):
