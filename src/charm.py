@@ -12,6 +12,7 @@ https://discourse.charmhub.io/t/4208
 import logging
 import socket
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 import cosl.coordinated_workers.nginx
 import ops
@@ -44,7 +45,12 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         # TODO: On any worker relation-joined/departed, need to updade grafana agent's scrape
         #  targets with the new memberlist.
         #  (Remote write would still be the same nginx-proxied endpoint.)
-        self.ingress = IngressPerAppRequirer(charm=self, strip_prefix=True)
+        self.ingress = IngressPerAppRequirer(
+            charm=self,
+            port=urlparse(self.internal_url).port,
+            strip_prefix=True,
+            scheme=lambda: urlparse(self.internal_url).scheme,
+        )
 
         self.coordinator = Coordinator(
             charm=self,
@@ -73,6 +79,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
 
         grafana_source_scheme = "https" if self.coordinator.cert_handler.available else "http"
         grafana_source_url = self.coordinator.cluster.get_address_from_role("ruler")
+        # TODO: add a refresh event for mimir-cluster here
         self.grafana_source = GrafanaSourceProvider(
             self,
             source_type="prometheus",
@@ -131,9 +138,11 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     def internal_url(self) -> str:
         """Returns workload's FQDN. Used for ingress."""
         scheme = "http"
+        port = 8080
         if hasattr(self, "coordinator") and self.coordinator.nginx.are_certificates_on_disk:
             scheme = "https"
-        return f"{scheme}://{self.hostname}:8080"
+            port = 443
+        return f"{scheme}://{self.hostname}:{port}"
 
     @property
     def external_url(self) -> str:

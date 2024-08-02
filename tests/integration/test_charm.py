@@ -13,6 +13,7 @@ import requests
 import sh
 import yaml
 from helpers import charm_resources, configure_minio, configure_s3_integrator, get_unit_address
+from juju.unit import Unit
 from pytest_operator.plugin import OpsTest
 
 logger = logging.getLogger(__name__)
@@ -107,7 +108,13 @@ async def test_mimir_cluster(ops_test: OpsTest):
     response = requests.get(f"http://{mimir_url}:8080/status")
     assert response.status_code == 200
 
-    # TODO: check the data from grafana agent is in Mimir
+    response = requests.get(
+        f"http://{mimir_url}:8080/prometheus/api/v1/query",
+        params={"query": 'up{juju_charm=~"grafana-agent-k8s"}'},
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "success"  # the query was successfully
+    assert response.json()["data"]["result"]  # grafana agent's data is in Mimir
 
 
 async def test_traefik(ops_test: OpsTest):
@@ -115,8 +122,16 @@ async def test_traefik(ops_test: OpsTest):
     await ops_test.model.deploy("traefik-k8s", "traefik", channel="latest/edge")
     await ops_test.model.integrate("mimir", "traefik")
 
-    # await ops_test.model.wait_for_idle(apps=["mimir", "traefik"], status="active")
-    # TODO: check that ingress is working
+    await ops_test.model.wait_for_idle(apps=["mimir", "traefik"], status="active")
+
+    traefik_leader: Unit = ops_test.model.applications["traefik"].units[0]  # type: ignore
+    action = await traefik_leader.run_action("show-proxied-endpoints")
+    action_result = await action.wait()
+    proxied_endpoints = action_result.results["proxied-endpoints"]
+    assert "mimir" in proxied_endpoints
+
+    response = requests.get(f"{proxied_endpoints['mimir']}/status")
+    assert response.status_code == 200
 
 
 async def test_tls(ops_test: OpsTest):
@@ -125,4 +140,7 @@ async def test_tls(ops_test: OpsTest):
     await ops_test.model.integrate("mimir:certificates", "ca")
 
     await ops_test.model.wait_for_idle(apps=["mimir", "ca"], status="active")
-    # TODO: check the data and some endpoints again with https
+
+    mimir_url = await get_unit_address(ops_test, "mimir", 0)
+    response = requests.get(f"https://{mimir_url}:443/status", verify=False)
+    assert response.status_code == 200
