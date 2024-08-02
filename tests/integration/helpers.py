@@ -1,8 +1,6 @@
 import logging
-from time import sleep
 from typing import Dict
 
-import requests
 import yaml
 from juju.application import Application
 from juju.unit import Unit
@@ -119,17 +117,6 @@ async def get_unit_address(ops_test: OpsTest, app_name: str, unit_no: int):
     if unit is None:
         assert False, f"no unit exists in app {app_name} with index {unit_no}"
     return unit["address"]
-
-
-def wait_for_prometheus_query(url: str, query: str, attempts: int = 10, waiting_time=30) -> None:
-    for attempt in range(0, attempts):
-        response = requests.get(url, params={"query": query})
-        assert response.status_code == 200
-        assert response.json()["status"] == "success"  # the query was successful
-        if not response.json()["data"]["result"]:  # grafana agent's data is in Mimir
-            sleep(float(waiting_time))
-
-    assert response.json()["data"]["result"]  # grafana agent's data is in Mimir
 
 
 # def get_unit_info(unit_name: str, model: str = None) -> dict:

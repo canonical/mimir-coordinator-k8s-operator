@@ -17,10 +17,10 @@ from helpers import (
     configure_minio,
     configure_s3_integrator,
     get_unit_address,
-    wait_for_prometheus_query,
 )
 from juju.unit import Unit
 from pytest_operator.plugin import OpsTest
+from tenacity import retry, stop_after_attempt, wait_fixed
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +63,7 @@ async def test_build_and_deploy(ops_test: OpsTest, mimir_charm: str):
     await ops_test.model.wait_for_idle(apps=["s3"], status="active")
 
 
+@retry(wait=wait_fixed(10), stop=stop_after_attempt(10))
 async def test_grafana_source(ops_test: OpsTest):
     assert ops_test.model is not None
     grafana_leader: Unit = ops_test.model.applications["grafana"].units[0]  # type: ignore
@@ -106,14 +107,20 @@ async def test_mimir_cluster(ops_test: OpsTest):
 
     await ops_test.model.wait_for_idle(apps=["mimir", "worker", "agent", "s3"], status="active")
 
+
+@retry(wait=wait_fixed(10), stop=stop_after_attempt(10))
+async def test_mimir_data(ops_test: OpsTest):
     mimir_url = await get_unit_address(ops_test, "mimir", 0)
     response = requests.get(f"http://{mimir_url}:8080/status")
     assert response.status_code == 200
 
-    wait_for_prometheus_query(
-        url=f"http://{mimir_url}:8080/prometheus/api/v1/query",
-        query='up{juju_charm=~"grafana-agent-k8s"}',
+    response = requests.get(
+        f"http://{mimir_url}:8080/prometheus/api/v1/query",
+        params={"query": 'up{juju_charm=~"grafana-agent-k8s"}'},
     )
+    assert response.status_code == 200
+    assert response.json()["status"] == "success"  # the query was successful
+    assert response.json()["data"]["result"]  # grafana agent's data is in Mimir
 
 
 async def test_traefik(ops_test: OpsTest):
