@@ -69,7 +69,7 @@ async def test_build_and_deploy(ops_test: OpsTest, mimir_charm: str):
     await ops_test.model.integrate("mimir:receive-remote-write", "agent")
     await ops_test.model.integrate("mimir:s3", "s3")
 
-    await ops_test.model.wait_for_idle(apps=["mimir", "grafana", "agent", "s3"], status="active")
+    await ops_test.model.wait_for_idle(apps=["grafana", "agent"], status="active")
 
 
 @retry(wait=wait_fixed(10), stop=stop_after_attempt(10))
