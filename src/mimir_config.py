@@ -40,7 +40,7 @@ META_ROLES = {
     "read": {"query-frontend", "querier"},
     "write": {"distributor", "ingester"},
     "backend": {
-        "store_gateway",
+        "store-gateway",
         "compactor",
         "ruler",
         "alertmanager",
