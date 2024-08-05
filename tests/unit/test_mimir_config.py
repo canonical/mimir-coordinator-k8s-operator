@@ -20,11 +20,11 @@ def coordinator():
     coord.cluster.gather_addresses_by_role = MagicMock(
         return_value={
             "alertmanager": ["http://some.mimir.worker.0:8080"],
-            "overrides_exporter": ["http://some.mimir.worker.0:8080"],
+            "overrides-exporter": ["http://some.mimir.worker.0:8080"],
             "flusher": ["http://some.mimir.worker.0:8080"],
-            "query_frontend": ["http://some.mimir.worker.0:8080"],
+            "query-frontend": ["http://some.mimir.worker.0:8080"],
             "querier": ["http://some.mimir.worker.0:8080"],
-            "store_gateway": ["http://some.mimir.worker.1:8080"],
+            "store-gateway": ["http://some.mimir.worker.1:8080"],
             "ingester": ["http://some.mimir.worker.1:8080"],
             "distributor": ["http://some.mimir.worker.1:8080"],
             "ruler": ["http://some.mimir.worker.1:8080"],
