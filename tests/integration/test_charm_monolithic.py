@@ -44,6 +44,8 @@ async def test_build_and_deploy(ops_test: OpsTest, mimir_charm: str):
         config={"access-key": "access", "secret-key": "secretsecret"},
     )
     await ops_test.model.deploy("s3-integrator", "s3", channel="latest/stable")
+    await ops_test.model.wait_for_idle(apps=["minio"], status="active")
+    await ops_test.model.wait_for_idle(apps=["s3"], status="blocked")
     await configure_minio(ops_test)
     await configure_s3_integrator(ops_test)
 
@@ -64,7 +66,7 @@ async def test_deploy_workers(ops_test: OpsTest):
         channel="latest/edge",
         config={"role-all": True, "role-query-frontend": True},
     )
-    await ops_test.model.wait_for_idle(apps=["worker"], status="waiting")
+    await ops_test.model.wait_for_idle(apps=["worker"], status="blocked")
 
 
 @pytest.mark.setup
