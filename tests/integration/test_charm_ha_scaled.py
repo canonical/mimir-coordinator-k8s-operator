@@ -4,6 +4,7 @@
 
 # pyright: reportAttributeAccessIssue=false
 
+import asyncio
 import logging
 
 import pytest
@@ -28,22 +29,22 @@ logger = logging.getLogger(__name__)
 async def test_build_and_deploy(ops_test: OpsTest, mimir_charm: str):
     """Build the charm-under-test and deploy it together with related charms."""
     assert ops_test.model is not None  # for pyright
-    await ops_test.model.deploy(mimir_charm, "mimir", resources=charm_resources())
-
-    await ops_test.model.deploy("prometheus-k8s", "prometheus", channel="latest/edge")
-    await ops_test.model.deploy("loki-k8s", "loki", channel="latest/edge")
-    await ops_test.model.deploy("grafana-k8s", "grafana", channel="latest/edge")
-    await ops_test.model.deploy("grafana-agent-k8s", "agent", channel="latest/edge")
-    await ops_test.model.deploy("traefik-k8s", "traefik", channel="latest/edge")
-
-    # Deploy and configure Minio and S3
-    # Secret must be at least 8 characters: https://github.com/canonical/minio-operator/issues/137
-    await ops_test.model.deploy(
-        "minio",
-        channel="latest/stable",
-        config={"access-key": "access", "secret-key": "secretsecret"},
+    await asyncio.gather(
+        ops_test.model.deploy(mimir_charm, "mimir", resources=charm_resources()),
+        ops_test.model.deploy("prometheus-k8s", "prometheus", channel="latest/edge"),
+        ops_test.model.deploy("loki-k8s", "loki", channel="latest/edge"),
+        ops_test.model.deploy("grafana-k8s", "grafana", channel="latest/edge"),
+        ops_test.model.deploy("grafana-agent-k8s", "agent", channel="latest/edge"),
+        ops_test.model.deploy("traefik-k8s", "traefik", channel="latest/edge"),
+        # Deploy and configure Minio and S3
+        # Secret must be at least 8 characters: https://github.com/canonical/minio-operator/issues/137
+        ops_test.model.deploy(
+            "minio",
+            channel="latest/stable",
+            config={"access-key": "access", "secret-key": "secretsecret"},
+        ),
+        ops_test.model.deploy("s3-integrator", "s3", channel="latest/stable"),
     )
-    await ops_test.model.deploy("s3-integrator", "s3", channel="latest/stable")
     await ops_test.model.wait_for_idle(apps=["minio"], status="active")
     await ops_test.model.wait_for_idle(apps=["s3"], status="blocked")
     await configure_minio(ops_test)
@@ -60,26 +61,28 @@ async def test_build_and_deploy(ops_test: OpsTest, mimir_charm: str):
 async def test_deploy_workers(ops_test: OpsTest):
     """Deploy the Mimir workers."""
     assert ops_test.model is not None
-    await ops_test.model.deploy(
-        "mimir-worker-k8s",
-        "worker-read",
-        channel="latest/edge",
-        config={"role-read": True},
-        num_units=3,
-    )
-    await ops_test.model.deploy(
-        "mimir-worker-k8s",
-        "worker-write",
-        channel="latest/edge",
-        config={"role-write": True},
-        num_units=3,
-    )
-    await ops_test.model.deploy(
-        "mimir-worker-k8s",
-        "worker-backend",
-        channel="latest/edge",
-        config={"role-backend": True},
-        num_units=3,
+    await asyncio.gather(
+        ops_test.model.deploy(
+            "mimir-worker-k8s",
+            "worker-read",
+            channel="latest/edge",
+            config={"role-read": True},
+            num_units=3,
+        ),
+        ops_test.model.deploy(
+            "mimir-worker-k8s",
+            "worker-write",
+            channel="latest/edge",
+            config={"role-write": True},
+            num_units=3,
+        ),
+        ops_test.model.deploy(
+            "mimir-worker-k8s",
+            "worker-backend",
+            channel="latest/edge",
+            config={"role-backend": True},
+            num_units=3,
+        ),
     )
     await ops_test.model.wait_for_idle(
         apps=["worker-read", "worker-write", "worker-backend"], status="blocked"
@@ -90,18 +93,19 @@ async def test_deploy_workers(ops_test: OpsTest):
 @pytest.mark.abort_on_fail
 async def test_integrate(ops_test: OpsTest):
     assert ops_test.model is not None
-    await ops_test.model.integrate("mimir:s3", "s3")
-    await ops_test.model.integrate("mimir:mimir-cluster", "worker-read")
-    await ops_test.model.integrate("mimir:mimir-cluster", "worker-write")
-    await ops_test.model.integrate("mimir:mimir-cluster", "worker-backend")
-
-    await ops_test.model.integrate("mimir:self-metrics-endpoint", "prometheus")
-    await ops_test.model.integrate("mimir:grafana-dashboards-provider", "grafana")
-    await ops_test.model.integrate("mimir:grafana-source", "grafana")
-    await ops_test.model.integrate("mimir:logging-consumer", "loki")
-    await ops_test.model.integrate("mimir:ingress", "traefik")
-    await ops_test.model.integrate("mimir:receive-remote-write", "agent")
-    await ops_test.model.integrate("agent:metrics-endpoint", "grafana")
+    await asyncio.gather(
+        ops_test.model.integrate("mimir:s3", "s3"),
+        ops_test.model.integrate("mimir:mimir-cluster", "worker-read"),
+        ops_test.model.integrate("mimir:mimir-cluster", "worker-write"),
+        ops_test.model.integrate("mimir:mimir-cluster", "worker-backend"),
+        ops_test.model.integrate("mimir:self-metrics-endpoint", "prometheus"),
+        ops_test.model.integrate("mimir:grafana-dashboards-provider", "grafana"),
+        ops_test.model.integrate("mimir:grafana-source", "grafana"),
+        ops_test.model.integrate("mimir:logging-consumer", "loki"),
+        ops_test.model.integrate("mimir:ingress", "traefik"),
+        ops_test.model.integrate("mimir:receive-remote-write", "agent"),
+        ops_test.model.integrate("agent:metrics-endpoint", "grafana"),
+    )
 
     await ops_test.model.wait_for_idle(
         apps=[
