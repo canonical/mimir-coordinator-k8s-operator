@@ -90,18 +90,17 @@ async def test_deploy_workers(ops_test: OpsTest):
 @pytest.mark.abort_on_fail
 async def test_integrate(ops_test: OpsTest):
     assert ops_test.model is not None
+    await ops_test.model.integrate("mimir:s3", "s3")
+    await ops_test.model.integrate("mimir:mimir-cluster", "worker-read")
+    await ops_test.model.integrate("mimir:mimir-cluster", "worker-write")
+    await ops_test.model.integrate("mimir:mimir-cluster", "worker-backend")
+
     await ops_test.model.integrate("mimir:self-metrics-endpoint", "prometheus")
     await ops_test.model.integrate("mimir:grafana-dashboards-provider", "grafana")
     await ops_test.model.integrate("mimir:grafana-source", "grafana")
     await ops_test.model.integrate("mimir:logging-consumer", "loki")
     await ops_test.model.integrate("mimir:ingress", "traefik")
-
-    await ops_test.model.integrate("mimir:s3", "s3")
     await ops_test.model.integrate("mimir:receive-remote-write", "avalanche")
-
-    await ops_test.model.integrate("mimir:mimir-cluster", "worker-read")
-    await ops_test.model.integrate("mimir:mimir-cluster", "worker-write")
-    await ops_test.model.integrate("mimir:mimir-cluster", "worker-backend")
 
     await ops_test.model.wait_for_idle(
         apps=[
