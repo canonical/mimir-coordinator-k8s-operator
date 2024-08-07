@@ -52,9 +52,9 @@ async def test_build_and_deploy(ops_test: OpsTest, mimir_charm: str):
     await configure_s3_integrator(ops_test)
 
     await ops_test.model.wait_for_idle(
-        apps=["prometheus", "loki", "grafana", "minio", "agent", "s3"], status="active"
+        apps=["prometheus", "loki", "grafana", "minio", "s3"], status="active"
     )
-    await ops_test.model.wait_for_idle(apps=["mimir"], status="blocked")
+    await ops_test.model.wait_for_idle(apps=["mimir", "agent"], status="blocked")
 
 
 @pytest.mark.setup
