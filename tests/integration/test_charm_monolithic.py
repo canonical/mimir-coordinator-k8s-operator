@@ -33,7 +33,7 @@ async def test_build_and_deploy(ops_test: OpsTest, mimir_charm: str):
     await ops_test.model.deploy("prometheus-k8s", "prometheus", channel="latest/edge")
     await ops_test.model.deploy("loki-k8s", "loki", channel="latest/edge")
     await ops_test.model.deploy("grafana-k8s", "grafana", channel="latest/edge")
-    await ops_test.model.deploy("avalanche-k8s", "avalanche", channel="latest/edge")
+    await ops_test.model.deploy("grafana-agent-k8s", "agent", channel="latest/edge")
     await ops_test.model.deploy("traefik-k8s", "traefik", channel="latest/edge")
 
     # Deploy and configure Minio and S3
@@ -50,7 +50,7 @@ async def test_build_and_deploy(ops_test: OpsTest, mimir_charm: str):
     await configure_s3_integrator(ops_test)
 
     await ops_test.model.wait_for_idle(
-        apps=["prometheus", "loki", "grafana", "minio", "avalanche", "s3"], status="active"
+        apps=["prometheus", "loki", "grafana", "minio", "agent", "s3"], status="active"
     )
     await ops_test.model.wait_for_idle(apps=["mimir"], status="blocked")
 
@@ -81,7 +81,8 @@ async def test_integrate(ops_test: OpsTest):
     await ops_test.model.integrate("mimir:grafana-source", "grafana")
     await ops_test.model.integrate("mimir:logging-consumer", "loki")
     await ops_test.model.integrate("mimir:ingress", "traefik")
-    await ops_test.model.integrate("mimir:receive-remote-write", "avalanche")
+    await ops_test.model.integrate("mimir:receive-remote-write", "agent")
+    await ops_test.model.integrate("agent:metrics-endpoint", "grafana")
 
     await ops_test.model.wait_for_idle(
         apps=[
@@ -89,7 +90,7 @@ async def test_integrate(ops_test: OpsTest):
             "prometheus",
             "loki",
             "grafana",
-            "avalanche",
+            "agent",
             "minio",
             "s3",
             "worker",
@@ -122,8 +123,8 @@ async def test_metrics_endpoint(ops_test: OpsTest):
 
 @retry(wait=wait_fixed(10), stop=stop_after_attempt(6))
 async def test_metrics_in_mimir(ops_test: OpsTest):
-    """Check that the Avalanche metrics appear in Mimir."""
-    result = await query_mimir(ops_test, query='up{juju_charm=~"avalanche-k8s"}')
+    """Check that the agent metrics appear in Mimir."""
+    result = await query_mimir(ops_test, query='up{juju_charm=~"grafana-agent-k8s"}')
     assert result
 
 
