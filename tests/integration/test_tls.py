@@ -24,7 +24,7 @@ async def test_setup(ops_test: OpsTest, mimir_charm: str):
     assert ops_test.model is not None  # for pyright
     await ops_test.model.deploy(mimir_charm, "mimir", resources=charm_resources())
 
-    await ops_test.model.deploy("self-signed-certificiates", "ca")
+    await ops_test.model.deploy("self-signed-certificates", "ca")
     await ops_test.model.integrate("mimir:certificates", "ca")
 
     await ops_test.model.wait_for_idle(apps=["ca"], status="active")

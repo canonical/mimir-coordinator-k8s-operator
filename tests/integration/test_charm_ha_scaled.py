@@ -61,28 +61,26 @@ async def test_build_and_deploy(ops_test: OpsTest, mimir_charm: str):
 async def test_deploy_workers(ops_test: OpsTest):
     """Deploy the Mimir workers."""
     assert ops_test.model is not None
-    await asyncio.gather(
-        ops_test.model.deploy(
-            "mimir-worker-k8s",
-            "worker-read",
-            channel="latest/edge",
-            config={"role-read": True},
-            num_units=3,
-        ),
-        ops_test.model.deploy(
-            "mimir-worker-k8s",
-            "worker-write",
-            channel="latest/edge",
-            config={"role-write": True},
-            num_units=3,
-        ),
-        ops_test.model.deploy(
-            "mimir-worker-k8s",
-            "worker-backend",
-            channel="latest/edge",
-            config={"role-backend": True},
-            num_units=3,
-        ),
+    await ops_test.model.deploy(
+        "mimir-worker-k8s",
+        "worker-read",
+        channel="latest/edge",
+        config={"role-read": True},
+        num_units=3,
+    )
+    await ops_test.model.deploy(
+        "mimir-worker-k8s",
+        "worker-write",
+        channel="latest/edge",
+        config={"role-write": True},
+        num_units=3,
+    )
+    await ops_test.model.deploy(
+        "mimir-worker-k8s",
+        "worker-backend",
+        channel="latest/edge",
+        config={"role-backend": True},
+        num_units=3,
     )
     await ops_test.model.wait_for_idle(
         apps=["worker-read", "worker-write", "worker-backend"], status="blocked"
