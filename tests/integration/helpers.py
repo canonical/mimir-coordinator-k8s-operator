@@ -1,6 +1,8 @@
+import json
 import logging
-from typing import Dict
+from typing import Any, Dict, List
 
+import requests
 import yaml
 from juju.application import Application
 from juju.unit import Unit
@@ -55,7 +57,7 @@ async def configure_s3_integrator(ops_test: OpsTest):
     assert action_result.status == "completed"
 
 
-async def get_unit_address(ops_test: OpsTest, app_name: str, unit_no: int):
+async def get_unit_address(ops_test: OpsTest, app_name: str, unit_no: int) -> str:
     assert ops_test.model is not None
     status = await ops_test.model.get_status()
     app = status["applications"][app_name]
@@ -65,3 +67,60 @@ async def get_unit_address(ops_test: OpsTest, app_name: str, unit_no: int):
     if unit is None:
         assert False, f"no unit exists in app {app_name} with index {unit_no}"
     return unit["address"]
+
+
+async def get_grafana_datasources(ops_test: OpsTest, grafana_app: str = "grafana") -> List[Any]:
+    """Get the Datasources from Grafana using the HTTP API.
+
+    HTTP API Response format: [{"id": 1, "name": <some-name>, ...}, ...]
+    """
+    assert ops_test.model is not None
+    grafana_leader: Unit = ops_test.model.applications[grafana_app].units[0]  # type: ignore
+    action = await grafana_leader.run_action("get-admin-password")
+    action_result = await action.wait()
+    admin_password = action_result.results["admin-password"]
+    grafana_url = await get_unit_address(ops_test, grafana_app, 0)
+    response = requests.get(f"http://admin:{admin_password}@{grafana_url}:3000/api/datasources")
+    assert response.status_code == 200
+
+    return response.json()
+
+
+async def get_prometheus_targets(
+    ops_test: OpsTest, prometheus_app: str = "prometheus"
+) -> Dict[str, Any]:
+    """Get the Scrape Targets from Prometheus using the HTTP API.
+
+    HTTP API Response format:
+        {"status": "success", "data": {"activeTargets": [{"discoveredLabels": {..., "juju_charm": <charm>, ...}}]}}
+    """
+    assert ops_test.model is not None
+    prometheus_url = await get_unit_address(ops_test, prometheus_app, 0)
+    response = requests.get(f"http://{prometheus_url}:9090/api/v1/targets")
+    assert response.status_code == 200
+    assert response.json()["status"] == "success"
+
+    return response.json()["data"]
+
+
+async def query_mimir(
+    ops_test: OpsTest, query: str, coordinator_app: str = "mimir"
+) -> Dict[str, Any]:
+    mimir_url = await get_unit_address(ops_test, coordinator_app, 0)
+    response = requests.get(
+        f"http://{mimir_url}:8080/prometheus/api/v1/query",
+        params={"query": query},
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "success"  # the query was successful
+    return response.json()["data"]["result"]
+
+
+async def get_traefik_proxied_endpoints(
+    ops_test: OpsTest, traefik_app: str = "traefik"
+) -> Dict[str, Any]:
+    assert ops_test.model is not None
+    traefik_leader: Unit = ops_test.model.applications[traefik_app].units[0]  # type: ignore
+    action = await traefik_leader.run_action("show-proxied-endpoints")
+    action_result = await action.wait()
+    return json.loads(action_result.results["proxied-endpoints"])

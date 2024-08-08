@@ -17,12 +17,12 @@ from cosl.coordinated_workers.worker import CERT_FILE, CLIENT_CA_FILE, KEY_FILE
 logger = logging.getLogger(__name__)
 
 ROLES = {
-    "overrides_exporter",
-    "query_scheduler",
+    "overrides-exporter",
+    "query-scheduler",
     "flusher",
-    "query_frontend",
+    "query-frontend",
     "querier",
-    "store_gateway",
+    "store-gateway",
     "ingester",
     "distributor",
     "ruler",
@@ -37,15 +37,15 @@ ROLES = {
 """Mimir component role names."""
 
 META_ROLES = {
-    "read": {"query_frontend", "querier"},
+    "read": {"query-frontend", "querier"},
     "write": {"distributor", "ingester"},
     "backend": {
-        "store_gateway",
+        "store-gateway",
         "compactor",
         "ruler",
         "alertmanager",
-        "query_scheduler",
-        "overrides_exporter",
+        "query-scheduler",
+        "overrides-exporter",
     },
     "all": set(ROLES) - {"read", "write", "backend", "all"},
 }
@@ -56,9 +56,9 @@ MINIMAL_DEPLOYMENT = {
     "distributor",
     "ingester",
     "querier",
-    "query_frontend",
-    "query_scheduler",
-    "store_gateway",
+    "query-frontend",
+    "query-scheduler",
+    "store-gateway",
     # we add:
     "ruler",
     "alertmanager",
@@ -70,11 +70,11 @@ we add alertmanager."""
 RECOMMENDED_DEPLOYMENT = {
     "ingester": 3,
     "querier": 2,
-    "query_scheduler": 2,
+    "query-scheduler": 2,
     "alertmanager": 1,
-    "query_frontend": 1,
+    "query-frontend": 1,
     "ruler": 1,
-    "store_gateway": 1,
+    "store-gateway": 1,
     "compactor": 1,
     "distributor": 1,
 }
@@ -214,7 +214,7 @@ class MimirConfig:
     # needs be set both on the store-gateway, querier and ruler when running in
     # microservices mode.
     def _build_store_gateway_config(self, cluster: ClusterProvider) -> Dict[str, Any]:
-        store_gateway_scale = len(cluster.gather_addresses_by_role().get("store_gateway", []))
+        store_gateway_scale = len(cluster.gather_addresses_by_role().get("store-gateway", []))
         return {
             "sharding_ring": {
                 "replication_factor": (
