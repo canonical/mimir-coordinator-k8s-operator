@@ -21,9 +21,10 @@ from charms.prometheus_k8s.v1.prometheus_remote_write import PrometheusRemoteWri
 from charms.tempo_k8s.v1.charm_tracing import trace_charm
 from charms.traefik_k8s.v2.ingress import IngressPerAppReadyEvent, IngressPerAppRequirer
 from cosl.coordinated_workers.coordinator import Coordinator
+from ops.model import ModelError
+
 from mimir_config import MimirConfig, MimirRolesConfig
 from nginx_config import NginxConfig
-from ops.model import ModelError
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
