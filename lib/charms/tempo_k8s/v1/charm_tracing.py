@@ -172,6 +172,58 @@ needs to be replaced with:
 provide an *absolute* path to the certificate file instead.
 """
 
+
+def _remove_stale_otel_sdk_packages():
+    """Hack to remove stale opentelemetry sdk packages from the charm's python venv.
+
+    See https://github.com/canonical/grafana-agent-operator/issues/146 and
+    https://bugs.launchpad.net/juju/+bug/2058335 for more context. This patch can be removed after
+    this juju issue is resolved and sufficient time has passed to expect most users of this library
+    have migrated to the patched version of juju.  When this patch is removed, un-ignore rule E402 for this file in the pyproject.toml (see setting
+    [tool.ruff.lint.per-file-ignores] in pyproject.toml).
+
+    This only has an effect if executed on an upgrade-charm event.
+    """
+    # all imports are local to keep this function standalone, side-effect-free, and easy to revert later
+    import os
+
+    if os.getenv("JUJU_DISPATCH_PATH") != "hooks/upgrade-charm":
+        return
+
+    import logging
+    import shutil
+    from collections import defaultdict
+
+    from importlib_metadata import distributions
+
+    otel_logger = logging.getLogger("charm_tracing_otel_patcher")
+    otel_logger.debug("Applying _remove_stale_otel_sdk_packages patch on charm upgrade")
+    # group by name all distributions starting with "opentelemetry_"
+    otel_distributions = defaultdict(list)
+    for distribution in distributions():
+        name = distribution._normalized_name  # type: ignore
+        if name.startswith("opentelemetry_"):
+            otel_distributions[name].append(distribution)
+
+    otel_logger.debug(f"Found {len(otel_distributions)} opentelemetry distributions")
+
+    # If we have multiple distributions with the same name, remove any that have 0 associated files
+    for name, distributions_ in otel_distributions.items():
+        if len(distributions_) <= 1:
+            continue
+
+        otel_logger.debug(f"Package {name} has multiple ({len(distributions_)}) distributions.")
+        for distribution in distributions_:
+            if not distribution.files:  # Not None or empty list
+                path = distribution._path  # type: ignore
+                otel_logger.info(f"Removing empty distribution of {name} at {path}.")
+                shutil.rmtree(path)
+
+    otel_logger.debug("Successfully applied _remove_stale_otel_sdk_packages patch. ")
+
+
+_remove_stale_otel_sdk_packages()
+
 import functools
 import inspect
 import logging
@@ -217,7 +269,7 @@ LIBAPI = 1
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
 
-LIBPATCH = 11
+LIBPATCH = 15
 
 PYDEPS = ["opentelemetry-exporter-otlp-proto-http==1.21.0"]
 
@@ -226,7 +278,6 @@ dev_logger = logging.getLogger("tracing-dev")
 
 # set this to 0 if you are debugging/developing this library source
 dev_logger.setLevel(logging.CRITICAL)
-
 
 _CharmType = Type[CharmBase]  # the type CharmBase and any subclass thereof
 _C = TypeVar("_C", bound=_CharmType)
@@ -279,9 +330,22 @@ def _get_tracer() -> Optional[Tracer]:
     try:
         return tracer.get()
     except LookupError:
+        # fallback: this course-corrects for a user error where charm_tracing symbols are imported
+        # from different paths (typically charms.tempo_k8s... and lib.charms.tempo_k8s...)
         try:
             ctx: Context = copy_context()
             if context_tracer := _get_tracer_from_context(ctx):
+                logger.warning(
+                    "Tracer not found in `tracer` context var. "
+                    "Verify that you're importing all `charm_tracing` symbols from the same module path. \n"
+                    "For example, DO"
+                    ": `from charms.lib...charm_tracing import foo, bar`. \n"
+                    "DONT: \n"
+                    " \t - `from charms.lib...charm_tracing import foo` \n"
+                    " \t - `from lib...charm_tracing import bar` \n"
+                    "For more info: https://python-notes.curiousefficiency.org/en/latest/python"
+                    "_concepts/import_traps.html#the-double-import-trap"
+                )
                 return context_tracer.get()
             else:
                 return None
