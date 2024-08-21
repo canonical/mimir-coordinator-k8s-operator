@@ -23,7 +23,8 @@ def charm_resources(metadata_file="metadata.yaml") -> Dict[str, str]:
 
 async def configure_minio(ops_test: OpsTest):
     bucket_name = "mimir"
-    minio_addr = await get_unit_address(ops_test, "minio", 0)
+    minio_leader_unit_number = await get_leader_unit_number(ops_test, "minio")
+    minio_addr = await get_unit_address(ops_test, "minio", minio_leader_unit_number)
     mc_client = Minio(
         f"{minio_addr}:9000",
         access_key="access",
@@ -57,6 +58,23 @@ async def configure_s3_integrator(ops_test: OpsTest):
     assert action_result.status == "completed"
 
 
+async def get_leader_unit_number(ops_test: OpsTest, app_name: str) -> int:
+    """Get the unit number of the leader of an application.
+
+    Raises an exception if no leader is found.
+    """
+    status = await ops_test.model.get_status()
+    app = status["applications"][app_name]
+    if app is None:
+        raise ValueError(f"no app exists with name {app_name}")
+
+    for name, unit in app["units"].items():
+        if unit["leader"]:
+            return int(name.split("/")[1])
+
+    raise ValueError(f"no leader found for app {app_name}")
+
+
 async def get_unit_address(ops_test: OpsTest, app_name: str, unit_no: int) -> str:
     assert ops_test.model is not None
     status = await ops_test.model.get_status()
@@ -79,7 +97,8 @@ async def get_grafana_datasources(ops_test: OpsTest, grafana_app: str = "grafana
     action = await grafana_leader.run_action("get-admin-password")
     action_result = await action.wait()
     admin_password = action_result.results["admin-password"]
-    grafana_url = await get_unit_address(ops_test, grafana_app, 0)
+    leader_unit_number = await get_leader_unit_number(ops_test, grafana_app)
+    grafana_url = await get_unit_address(ops_test, grafana_app, leader_unit_number)
     response = requests.get(f"http://admin:{admin_password}@{grafana_url}:3000/api/datasources")
     assert response.status_code == 200
 
@@ -95,7 +114,8 @@ async def get_prometheus_targets(
         {"status": "success", "data": {"activeTargets": [{"discoveredLabels": {..., "juju_charm": <charm>, ...}}]}}
     """
     assert ops_test.model is not None
-    prometheus_url = await get_unit_address(ops_test, prometheus_app, 0)
+    leader_unit_number = await get_leader_unit_number(ops_test, prometheus_app)
+    prometheus_url = await get_unit_address(ops_test, prometheus_app, leader_unit_number)
     response = requests.get(f"http://{prometheus_url}:9090/api/v1/targets")
     assert response.status_code == 200
     assert response.json()["status"] == "success"
@@ -106,7 +126,8 @@ async def get_prometheus_targets(
 async def query_mimir(
     ops_test: OpsTest, query: str, coordinator_app: str = "mimir"
 ) -> Dict[str, Any]:
-    mimir_url = await get_unit_address(ops_test, coordinator_app, 0)
+    leader_unit_number = await get_leader_unit_number(ops_test, coordinator_app)
+    mimir_url = await get_unit_address(ops_test, coordinator_app, leader_unit_number)
     response = requests.get(
         f"http://{mimir_url}:8080/prometheus/api/v1/query",
         params={"query": query},
