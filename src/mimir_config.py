@@ -6,11 +6,11 @@
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, Iterable, Mapping
+from typing import Any, Dict
 
 import yaml
 from cosl import JujuTopology
-from cosl.coordinated_workers.coordinator import Coordinator
+from cosl.coordinated_workers.coordinator import ClusterRolesConfig, Coordinator
 from cosl.coordinated_workers.interface import ClusterProvider
 from cosl.coordinated_workers.worker import CERT_FILE, CLIENT_CA_FILE, KEY_FILE
 
@@ -81,15 +81,13 @@ RECOMMENDED_DEPLOYMENT = {
 """The set of roles that need to be allocated for the
 deployment to be considered robust according to the official recommendations/guidelines."""
 
-
-class MimirRolesConfig:
-    """Define the configuration for Mimir roles."""
-
-    roles: Iterable[str] = ROLES
-    meta_roles: Mapping[str, Iterable[str]] = META_ROLES
-    minimal_deployment: Iterable[str] = MINIMAL_DEPLOYMENT
-    recommended_deployment: Dict[str, int] = RECOMMENDED_DEPLOYMENT
-
+MIMIR_ROLES_CONFIG = ClusterRolesConfig(
+    roles=ROLES,
+    meta_roles=META_ROLES,
+    minimal_deployment=MINIMAL_DEPLOYMENT,
+    recommended_deployment=RECOMMENDED_DEPLOYMENT,
+)
+"""Define the configuration for Mimir roles."""
 
 # The minimum number of workers per role to enable replication
 REPLICATION_MIN_WORKERS = 3
