@@ -23,7 +23,6 @@ from charms.traefik_k8s.v2.ingress import IngressPerAppReadyEvent, IngressPerApp
 from cosl.coordinated_workers.coordinator import Coordinator
 from ops.model import ModelError
 
-
 from mimir_config import MIMIR_ROLES_CONFIG, MimirConfig
 from nginx_config import NginxConfig
 
