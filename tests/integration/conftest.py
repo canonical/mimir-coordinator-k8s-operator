@@ -38,22 +38,5 @@ def timed_memoizer(func):
 async def mimir_charm(ops_test: OpsTest) -> str:
     """Mimir charm used for integration testing."""
     charm = await ops_test.build_charm(".")
-    return charm
-
-
-# @pytest.fixture(scope="session")
-# def mimir_charm() -> str:
-#     charm_name = "mimir-coordinator-k8s"  # TODO: get this from a module-level variable maybe
-
-#     # TODO: only select the correct one when building multiple charms
-#     def find_charm_file() -> str:
-#         return sh.find(
-#             "-name", f"{charm_name}*.charm", "-printf", "./%f"
-#         )  # TODO: this assumes there is only one
-
-#     if find_charm_file():
-#         logger.info("Mimir Coordinator already packed.")
-#         return find_charm_file()
-#     logger.info("Packing Mimir Coordinator...")
-#     sh.charmcraft.pack()
-#     return find_charm_file()
+    assert charm
+    return str(charm)

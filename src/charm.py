@@ -23,6 +23,7 @@ from charms.traefik_k8s.v2.ingress import IngressPerAppReadyEvent, IngressPerApp
 from cosl.coordinated_workers.coordinator import Coordinator
 from ops.model import ModelError
 
+
 from mimir_config import MIMIR_ROLES_CONFIG, MimirConfig
 from nginx_config import NginxConfig
 
@@ -43,9 +44,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     def __init__(self, *args: Any):
         super().__init__(*args)
 
-        # TODO: On any worker relation-joined/departed, need to updade grafana agent's scrape
-        #  targets with the new memberlist.
-        #  (Remote write would still be the same nginx-proxied endpoint.)
         self.ingress = IngressPerAppRequirer(
             charm=self,
             port=urlparse(self.internal_url).port,
@@ -78,15 +76,13 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             endpoint_path="/api/v1/push",
         )
 
-        grafana_source_scheme = "https" if self.coordinator.cert_handler.available else "http"
-        grafana_source_url = self.coordinator.cluster.get_address_from_role("ruler")
-        # TODO: add a refresh event for mimir-cluster here
         self.grafana_source = GrafanaSourceProvider(
             self,
             source_type="prometheus",
-            source_url=f"{grafana_source_scheme}://{grafana_source_url}:8080/prometheus",
+            source_url=f"{self.external_url}/prometheus",
             extra_fields={"httpHeaderName1": "X-Scope-OrgID"},
             secure_extra_fields={"httpHeaderValue1": "anonymous"},
+            refresh_event=[self.coordinator.cluster.on.changed],
         )
 
         ######################################
