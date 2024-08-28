@@ -23,7 +23,7 @@ from charms.traefik_k8s.v2.ingress import IngressPerAppReadyEvent, IngressPerApp
 from cosl.coordinated_workers.coordinator import Coordinator
 from ops.model import ModelError
 
-from mimir_config import MimirConfig, MimirRolesConfig
+from mimir_config import MIMIR_ROLES_CONFIG, MimirConfig
 from nginx_config import NginxConfig
 
 # Log messages can be retrieved using juju debug-log
@@ -52,7 +52,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
 
         self.coordinator = Coordinator(
             charm=self,
-            roles_config=MimirRolesConfig(),
+            roles_config=MIMIR_ROLES_CONFIG,
             s3_bucket_name="mimir",
             external_url=self.external_url,
             worker_metrics_port=8080,
