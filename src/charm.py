@@ -20,7 +20,6 @@ from urllib.parse import urlparse
 
 import cosl.coordinated_workers.nginx
 import ops
-from charms.alertmanager_k8s.v1.alertmanager_dispatch import AlertmanagerConsumer
 from charms.grafana_k8s.v0.grafana_source import GrafanaSourceProvider
 from charms.prometheus_k8s.v1.prometheus_remote_write import PrometheusRemoteWriteProvider
 from charms.tempo_k8s.v1.charm_tracing import trace_charm
