@@ -80,8 +80,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             workers_config=MimirConfig().config,
         )
 
-        # FIXME: we should use the internal alertmanager instead
-        self.alertmanager_consumer = AlertmanagerConsumer(self, relation_name="alertmanager")
         self.grafana_source = GrafanaSourceProvider(
             self,
             source_type="prometheus",
