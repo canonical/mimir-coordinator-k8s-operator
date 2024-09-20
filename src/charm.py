@@ -9,7 +9,11 @@ develop a new k8s charm using the Operator Framework:
 
 https://discourse.charmhub.io/t/4208
 """
+
+import glob
 import logging
+import os
+import shutil
 import socket
 from typing import Any, Optional
 from urllib.parse import urlparse
@@ -29,6 +33,10 @@ from nginx_config import NginxConfig
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
 
+NGINX_ORIGINAL_ALERT_RULES_PATH = "./src/prometheus_alert_rules/nginx"
+WORKER_ORIGINAL_ALERT_RULES_PATH = "./src/prometheus_alert_rules/mimir_workers"
+CONSOLIDATED_ALERT_RULES_PATH = "./src/prometheus_alert_rules/consolidated_rules"
+
 
 @trace_charm(
     tracing_endpoint="tempo_endpoint",
@@ -43,17 +51,19 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     def __init__(self, *args: Any):
         super().__init__(*args)
 
+        self._nginx_container = self.unit.get_container("nginx")
+        self._nginx_prometheus_exporter_container = self.unit.get_container(
+            "nginx-prometheus-exporter"
+        )
         self.ingress = IngressPerAppRequirer(
             charm=self,
             port=urlparse(self.internal_url).port,
             strip_prefix=True,
             scheme=lambda: urlparse(self.internal_url).scheme,
         )
-
         self.coordinator = Coordinator(
             charm=self,
             roles_config=MIMIR_ROLES_CONFIG,
-            s3_bucket_name="mimir",
             external_url=self.external_url,
             worker_metrics_port=8080,
             endpoints={
@@ -69,12 +79,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             workers_config=MimirConfig().config,
         )
 
-        self.remote_write_provider = PrometheusRemoteWriteProvider(
-            charm=self,
-            server_url_func=lambda: MimirCoordinatorK8SOperatorCharm.external_url.fget(self),  # type: ignore
-            endpoint_path="/api/v1/push",
-        )
-
         self.grafana_source = GrafanaSourceProvider(
             self,
             source_type="prometheus",
@@ -82,6 +86,13 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             extra_fields={"httpHeaderName1": "X-Scope-OrgID"},
             secure_extra_fields={"httpHeaderValue1": "anonymous"},
             refresh_event=[self.coordinator.cluster.on.changed],
+        )
+        self._consolidate_nginx_rules()
+
+        self.remote_write_provider = PrometheusRemoteWriteProvider(
+            charm=self,
+            server_url_func=lambda: MimirCoordinatorK8SOperatorCharm.external_url.fget(self),  # type: ignore
+            endpoint_path="/api/v1/push",
         )
 
         ######################################
@@ -149,6 +160,17 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         except ModelError as e:
             logger.error("Failed obtaining external url: %s.", e)
         return self.internal_url
+
+    ###########################
+    # === UTILITY METHODS === #
+    ###########################
+
+    # FIXME: Move the alert_rules handling to Coordinator
+    def _consolidate_nginx_rules(self):
+        os.makedirs(CONSOLIDATED_ALERT_RULES_PATH, exist_ok=True)
+        os.makedirs(CONSOLIDATED_ALERT_RULES_PATH, exist_ok=True)
+        for filename in glob.glob(os.path.join(NGINX_ORIGINAL_ALERT_RULES_PATH, "*.*")):
+            shutil.copy(filename, f"{CONSOLIDATED_ALERT_RULES_PATH}/")
 
 
 if __name__ == "__main__":  # pragma: nocover
