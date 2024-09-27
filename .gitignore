@@ -9,3 +9,4 @@ __pycache__/
 .vscode/
 *.egg-info/
 cos-tool-*
+*.terraform*
