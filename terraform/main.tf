@@ -2,7 +2,6 @@ resource "juju_application" "mimir_coordinator" {
   name = var.app_name
   # Coordinator and worker must be in the same model
   model = var.model_name
-  trust = var.trust
 
   charm {
     name     = "mimir-coordinator-k8s"
