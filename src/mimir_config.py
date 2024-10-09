@@ -258,10 +258,17 @@ class MimirConfig:
         }
 
     def _build_s3_storage_config(self, s3_config_data: Dict[str, Any]) -> Dict[str, Any]:
-        return {
+        tls_ca_path = s3_config_data.get("tls_ca_path", None)
+        s3_config_data.pop("tls_ca_path", None)
+
+        s3_storage_config = {
             "backend": "s3",
             "s3": s3_config_data,
         }
+        if tls_ca_path:
+            s3_storage_config["s3"]["http"] = {"tls_ca_path": tls_ca_path}
+
+        return s3_storage_config
 
     def _update_s3_storage_config(self, storage_config: Dict[str, Any], prefix_name: str) -> None:
         """Update S3 storage configuration in `storage_config`.

@@ -11,150 +11,165 @@ from cosl.coordinated_workers.nginx import CERT_PATH, KEY_PATH
 
 logger = logging.getLogger(__name__)
 
-LOCATIONS_DISTRIBUTOR: List[Dict[str, Any]] = [
-    {
-        "directive": "location",
-        "args": ["/distributor"],
-        "block": [
-            {
-                "directive": "proxy_pass",
-                "args": ["http://distributor"],
-            },
-        ],
-    },
-    {
-        "directive": "location",
-        "args": ["/api/v1/push"],
-        "block": [
-            {
-                "directive": "proxy_pass",
-                "args": ["http://distributor"],
-            },
-        ],
-    },
-    {
-        "directive": "location",
-        "args": ["/otlp/v1/metrics"],
-        "block": [
-            {
-                "directive": "proxy_pass",
-                "args": ["http://distributor"],
-            },
-        ],
-    },
-]
-LOCATIONS_ALERTMANAGER: List[Dict] = [
-    {
-        "directive": "location",
-        "args": ["/alertmanager"],
-        "block": [
-            {
-                "directive": "proxy_pass",
-                "args": ["http://alertmanager"],
-            },
-        ],
-    },
-    {
-        "directive": "location",
-        "args": ["/multitenant_alertmanager/status"],
-        "block": [
-            {
-                "directive": "proxy_pass",
-                "args": ["http://alertmanager"],
-            },
-        ],
-    },
-    {
-        "directive": "location",
-        "args": ["/api/v1/alerts"],
-        "block": [
-            {
-                "directive": "proxy_pass",
-                "args": ["http://alertmanager"],
-            },
-        ],
-    },
-]
-LOCATIONS_RULER: List[Dict] = [
-    {
-        "directive": "location",
-        "args": ["/prometheus/config/v1/rules"],
-        "block": [
-            {
-                "directive": "proxy_pass",
-                "args": ["http://ruler"],
-            },
-        ],
-    },
-    {
-        "directive": "location",
-        "args": ["/prometheus/api/v1/rules"],
-        "block": [
-            {
-                "directive": "proxy_pass",
-                "args": ["http://ruler"],
-            },
-        ],
-    },
-    {
-        "directive": "location",
-        "args": ["/prometheus/api/v1/alerts"],
-        "block": [
-            {
-                "directive": "proxy_pass",
-                "args": ["http://ruler"],
-            },
-        ],
-    },
-    {
-        "directive": "location",
-        "args": ["=", "/ruler/ring"],
-        "block": [
-            {
-                "directive": "proxy_pass",
-                "args": ["http://ruler"],
-            },
-        ],
-    },
-]
-LOCATIONS_QUERY_FRONTEND: List[Dict] = [
-    {
-        "directive": "location",
-        "args": ["/prometheus"],
-        "block": [
-            {
-                "directive": "proxy_pass",
-                "args": ["http://query-frontend"],
-            },
-        ],
-    },
-    # Buildinfo endpoint can go to any component
-    {
-        "directive": "location",
-        "args": ["=", "/api/v1/status/buildinfo"],
-        "block": [
-            {
-                "directive": "proxy_pass",
-                "args": ["http://query-frontend"],
-            },
-        ],
-    },
-]
-LOCATIONS_COMPACTOR: List[Dict] = [
-    # Compactor endpoint for uploading blocks
-    {
-        "directive": "location",
-        "args": ["=", "/api/v1/upload/block/"],
-        "block": [
-            {
-                "directive": "proxy_pass",
-                "args": ["http://compactor"],
-            },
-        ],
-    },
-]
 
-LOCATIONS_BASIC: List[Dict] = [
+def _locations_distributor(tls: bool) -> List[Dict[str, Any]]:
+    return [
+        {
+            "directive": "location",
+            "args": ["/distributor"],
+            "block": [
+                {
+                    "directive": "proxy_pass",
+                    "args": [f"{'https' if tls else 'http'}://distributor"],
+                },
+            ],
+        },
+        {
+            "directive": "location",
+            "args": ["/api/v1/push"],
+            "block": [
+                {
+                    "directive": "proxy_pass",
+                    "args": [f"{'https' if tls else 'http'}://distributor"],
+                },
+            ],
+        },
+        {
+            "directive": "location",
+            "args": ["/otlp/v1/metrics"],
+            "block": [
+                {
+                    "directive": "proxy_pass",
+                    "args": [f"{'https' if tls else 'http'}://distributor"],
+                },
+            ],
+        },
+    ]
+
+
+def _locations_alertmanager(tls: bool) -> List[Dict[str, Any]]:
+    return [
+        {
+            "directive": "location",
+            "args": ["/alertmanager"],
+            "block": [
+                {
+                    "directive": "proxy_pass",
+                    "args": [f"{'https' if tls else 'http'}://alertmanager"],
+                },
+            ],
+        },
+        {
+            "directive": "location",
+            "args": ["/multitenant_alertmanager/status"],
+            "block": [
+                {
+                    "directive": "proxy_pass",
+                    "args": [f"{'https' if tls else 'http'}://alertmanager"],
+                },
+            ],
+        },
+        {
+            "directive": "location",
+            "args": ["/api/v1/alerts"],
+            "block": [
+                {
+                    "directive": "proxy_pass",
+                    "args": [f"{'https' if tls else 'http'}://alertmanager"],
+                },
+            ],
+        },
+    ]
+
+
+def _locations_ruler(tls: bool) -> List[Dict[str, Any]]:
+    return [
+        {
+            "directive": "location",
+            "args": ["/prometheus/config/v1/rules"],
+            "block": [
+                {
+                    "directive": "proxy_pass",
+                    "args": [f"{'https' if tls else 'http'}://ruler"],
+                },
+            ],
+        },
+        {
+            "directive": "location",
+            "args": ["/prometheus/api/v1/rules"],
+            "block": [
+                {
+                    "directive": "proxy_pass",
+                    "args": [f"{'https' if tls else 'http'}://ruler"],
+                },
+            ],
+        },
+        {
+            "directive": "location",
+            "args": ["/prometheus/api/v1/alerts"],
+            "block": [
+                {
+                    "directive": "proxy_pass",
+                    "args": [f"{'https' if tls else 'http'}://ruler"],
+                },
+            ],
+        },
+        {
+            "directive": "location",
+            "args": ["=", "/ruler/ring"],
+            "block": [
+                {
+                    "directive": "proxy_pass",
+                    "args": [f"{'https' if tls else 'http'}://ruler"],
+                },
+            ],
+        },
+    ]
+
+
+def _locations_query_frontend(tls: bool) -> List[Dict[str, Any]]:
+    return [
+        {
+            "directive": "location",
+            "args": ["/prometheus"],
+            "block": [
+                {
+                    "directive": "proxy_pass",
+                    "args": [f"{'https' if tls else 'http'}://query-frontend"],
+                },
+            ],
+        },
+        # Buildinfo endpoint can go to any component
+        {
+            "directive": "location",
+            "args": ["=", "/api/v1/status/buildinfo"],
+            "block": [
+                {
+                    "directive": "proxy_pass",
+                    "args": [f"{'https' if tls else 'http'}://query-frontend"],
+                },
+            ],
+        },
+    ]
+
+
+def _locations_compactor(tls: bool) -> List[Dict[str, Any]]:
+    return [
+        # Compactor endpoint for uploading blocks
+        {
+            "directive": "location",
+            "args": ["=", "/api/v1/upload/block/"],
+            "block": [
+                {
+                    "directive": "proxy_pass",
+                    "args": [f"{'https' if tls else 'http'}://compactor"],
+                },
+            ],
+        },
+    ]
+
+
+LOCATIONS_BASIC: List[Dict[str, Any]] = [
     {
         "directive": "location",
         "args": ["=", "/"],
@@ -274,20 +289,22 @@ class NginxConfig:
 
         return nginx_upstreams
 
-    def _locations(self, addresses_by_role: Dict[str, Set[str]]) -> List[Dict[str, Any]]:
+    def _locations(
+        self, addresses_by_role: Dict[str, Set[str]], tls: bool
+    ) -> List[Dict[str, Any]]:
         nginx_locations = LOCATIONS_BASIC.copy()
         roles = addresses_by_role.keys()
 
         if "distributor" in roles:
-            nginx_locations.extend(LOCATIONS_DISTRIBUTOR)
+            nginx_locations.extend(_locations_distributor(tls))
         if "alertmanager" in roles:
-            nginx_locations.extend(LOCATIONS_ALERTMANAGER)
+            nginx_locations.extend(_locations_alertmanager(tls))
         if "ruler" in roles:
-            nginx_locations.extend(LOCATIONS_RULER)
+            nginx_locations.extend(_locations_ruler(tls))
         if "query-frontend" in roles:
-            nginx_locations.extend(LOCATIONS_QUERY_FRONTEND)
+            nginx_locations.extend(_locations_query_frontend(tls))
         if "compactor" in roles:
-            nginx_locations.extend(LOCATIONS_COMPACTOR)
+            nginx_locations.extend(_locations_compactor(tls))
         return nginx_locations
 
     def _resolver(self, custom_resolver: Optional[List[Any]] = None) -> List[Dict[str, Any]]:
@@ -333,7 +350,7 @@ class NginxConfig:
                     {"directive": "ssl_certificate_key", "args": [KEY_PATH]},
                     {"directive": "ssl_protocols", "args": ["TLSv1", "TLSv1.1", "TLSv1.2"]},
                     {"directive": "ssl_ciphers", "args": ["HIGH:!aNULL:!MD5"]},  # pyright: ignore
-                    *self._locations(addresses_by_role),
+                    *self._locations(addresses_by_role, tls),
                 ],
             }
 
@@ -348,6 +365,6 @@ class NginxConfig:
                     "directive": "proxy_set_header",
                     "args": ["X-Scope-OrgID", "$ensured_x_scope_orgid"],
                 },
-                *self._locations(addresses_by_role),
+                *self._locations(addresses_by_role, tls),
             ],
         }
