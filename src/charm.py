@@ -85,7 +85,11 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             source_url=f"{self.external_url}/prometheus",
             extra_fields={"httpHeaderName1": "X-Scope-OrgID"},
             secure_extra_fields={"httpHeaderValue1": "anonymous"},
-            refresh_event=[self.coordinator.cluster.on.changed],
+            refresh_event=[
+                self.coordinator.cluster.on.changed,
+                self.on[self.coordinator.cert_handler.certificates_relation_name].relation_changed,
+                self.ingress.on.ready,
+            ],
         )
         self._consolidate_nginx_rules()
 
