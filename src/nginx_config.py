@@ -3,6 +3,7 @@
 """Nginx workload."""
 
 import logging
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
 import crossplane
@@ -307,7 +308,7 @@ class NginxConfig:
             nginx_locations.extend(_locations_compactor(tls))
         return nginx_locations
 
-    def _resolver(self, custom_resolver: Optional[List[Any]] = None) -> List[Dict[str, Any]]:
+    def _resolver(self, custom_resolver: Optional[str] = None) -> List[Dict[str, Any]]:
         if custom_resolver:
             return [{"directive": "resolver", "args": [custom_resolver]}]
         return [{"directive": "resolver", "args": ["kube-dns.kube-system.svc.cluster.local."]}]
@@ -350,6 +351,9 @@ class NginxConfig:
                     {"directive": "ssl_certificate_key", "args": [KEY_PATH]},
                     {"directive": "ssl_protocols", "args": ["TLSv1", "TLSv1.1", "TLSv1.2"]},
                     {"directive": "ssl_ciphers", "args": ["HIGH:!aNULL:!MD5"]},  # pyright: ignore
+                    # specify resolver to ensure that if a unit IP changes,
+                    # we reroute to the new one
+                    *self._resolver(custom_resolver=_get_dns_ip_address()),
                     *self._locations(addresses_by_role, tls),
                 ],
             }
@@ -368,3 +372,12 @@ class NginxConfig:
                 *self._locations(addresses_by_role, tls),
             ],
         }
+
+
+def _get_dns_ip_address():
+    """Obtain DNS ip address from /etc/resolv.conf."""
+    resolv = Path("/etc/resolv.conf").read_text()
+    for line in resolv.splitlines():
+        if line.startswith("nameserver"):
+            # assume there's only one
+            return line.split()[1].strip()
