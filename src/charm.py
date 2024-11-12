@@ -82,7 +82,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         )
 
         self.charm_tracing_endpoint, self.server_ca_cert = charm_tracing_config(
-            self.coordi  grpc_tls_config: &id001nator.charm_tracing, cosl.coordinated_workers.nginx.CA_CERT_PATH
+            self.coordinator.charm_tracing, cosl.coordinated_workers.nginx.CA_CERT_PATH
         )
 
         if port := urlparse(self.internal_url).port:

@@ -1,5 +1,5 @@
 ops
-cosl
+cosl@git+https://github.com/canonical/cos-lib@OPENG-2902
 pydantic
 # crossplane is a package from nginxinc to interact with the Nginx config
 crossplane
