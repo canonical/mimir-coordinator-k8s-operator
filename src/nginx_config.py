@@ -192,6 +192,9 @@ LOCATIONS_BASIC: List[Dict[str, Any]] = [
 class NginxConfig:
     """Helper class to manage the nginx workload."""
 
+    def __init__(self):
+        self.dns_IP_address = _get_dns_ip_address()
+
     def config(self, coordinator: Coordinator) -> str:
         """Build and return the Nginx configuration."""
         log_level = "error"
@@ -353,7 +356,7 @@ class NginxConfig:
                     {"directive": "ssl_ciphers", "args": ["HIGH:!aNULL:!MD5"]},  # pyright: ignore
                     # specify resolver to ensure that if a unit IP changes,
                     # we reroute to the new one
-                    *self._resolver(custom_resolver=_get_dns_ip_address()),
+                    *self._resolver(custom_resolver=self.dns_IP_address),
                     *self._locations(addresses_by_role, tls),
                 ],
             }
@@ -369,6 +372,7 @@ class NginxConfig:
                     "directive": "proxy_set_header",
                     "args": ["X-Scope-OrgID", "$ensured_x_scope_orgid"],
                 },
+                *self._resolver(custom_resolver=self.dns_IP_address),
                 *self._locations(addresses_by_role, tls),
             ],
         }
@@ -381,3 +385,5 @@ def _get_dns_ip_address():
         if line.startswith("nameserver"):
             # assume there's only one
             return line.split()[1].strip()
+    raise RuntimeError("cannot find nameserver in /etc/resolv.conf")
+
