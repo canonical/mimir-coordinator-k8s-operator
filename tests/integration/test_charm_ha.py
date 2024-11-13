@@ -41,7 +41,7 @@ async def test_build_and_deploy(ops_test: OpsTest, mimir_charm: str):
         # Secret must be at least 8 characters: https://github.com/canonical/minio-operator/issues/137
         ops_test.model.deploy(
             "minio",
-            channel="latest/stable",
+            channel="ckf-1.9/stable",
             config={"access-key": "access", "secret-key": "secretsecret"},
         ),
         ops_test.model.deploy("s3-integrator", "s3", channel="latest/stable"),
