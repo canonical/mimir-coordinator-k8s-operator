@@ -4,6 +4,9 @@ output "app_name" {
 
 output "endpoints" {
   value = {
+    # Requires
+    
+    # Provides
     mimir_cluster = "mimir-cluster"
   }
 }
