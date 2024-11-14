@@ -56,11 +56,17 @@ requires:
     description: |
       Certificate and key files for securing Mimir communications with TLS.
 
-  tracing:
+  charm-tracing:
     interface: tracing
     limit: 1
     description: |
-      Enables sending traces to the tracing backend.
+      Enables sending charm traces to a distributed tracing backend such as Tempo.
+
+  workload-tracing:
+    interface: tracing
+    limit: 1
+    description: |
+      Enables sending workload traces to a distributed tracing backend such as Tempo.
 
 provides:
   mimir-cluster:
