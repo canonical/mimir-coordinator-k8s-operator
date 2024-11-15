@@ -104,9 +104,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             endpoint_path="/api/v1/push",
         )
 
-        with open("mimirtool", "rb") as f:
-            self._nginx_container.push("/usr/bin/mimirtool", source=f, permissions=0o744)
-
         self._set_alerts()
 
         ######################################
@@ -114,6 +111,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         ######################################
         self.framework.observe(self.ingress.on.ready, self._on_ingress_ready)
         self.framework.observe(self.ingress.on.revoked, self._on_ingress_revoked)
+        self.framework.observe(self.on.nginx_pebble_ready, self._on_pebble_ready)
 
     ##########################
     # === EVENT HANDLERS === #
@@ -132,6 +130,11 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         This event refreshes the PrometheusRemoteWriteProvider address.
         """
         logger.info("Ingress for app revoked")
+
+    def _on_pebble_ready(self, _) -> None:
+        """Make sure the `mimirtool` binary is in the workload container."""
+        self._get_mimirtool()
+
 
     ######################
     # === PROPERTIES === #
@@ -215,14 +218,22 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
 
         return paths
 
+    def _get_mimirtool(self):
+        """Copy the `mimirtool` binary to the workload container."""
+        with open("mimirtool", "rb") as f:
+            self._nginx_container.push("/usr/bin/mimirtool", source=f, permissions=0o744)
+
     def _set_alerts(self):
         """Create alert rule files for all Mimir consumers."""
-
         def sha256(hashable: Any) -> str:
             """Use instead of the builtin hash() for repeatable values."""
             if isinstance(hashable, str):
                 hashable = hashable.encode("utf-8")
             return hashlib.sha256(hashable).hexdigest()
+
+        # Get mimirtool if this is the first execution
+        if not self._pull(ALERTS_HASH_PATH):
+            self._get_mimirtool()
 
         remote_write_alerts = self.remote_write_provider.alerts
         alerts_hash = sha256(str(remote_write_alerts))
