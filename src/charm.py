@@ -13,7 +13,6 @@ https://discourse.charmhub.io/t/4208
 import hashlib
 import logging
 import socket
-import subprocess
 from typing import Any, Dict, List, Optional, cast
 from urllib.parse import urlparse
 
@@ -142,7 +141,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         """Make sure the `mimirtool` binary is in the workload container."""
         self._get_mimirtool()
 
-
     ######################
     # === PROPERTIES === #
     ######################
@@ -219,6 +217,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
 
     def _set_alerts(self):
         """Create alert rule files for all Mimir consumers."""
+
         def sha256(hashable: Any) -> str:
             """Use instead of the builtin hash() for repeatable values."""
             if isinstance(hashable, str):
