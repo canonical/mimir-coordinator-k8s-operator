@@ -4,9 +4,9 @@ import pytest as pytest
 from cosl.coordinated_workers.coordinator import Coordinator
 
 from src.mimir_config import (
+    MIMIR_ROLES_CONFIG,
     MINIMAL_DEPLOYMENT,
     RECOMMENDED_DEPLOYMENT,
-    MIMIR_ROLES_CONFIG,
 )
 
 
@@ -22,7 +22,6 @@ from src.mimir_config import (
     ),
 )
 def test_coherent(mock_coordinator, roles, expected):
-
     mc = Coordinator(None, None, "", "", 0, None, None, None)
     cluster_mock = MagicMock()
     cluster_mock.gather_roles = MagicMock(return_value=roles)
