@@ -34,13 +34,13 @@ async def test_build_and_deploy(ops_test: OpsTest, mimir_charm: str):
         ops_test.model.deploy("prometheus-k8s", "prometheus", channel="latest/edge", trust=True),
         ops_test.model.deploy("loki-k8s", "loki", channel="latest/edge", trust=True),
         ops_test.model.deploy("grafana-k8s", "grafana", channel="latest/edge", trust=True),
-        ops_test.model.deploy("grafana-agent-k8s", "agent", channel="latest/edge"),
+        ops_test.model.deploy("grafana-agent-k8s", "agent", channel="latest/edge", series="jammy"),
         ops_test.model.deploy("traefik-k8s", "traefik", channel="latest/edge", trust=True),
         # Deploy and configure Minio and S3
         # Secret must be at least 8 characters: https://github.com/canonical/minio-operator/issues/137
         ops_test.model.deploy(
             "minio",
-            channel="latest/stable",
+            channel="ckf-1.9/stable",
             config={"access-key": "access", "secret-key": "secretsecret"},
         ),
         ops_test.model.deploy("s3-integrator", "s3", channel="latest/stable"),
