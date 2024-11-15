@@ -1,0 +1,15 @@
+# Copyright 2024 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+options:
+  alertmanager-config:
+    type: string
+    default: ""
+    description: >
+      Alertmanager configuration section (yaml).
+      To send the contents of a file to this configuration option, the symbol `@` must be used.
+
+      Usage: `juju config mimir alertmanager-config=@alertmanager.yaml`
+
+      For more information on configuring the Alertmanager section, refer to:
+      https://grafana.com/docs/mimir/latest/configure/configuration-parameters/#alertmanager

@@ -27,3 +27,12 @@ parts:
     override-pull: |
       curl -L -O https://github.com/canonical/cos-tool/releases/latest/download/cos-tool-${CRAFT_TARGET_ARCH}
       chmod +x cos-tool-*
+  mimirtool:
+    plugin: dump
+    source: .
+    build-packages:
+      - curl
+    override-pull: |
+      curl -fLo mimirtool https://github.com/grafana/mimir/releases/latest/download/mimirtool-linux-${CRAFT_TARGET_ARCH}
+      chmod +x mimirtool
+

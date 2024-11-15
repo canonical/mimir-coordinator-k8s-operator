@@ -10,22 +10,24 @@ develop a new k8s charm using the Operator Framework:
 https://discourse.charmhub.io/t/4208
 """
 
-import glob
+import hashlib
 import logging
-import os
-import shutil
 import socket
-from typing import Any, Optional
+import subprocess
+from typing import Any, Dict, List, Optional, cast
 from urllib.parse import urlparse
 
 import cosl.coordinated_workers.nginx
 import ops
+import yaml
+from charms.alertmanager_k8s.v1.alertmanager_dispatch import AlertmanagerConsumer
 from charms.grafana_k8s.v0.grafana_source import GrafanaSourceProvider
 from charms.prometheus_k8s.v1.prometheus_remote_write import PrometheusRemoteWriteProvider
 from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
 from charms.traefik_k8s.v2.ingress import IngressPerAppReadyEvent, IngressPerAppRequirer
 from cosl.coordinated_workers.coordinator import Coordinator
 from ops.model import ModelError
+from ops.pebble import Error as PebbleError
 
 from mimir_config import MIMIR_ROLES_CONFIG, MimirConfig
 from nginx_config import NginxConfig
@@ -33,9 +35,8 @@ from nginx_config import NginxConfig
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
 
-NGINX_ORIGINAL_ALERT_RULES_PATH = "./src/prometheus_alert_rules/nginx"
-WORKER_ORIGINAL_ALERT_RULES_PATH = "./src/prometheus_alert_rules/mimir_workers"
-CONSOLIDATED_ALERT_RULES_PATH = "./src/prometheus_alert_rules/consolidated_rules"
+RULES_DIR = "/etc/mimir-alerts/rules"
+ALERTS_HASH_PATH = "/etc/mimir-alerts/alerts.sha256"
 
 
 @trace_charm(
@@ -60,6 +61,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             strip_prefix=True,
             scheme=lambda: urlparse(self.internal_url).scheme,
         )
+        self.alertmanager = AlertmanagerConsumer(charm=self, relation_name="alertmanager")
         self.coordinator = Coordinator(
             charm=self,
             roles_config=MIMIR_ROLES_CONFIG,
@@ -75,7 +77,9 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                 "s3": "s3",
             },
             nginx_config=NginxConfig().config,
-            workers_config=MimirConfig().config,
+            workers_config=MimirConfig(
+                alertmanager_urls=self.alertmanager.get_cluster_info()
+            ).config,
         )
 
         if port := urlparse(self.internal_url).port:
@@ -93,13 +97,17 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                 self.ingress.on.ready,
             ],
         )
-        self._consolidate_nginx_rules()
 
         self.remote_write_provider = PrometheusRemoteWriteProvider(
             charm=self,
             server_url_func=lambda: MimirCoordinatorK8SOperatorCharm.external_url.fget(self),  # type: ignore
             endpoint_path="/api/v1/push",
         )
+
+        with open("mimirtool", "rb") as f:
+            self._nginx_container.push("/usr/bin/mimirtool", source=f, permissions=0o744)
+
+        self._set_alerts()
 
         ######################################
         # === EVENT HANDLER REGISTRATION === #
@@ -171,12 +179,71 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     # === UTILITY METHODS === #
     ###########################
 
-    # FIXME: Move the alert_rules handling to Coordinator
-    def _consolidate_nginx_rules(self):
-        os.makedirs(CONSOLIDATED_ALERT_RULES_PATH, exist_ok=True)
-        os.makedirs(CONSOLIDATED_ALERT_RULES_PATH, exist_ok=True)
-        for filename in glob.glob(os.path.join(NGINX_ORIGINAL_ALERT_RULES_PATH, "*.*")):
-            shutil.copy(filename, f"{CONSOLIDATED_ALERT_RULES_PATH}/")
+    def _pull(self, path: str) -> Optional[str]:
+        """Pull file from container (without raising pebble errors).
+
+        Returns:
+            File contents if exists; None otherwise.
+        """
+        try:
+            return cast(str, self._nginx_container.pull(path, encoding="utf-8").read())
+        except (FileNotFoundError, PebbleError):
+            # Drop FileNotFoundError https://github.com/canonical/operator/issues/896
+            return None
+
+    def _push(self, path: str, contents: Any):
+        """Push file to container, creating subdirs as necessary."""
+        self._nginx_container.push(path, contents, make_dirs=True, encoding="utf-8")
+
+    def _push_alert_rules(self, alerts: Dict[str, Any]) -> List[str]:
+        """Pushes alert rules from a rules file to the nginx container.
+
+        Args:
+            alerts: a dictionary of alert rule files, fetched from
+                either a metrics consumer or a remote write provider.
+        """
+        paths = []
+        for topology_identifier, rules_file in alerts.items():
+            filename = f"juju_{topology_identifier}.rules"
+            path = f"{RULES_DIR}/{filename}"
+
+            rules = yaml.safe_dump(rules_file)
+
+            self._push(path, rules)
+            paths.append(path)
+            logger.debug("Updated alert rules file %s", filename)
+
+        return paths
+
+    def _set_alerts(self):
+        """Create alert rule files for all Mimir consumers."""
+
+        def sha256(hashable: Any) -> str:
+            """Use instead of the builtin hash() for repeatable values."""
+            if isinstance(hashable, str):
+                hashable = hashable.encode("utf-8")
+            return hashlib.sha256(hashable).hexdigest()
+
+        remote_write_alerts = self.remote_write_provider.alerts
+        alerts_hash = sha256(str(remote_write_alerts))
+        alert_rules_changed = alerts_hash != self._pull(ALERTS_HASH_PATH)
+
+        if alert_rules_changed:
+            # Update the alert rules files on disk
+            self._nginx_container.remove_path(RULES_DIR, recursive=True)
+            rules_file_paths: List[str] = self._push_alert_rules(remote_write_alerts)
+            self._push(ALERTS_HASH_PATH, alerts_hash)
+            # Push the alert rules to the Mimir cluster (persisted in s3)
+            self._nginx_container.pebble.exec(
+                [
+                    "mimirtool",
+                    "rules",
+                    "sync",
+                    *rules_file_paths,
+                    f"--address={self.external_url}",
+                    "--id=anonymous",  # multitenancy is disabled, the default tenant is 'anonymous'
+                ]
+            )
 
 
 if __name__ == "__main__":  # pragma: nocover
