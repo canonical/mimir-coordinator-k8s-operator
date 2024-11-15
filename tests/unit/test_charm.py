@@ -1,25 +1,55 @@
-# Copyright 2023 Ubuntu
-# See LICENSE file for licensing details.
-#
-# Learn more about testing at: https://juju.is/docs/sdk/testing
+from unittest.mock import MagicMock, patch
 
-import os
-import unittest
+import pytest as pytest
+from cosl.coordinated_workers.coordinator import Coordinator
 
-from ops.model import BlockedStatus
-from ops.testing import Harness
-
-from charm import MimirCoordinatorK8SOperatorCharm
+from src.mimir_config import (
+    MINIMAL_DEPLOYMENT,
+    RECOMMENDED_DEPLOYMENT,
+    MIMIR_ROLES_CONFIG,
+)
 
 
-class TestCharm(unittest.TestCase):
-    def setUp(self):
-        os.environ["JUJU_VERSION"] = "3.0.3"
-        self.harness = Harness(MimirCoordinatorK8SOperatorCharm)
-        self.harness.set_can_connect("nginx", True)
-        self.addCleanup(self.harness.cleanup)
-        self.harness.begin_with_initial_hooks()
+@patch("cosl.coordinated_workers.coordinator.Coordinator.__init__", return_value=None)
+@pytest.mark.parametrize(
+    "roles, expected",
+    (
+        ({"queriere": 1}, False),
+        ({"distributor": 1}, False),
+        ({"distributor": 1, "ingester": 1}, False),
+        ({role: 1 for role in MINIMAL_DEPLOYMENT}, True),
+        (RECOMMENDED_DEPLOYMENT, True),
+    ),
+)
+def test_coherent(mock_coordinator, roles, expected):
 
-    def test_simple(self):
-        self.harness.evaluate_status()
-        self.assertIsInstance(self.harness.charm.unit.status, BlockedStatus)
+    mc = Coordinator(None, None, "", "", 0, None, None, None)
+    cluster_mock = MagicMock()
+    cluster_mock.gather_roles = MagicMock(return_value=roles)
+    mc.cluster = cluster_mock
+    mc._is_coherent = None
+    mc.roles_config = MIMIR_ROLES_CONFIG
+
+    assert mc.is_coherent is expected
+
+
+@patch("cosl.coordinated_workers.coordinator.Coordinator.__init__", return_value=None)
+@pytest.mark.parametrize(
+    "roles, expected",
+    (
+        ({"query-frontend": 1}, False),
+        ({"distributor": 1}, False),
+        ({"distributor": 1, "ingester": 1}, False),
+        ({role: 1 for role in MINIMAL_DEPLOYMENT}, False),
+        (RECOMMENDED_DEPLOYMENT, True),
+    ),
+)
+def test_recommended(mock_coordinator, roles, expected):
+    mc = Coordinator(None, None, "", "", 0, None, None, None)
+    cluster_mock = MagicMock()
+    cluster_mock.gather_roles = MagicMock(return_value=roles)
+    mc.cluster = cluster_mock
+    mc._is_recommended = None
+    mc.roles_config = MIMIR_ROLES_CONFIG
+
+    assert mc.is_recommended is expected

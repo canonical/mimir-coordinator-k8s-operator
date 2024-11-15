@@ -213,7 +213,7 @@ class MimirConfig:
     def _build_ruler_config(self) -> Dict[str, Any]:
         return {
             "rule_path": str(self._root_data_dir / "data-ruler"),
-            "alertmanager_url": ",".join(self._alertmanager_urls),
+            "alertmanager_url": ",".join(sorted(self._alertmanager_urls)),
         }
 
     # sharding_ring.replication_factor:
