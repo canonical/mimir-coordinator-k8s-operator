@@ -386,4 +386,3 @@ def _get_dns_ip_address():
             # assume there's only one
             return line.split()[1].strip()
     raise RuntimeError("cannot find nameserver in /etc/resolv.conf")
-
