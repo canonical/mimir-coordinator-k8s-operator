@@ -224,6 +224,9 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                 hashable = hashable.encode("utf-8")
             return hashlib.sha256(hashable).hexdigest()
 
+        if not self._nginx_container.can_connect():
+            return
+
         # Get mimirtool if this is the first execution
         if not self._pull(ALERTS_HASH_PATH):
             self._get_mimirtool()
@@ -238,7 +241,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             rules_file_paths: List[str] = self._push_alert_rules(remote_write_alerts)
             self._push(ALERTS_HASH_PATH, alerts_hash)
             # Push the alert rules to the Mimir cluster (persisted in s3)
-            self._nginx_container.pebble.exec(
+            mimirtool_output = self._nginx_container.pebble.exec(
                 [
                     "mimirtool",
                     "rules",
@@ -246,8 +249,13 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                     *rules_file_paths,
                     f"--address={self.external_url}",
                     "--id=anonymous",  # multitenancy is disabled, the default tenant is 'anonymous'
-                ]
+                ],
+                encoding="utf-8",
             )
+            if mimirtool_output.stdout:
+                logger.info(f"mimirtool: {mimirtool_output.stdout.read().strip()}")
+            if mimirtool_output.stderr:
+                logger.info(f"lokitool (err): {mimirtool_output.stderr.read().strip()}")
 
 
 if __name__ == "__main__":  # pragma: nocover
