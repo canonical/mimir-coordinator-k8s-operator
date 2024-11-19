@@ -14,7 +14,7 @@ from src.mimir_config import (
 @pytest.mark.parametrize(
     "roles, expected",
     (
-        ({"queriere": 1}, False),
+        ({"querier": 1}, False),
         ({"distributor": 1}, False),
         ({"distributor": 1, "ingester": 1}, False),
         ({role: 1 for role in MINIMAL_DEPLOYMENT}, True),
