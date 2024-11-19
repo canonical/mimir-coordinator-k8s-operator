@@ -33,6 +33,6 @@ parts:
     build-packages:
       - curl
     override-pull: |
-      curl -fLo mimirtool https://github.com/grafana/mimir/releases/latest/download/mimirtool-linux-${CRAFT_TARGET_ARCH}
+      curl -fLo mimirtool https://github.com/grafana/mimir/releases/download/mimir-2.14.2/mimirtool-linux-${CRAFT_TARGET_ARCH}
       chmod +x mimirtool
 
