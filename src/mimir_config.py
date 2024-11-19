@@ -65,7 +65,6 @@ MINIMAL_DEPLOYMENT = {
     "ingester",
     "querier",
     "query-frontend",
-    # "query-scheduler",
     "store-gateway",
     # we add:
     "ruler",
@@ -80,7 +79,6 @@ RECOMMENDED_DEPLOYMENT = {
     "ingester": 3,
     "querier": 2,
     "query-frontend": 1,
-    # "query-scheduler": 2,
     "store-gateway": 1,
     "ruler": 1,
 }
