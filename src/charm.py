@@ -225,9 +225,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                 hashable = hashable.encode("utf-8")
             return hashlib.sha256(hashable).hexdigest()
 
-        if not self._nginx_container.can_connect():
-            return
-
         # Get mimirtool if this is the first execution
         if not self._pull(ALERTS_HASH_PATH):
             self._push_mimirtool()
