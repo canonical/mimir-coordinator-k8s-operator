@@ -6,6 +6,7 @@
 
 import asyncio
 import logging
+import sh
 
 import pytest
 import requests
@@ -24,13 +25,19 @@ from tenacity import retry, stop_after_attempt, wait_fixed
 logger = logging.getLogger(__name__)
 
 
+TF_DIR='terraform'
+
+@pytest.mark.parametrize("us_tf", (False, True))
 @pytest.mark.setup
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest, mimir_charm: str):
+async def test_build_and_deploy(ops_test: OpsTest, us_tf: bool):
     """Build the charm-under-test and deploy it together with related charms."""
     assert ops_test.model is not None  # for pyright
+
+    print(sh.terraform(f"-chdir={TF_DIR}", "init"))
+    print(sh.terraform(f"-chdir={TF_DIR}", "apply", "-auto-approve", "-var", f"model_name={ops_test.model.name}", "-var", "app_name=mimir", "-var", "channel=latest/edge"))
+
     await asyncio.gather(
-        ops_test.model.deploy(mimir_charm, "mimir", resources=charm_resources()),
         ops_test.model.deploy("prometheus-k8s", "prometheus", channel="latest/edge", trust=True),
         ops_test.model.deploy("loki-k8s", "loki", channel="latest/edge", trust=True),
         ops_test.model.deploy("grafana-k8s", "grafana", channel="latest/edge", trust=True),
