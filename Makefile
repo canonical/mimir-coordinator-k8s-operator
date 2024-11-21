@@ -5,6 +5,7 @@ TESTS := $(PROJECT)tests
 ALL := $(SRC) $(TESTS)
 
 export PYTHONPATH = $(PROJECT):$(PROJECT)/lib:$(SRC)
+export PY_COLORS=1
 
 lock:
 	uv lock --upgrade --no-cache
