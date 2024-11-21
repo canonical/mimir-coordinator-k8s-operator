@@ -1,3 +1,34 @@
+[project]
+name = "mimir-k8s"
+version = "0.1"  # this is in fact irrelevant
+requires-python = ">=3.12"
+
+dependencies = [
+    "ops",
+    "cosl>=0.0.43",
+    "pydantic",
+    "crossplane",
+    # PYDEPS
+    # lib/charms/tempo_k8s/v1/charm_tracing.py
+    "opentelemetry-exporter-otlp-proto-http",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "coverage[toml]",
+    "deepdiff",
+    "numpy",
+    # lib/charms/tls_certificates_interface/v2/tls_certificates.py
+    "jsonschema",
+    "cryptography",
+    "pyright==1.1.344",
+    "minio",
+    "tenacity",
+    "juju",
+    "pytest-operator",
+]
+
 # Testing tools configuration
 [tool.coverage.run]
 branch = true
@@ -9,6 +40,9 @@ show_missing = true
 asyncio_mode = "auto"
 minversion = "6.0"
 log_cli_level = "INFO"
+markers = [
+  'setup: marks tests as setup (deselect with -m "not setup")'
+]
 
 # Formatting tools configuration
 [tool.black]

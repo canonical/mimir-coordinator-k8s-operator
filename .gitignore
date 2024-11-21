@@ -1,3 +1,6 @@
+requirements*.txt
+.venv/
+
 venv/
 build/
 *.charm

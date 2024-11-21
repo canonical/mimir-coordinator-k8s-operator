@@ -1,8 +1,0 @@
-ops
-cosl>=0.0.43
-pydantic
-# crossplane is a package from nginxinc to interact with the Nginx config
-crossplane
-
-# lib/charms/tempo_k8s/v1/charm_tracing.py
-opentelemetry-exporter-otlp-proto-http
