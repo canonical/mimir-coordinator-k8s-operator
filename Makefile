@@ -35,7 +35,7 @@ unit:
 	uv run --extra unit coverage report
 
 scenario:
-	echo "TODO: implement scenario tests with UV"
+	echo "TODO: implement scenario tests with UV."
 
 integration:
 	uv run --extra integration \
