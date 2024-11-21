@@ -684,38 +684,44 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
-dev = [
+integration = [
+    { name = "juju" },
+    { name = "minio" },
+    { name = "pytest" },
+    { name = "pytest-operator" },
+    { name = "tenacity" },
+]
+static = [
+    { name = "pyright" },
+]
+unit = [
     { name = "coverage" },
     { name = "cryptography" },
     { name = "deepdiff" },
     { name = "jsonschema" },
-    { name = "juju" },
-    { name = "minio" },
     { name = "numpy" },
-    { name = "pyright" },
     { name = "pytest" },
-    { name = "pytest-operator" },
-    { name = "tenacity" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "cosl", specifier = ">=0.0.43" },
-    { name = "coverage", extras = ["toml"], marker = "extra == 'dev'" },
+    { name = "coverage", extras = ["toml"], marker = "extra == 'unit'" },
     { name = "crossplane" },
-    { name = "cryptography", marker = "extra == 'dev'" },
-    { name = "deepdiff", marker = "extra == 'dev'" },
-    { name = "jsonschema", marker = "extra == 'dev'" },
-    { name = "juju", marker = "extra == 'dev'" },
-    { name = "minio", marker = "extra == 'dev'" },
-    { name = "numpy", marker = "extra == 'dev'" },
+    { name = "cryptography", marker = "extra == 'unit'" },
+    { name = "deepdiff", marker = "extra == 'unit'" },
+    { name = "jsonschema", marker = "extra == 'unit'" },
+    { name = "juju", marker = "extra == 'integration'" },
+    { name = "minio", marker = "extra == 'integration'" },
+    { name = "numpy", marker = "extra == 'unit'" },
     { name = "opentelemetry-exporter-otlp-proto-http" },
     { name = "ops" },
     { name = "pydantic" },
-    { name = "pyright", marker = "extra == 'dev'", specifier = "==1.1.344" },
-    { name = "pytest", marker = "extra == 'dev'" },
-    { name = "pytest-operator", marker = "extra == 'dev'" },
-    { name = "tenacity", marker = "extra == 'dev'" },
+    { name = "pyright", marker = "extra == 'static'", specifier = "==1.1.344" },
+    { name = "pytest", marker = "extra == 'integration'" },
+    { name = "pytest", marker = "extra == 'unit'" },
+    { name = "pytest-operator", marker = "extra == 'integration'" },
+    { name = "tenacity", marker = "extra == 'integration'" },
 ]
 
 [[package]]

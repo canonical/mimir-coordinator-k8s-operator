@@ -13,7 +13,9 @@ lock:
 lint:
 	uv tool run ruff check $(ALL)
 	uv tool run ruff format --check --diff $(ALL)
-	uv run --extra dev pyright
+
+static:
+	uv run --extra static pyright
 
 fmt:
 	uv tool run ruff check --fix-only $(ALL)
@@ -21,7 +23,7 @@ fmt:
 
 unit:
 	uv run --isolated \
-	    --extra dev \
+	    --extra unit \
 		coverage run \
 		--source=$(SRC) \
 		-m pytest \
@@ -30,10 +32,13 @@ unit:
 		-v \
 		-s \
 		$(ARGS)
-	uv run --all-extras coverage report
+	uv run --extra unit coverage report
+
+scenario:
+	echo "TODO: implement scenario tests with UV"
 
 integration:
-	uv run --all-extras \
+	uv run --extra integration \
 		pytest \
 		-v \
 		-x \

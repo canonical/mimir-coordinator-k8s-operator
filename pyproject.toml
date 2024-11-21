@@ -14,15 +14,18 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = [
+static = ["pyright==1.1.344"]
+unit = [
     "pytest",
     "coverage[toml]",
     "deepdiff",
     "numpy",
-    # lib/charms/tls_certificates_interface/v2/tls_certificates.py
+    # Binary deps from from charmcraft.yaml
     "jsonschema",
     "cryptography",
-    "pyright==1.1.344",
+]
+integration = [
+    "pytest",
     "minio",
     "tenacity",
     "juju",
