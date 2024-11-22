@@ -10,6 +10,12 @@ export PY_COLORS=1
 lock:
 	uv lock --upgrade --no-cache
 
+clean-requirements:
+	rm -f requirements*.txt
+
+generate-requirements: clean-requirements
+	uv pip compile -q --no-cache pyproject.toml -o requirements.txt
+
 lint:
 	uv tool run ruff check $(ALL)
 	uv tool run ruff format --check --diff $(ALL)
@@ -35,10 +41,21 @@ unit:
 	uv run --extra unit coverage report
 
 scenario:
-	echo "TODO: implement scenario tests with UV."
+	uv run --isolated \
+		--extra scenario \
+		coverage run \
+		--source=$(SRC) \
+		-m pytest \
+		--tb native \
+		-v \
+		-s \
+		$(TESTS)/scenario \
+		$(ARGS)
+	uv run --extra scenario coverage report
 
 integration:
-	uv run --extra integration \
+	uv run --isolated \
+		--extra integration \
 		pytest \
 		-v \
 		-x \

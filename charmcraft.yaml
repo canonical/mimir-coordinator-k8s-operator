@@ -12,6 +12,13 @@ bases:
 
 parts:
   charm:
+    build-snaps:
+      - astral-uv
+    
+    override-build: |
+      make generate-requirements
+      craftctl default
+    
     charm-binary-python-packages:
       - pydantic>2.0
 
