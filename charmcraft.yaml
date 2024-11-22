@@ -14,17 +14,24 @@ parts:
   charm:
     build-snaps:
       - astral-uv
-    
     override-build: |
       make generate-requirements
       craftctl default
-    
     charm-binary-python-packages:
       - pydantic>2.0
-
       # For v2.tls_certificates
       - cryptography
       - jsonschema
+    prime:
+      - -*.charm
+      - -.venv
+      - -CONTRIBUTING.md
+      - -Makefile
+      - -pyproject.toml
+      - -README.md
+      - -tests/
+      - -uv.lock
+      - -*.egg-info
 
   cos-tool:
     plugin: dump
