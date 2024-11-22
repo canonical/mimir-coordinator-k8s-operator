@@ -140,7 +140,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
 
     def _on_pebble_ready(self, _) -> None:
         """Make sure the `mimirtool` binary is in the workload container."""
-        self._push_mimirtool()
+        self._ensure_mimirtool()
 
     ######################
     # === PROPERTIES === #
@@ -211,8 +211,10 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
 
         return paths
 
-    def _push_mimirtool(self):
+    def _ensure_mimirtool(self):
         """Copy the `mimirtool` binary to the workload container."""
+        if self._nginx_container.exists("/usr/bin/mimirtool"):
+            return
         with open("mimirtool", "rb") as f:
             self._nginx_container.push("/usr/bin/mimirtool", source=f, permissions=0o744)
 
@@ -226,8 +228,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             return hashlib.sha256(hashable).hexdigest()
 
         # Get mimirtool if this is the first execution
-        if not self._pull(ALERTS_HASH_PATH):
-            self._push_mimirtool()
+        self._ensure_mimirtool()
 
         remote_write_alerts = self.remote_write_provider.alerts
         alerts_hash = sha256(str(remote_write_alerts))
@@ -253,7 +254,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             if mimirtool_output.stdout:
                 logger.info(f"mimirtool: {mimirtool_output.stdout.read().strip()}")
             if mimirtool_output.stderr:
-                logger.info(f"mimirtool (err): {mimirtool_output.stderr.read().strip()}")
+                logger.error(f"mimirtool (err): {mimirtool_output.stderr.read().strip()}")
 
 
 if __name__ == "__main__":  # pragma: nocover
