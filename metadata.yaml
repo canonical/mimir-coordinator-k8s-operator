@@ -68,6 +68,11 @@ requires:
     description: |
       Enables sending workload traces to a distributed tracing backend such as Tempo.
 
+  alertmanager:
+    interface: alertmanager_dispatch
+    description: |
+      Configure Mimir to utilize an external Alertmanager to notify the user when an alert is triggered.
+
 provides:
   mimir-cluster:
     interface: mimir_cluster

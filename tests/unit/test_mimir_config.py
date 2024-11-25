@@ -9,7 +9,7 @@ from src.mimir_config import MimirConfig
 
 @pytest.fixture(scope="module")
 def mimir_config():
-    return MimirConfig()
+    return MimirConfig(alertmanager_urls={"http://some.am.0:9093", "http://some.am.1:9093"})
 
 
 @pytest.fixture(scope="module")
@@ -102,7 +102,10 @@ def test_build_ingester_config(mimir_config, coordinator, addresses_by_role, rep
 
 def test_build_ruler_config(mimir_config):
     ruler_config = mimir_config._build_ruler_config()
-    expected_config = {"rule_path": "/data/data-ruler"}
+    expected_config = {
+        "rule_path": "/data/data-ruler",
+        "alertmanager_url": "http://some.am.0:9093,http://some.am.1:9093",
+    }
     assert ruler_config == expected_config
 
 
