@@ -6,7 +6,7 @@
 
 import logging
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Set
 
 import yaml
 from cosl import JujuTopology
@@ -37,17 +37,25 @@ ROLES = {
 """Mimir component role names."""
 
 META_ROLES = {
-    "read": {"query-frontend", "querier"},
+    "read": {"querier", "query-frontend"},
     "write": {"distributor", "ingester"},
     "backend": {
-        "store-gateway",
-        "compactor",
-        "ruler",
         "alertmanager",
-        "query-scheduler",
+        "compactor",
         "overrides-exporter",
+        "query-scheduler",
+        "ruler",
+        "store-gateway",
     },
-    "all": set(ROLES) - {"read", "write", "backend", "all"},
+    "all": {
+        "compactor",
+        "distributor",
+        "ingester",
+        "querier",
+        "query-frontend",
+        "ruler",
+        "store-gateway",
+    },
 }
 
 MINIMAL_DEPLOYMENT = {
@@ -57,26 +65,22 @@ MINIMAL_DEPLOYMENT = {
     "ingester",
     "querier",
     "query-frontend",
-    "query-scheduler",
     "store-gateway",
     # we add:
     "ruler",
-    "alertmanager",
 }
 """The minimal set of roles that need to be allocated for the
 deployment to be considered consistent (otherwise we set blocked). On top of what mimir itself lists as required,
 we add alertmanager."""
 
 RECOMMENDED_DEPLOYMENT = {
-    "ingester": 3,
-    "querier": 2,
-    "query-scheduler": 2,
-    "alertmanager": 1,
-    "query-frontend": 1,
-    "ruler": 1,
-    "store-gateway": 1,
     "compactor": 1,
     "distributor": 1,
+    "ingester": 3,
+    "querier": 2,
+    "query-frontend": 1,
+    "store-gateway": 1,
+    "ruler": 1,
 }
 """The set of roles that need to be allocated for the
 deployment to be considered robust according to the official recommendations/guidelines."""
@@ -101,9 +105,11 @@ class MimirConfig:
 
     def __init__(
         self,
+        alertmanager_urls: Set[str] = set(),
         root_data_dir: Path = Path("/data"),
         recovery_data_dir: Path = Path("/recovery-data"),
     ):
+        self._alertmanager_urls = alertmanager_urls
         self._root_data_dir = root_data_dir
         self._recovery_data_dir = recovery_data_dir
 
@@ -205,6 +211,7 @@ class MimirConfig:
     def _build_ruler_config(self) -> Dict[str, Any]:
         return {
             "rule_path": str(self._root_data_dir / "data-ruler"),
+            "alertmanager_url": ",".join(sorted(self._alertmanager_urls)),
         }
 
     # sharding_ring.replication_factor:
