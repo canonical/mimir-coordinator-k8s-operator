@@ -14,6 +14,8 @@ parts:
   charm:
     build-snaps:
       - astral-uv
+    charm-requirements:
+      - requirements.txt
     override-build: |
       make generate-requirements
       craftctl default

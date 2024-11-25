@@ -41,17 +41,18 @@ unit:
 	uv run --extra unit coverage report
 
 scenario:
-	uv run --isolated \
-		--extra scenario \
-		coverage run \
-		--source=$(SRC) \
-		-m pytest \
-		--tb native \
-		-v \
-		-s \
-		$(TESTS)/scenario \
-		$(ARGS)
-	uv run --extra scenario coverage report
+	@echo "Add scenario tests here ..."
+	@# uv run --isolated \
+	# 	--extra scenario \
+	# 	coverage run \
+	# 	--source=$(SRC) \
+	# 	-m pytest \
+	# 	--tb native \
+	# 	-v \
+	# 	-s \
+	# 	$(TESTS)/scenario \
+	# 	$(ARGS)
+	@# uv run --extra scenario coverage report
 
 integration:
 	uv run --isolated \
