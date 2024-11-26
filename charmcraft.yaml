@@ -14,16 +14,16 @@ parts:
   charm:
     build-snaps:
       - astral-uv
-    charm-requirements:
-      - requirements.txt
-    override-build: |
-      make generate-requirements
-      craftctl default
     charm-binary-python-packages:
       - pydantic>2.0
       # For v2.tls_certificates
       - cryptography
       - jsonschema
+    override-build: |
+      make generate-requirements
+      craftctl default
+    charm-requirements:
+      - requirements.txt
     prime:
       - -*.charm
       - -.venv
