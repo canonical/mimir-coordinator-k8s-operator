@@ -1,14 +1,19 @@
 set export
 set positional-arguments
+# TODO:
 # pos-args are tricky because we can run:
-# 	just lint unit --help
-# 	since lint has no pos-args, but we cannot run another test after unit since it accepts pos-args
+# 	just lint unit <unit_test_args>
+# but not:
+# 	just unit <unit_test_args> lint
+# since just will think lint is a pos-arg for the unit recipe
+# NOTE: Its not so bad since one can just run `just all-fast`.
 
+project-dir := invocation_directory()
 src-dir := "src"
 tests-dir := "tests"
 all-dirs := src-dir + " " + tests-dir
 
-# PYTHONPATH := $(PROJECT):$(PROJECT)/lib:$(SRC)
+PYTHONPATH := project-dir + ":" + project-dir + "/lib:" + src-dir
 PY_COLORS := "1"
 
 @default:
@@ -40,6 +45,7 @@ PY_COLORS := "1"
 		coverage run \
 		--source={{src-dir}} \
 		-m pytest \
+		--ignore={{tests-dir}}/integration \
 		--tb native \
 		-v \
 		-s \
@@ -69,5 +75,5 @@ PY_COLORS := "1"
 		-s \
 		--tb native \
 		--log-cli-level=INFO \
-		{{tests-dir}} /integration \
+		{{tests-dir}}/integration \
 		"$@"
