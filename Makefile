@@ -10,10 +10,7 @@ export PY_COLORS=1
 lock:
 	uv lock --upgrade --no-cache
 
-clean-requirements:
-	rm -f requirements*.txt
-
-generate-requirements: clean-requirements
+generate-requirements:
 	uv pip compile -q --no-cache pyproject.toml -o requirements.txt
 
 lint:
