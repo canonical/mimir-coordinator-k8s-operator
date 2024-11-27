@@ -3,5 +3,4 @@ systems:
   - ubuntu-24.04
 
 execute: |
-  echo "Task two was super hard but we did it!"
-
+  bash tests/spread/task_two/test.sh

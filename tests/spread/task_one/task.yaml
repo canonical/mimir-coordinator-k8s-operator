@@ -3,5 +3,4 @@ systems:
   - ubuntu-24.04
 
 execute: |
-  echo "You did it! You did task one!"
-
+  bash tests/spread/task_one/test.sh

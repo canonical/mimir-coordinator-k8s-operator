@@ -23,7 +23,7 @@ jobs:
       matrix:
         suite:
           - task_one:juju_3_5
-          - task_two:juju_3_6
+          - task_two:juju_3_5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
