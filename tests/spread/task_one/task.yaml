@@ -3,4 +3,4 @@ systems:
   - ubuntu-24.04
 
 execute: |
-  bash tests/spread/task_one/test.sh
+  bash test.sh
