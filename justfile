@@ -21,7 +21,6 @@ PY_COLORS := "1"
 
 # Generate requirements.txt from pyproject.toml
 @generate-requirements:
-	rm -f requirements*.txt
 	uv export --format=requirements-txt > requirements.txt
 
 # Lint the code
