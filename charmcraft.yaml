@@ -20,7 +20,7 @@ parts:
       - cryptography
       - jsonschema
     override-build: |
-      make generate-requirements
+      just requirements
       craftctl default
     charm-requirements:
       - requirements.txt
