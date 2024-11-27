@@ -1,0 +1,7 @@
+summary: Test observability relations with zinc
+systems:
+  - ubuntu-24.04
+
+execute: |
+  echo "You did it! You did task one!"
+
