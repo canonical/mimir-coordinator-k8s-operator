@@ -3,6 +3,7 @@ kill-timeout: 90m
 workers: 1
 
 environment:
+  # The CI variable is assigned automatically when using `github-ci`
   CI: "$(HOST: echo $CI)"
   # You can test on more Juju versions by adding them here
   CONCIERGE_JUJU_CHANNEL/juju_3_5: 3.5/stable
@@ -115,7 +116,7 @@ prepare: |
 
 restore: |
   if [[ -z "${CI:-}" ]]; then
-    concierge restore --trace
+    # concierge restore --trace
     
     apt autoremove -y --purge
     rm -Rf "$SPREAD_PATH"
