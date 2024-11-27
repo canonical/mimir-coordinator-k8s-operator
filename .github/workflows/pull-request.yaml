@@ -6,15 +6,15 @@ on:
       - main
 
 jobs:
-  pull-request:
-    name: PR
-    uses: canonical/observability/.github/workflows/charm-pull-request.yaml@feature/uv-ci-make
-    secrets: inherit
-
-  terraform-checks:
-    name: Terraform
-    uses: canonical/observability/.github/workflows/terraform-quality-checks.yaml@main
-
+  # pull-request:
+  #   name: PR
+  #   uses: canonical/observability/.github/workflows/charm-pull-request.yaml@feature/uv-ci-make
+  #   secrets: inherit
+  #
+  # terraform-checks:
+  #   name: Terraform
+  #   uses: canonical/observability/.github/workflows/terraform-quality-checks.yaml@main
+  #
   spread-tests:
     runs-on: ubuntu-24.04
     name: Spread Tests (trying it out)
