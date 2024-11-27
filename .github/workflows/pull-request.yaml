@@ -14,3 +14,25 @@ jobs:
   terraform-checks:
     name: Terraform
     uses: canonical/observability/.github/workflows/terraform-quality-checks.yaml@main
+
+  spread-tests:
+    runs-on: ubuntu-24.04
+    name: Spread Tests (trying it out)
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          - task_one:juju_3_5
+          - task_two:juju_3_6
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Charmcraft
+        run: sudo snap install charmcraft --classic
+
+      - name: Run spread tests
+        run: |
+          charmcraft test -v "github-ci:ubuntu-24.04:tests/spread/${{ matrix.suite }}"
+
+
