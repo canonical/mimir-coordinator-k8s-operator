@@ -108,8 +108,8 @@ prepare: |
   fi
 
   # Provision the machine
-  snap install --classic concierge
-  concierge prepare --trace --preset microk8s --extra-snaps astral-uv/latest/candidate --extra-debs make
+  # snap install --classic concierge
+  # concierge prepare --trace --preset microk8s --extra-snaps astral-uv/latest/candidate --extra-debs make
 
   pushd "$SPREAD_PATH"
 
@@ -120,7 +120,7 @@ prepare: |
 # TODO: how do we `concierge restore` in CI but not locally
 restore: |
   if [[ -z "${CI:-}" ]]; then
-    concierge restore --trace
+    # concierge restore --trace
     
     apt autoremove -y --purge
     rm -Rf "$SPREAD_PATH"

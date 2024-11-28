@@ -15,6 +15,10 @@ logger = logging.getLogger(__name__)
 store = defaultdict(str)
 
 
+def pytest_addoption(parser):
+    parser.addoption("--charm-path", action="store", default="")
+
+
 def timed_memoizer(func):
     @functools.wraps(func)
     async def wrapper(*args, **kwargs):
