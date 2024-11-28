@@ -10,14 +10,5 @@ execute: |
   pushd "$SPREAD_PATH"
   chown $(id -u):$(id -g) *.charm
 
-  if [[ -z "${CHARM_PATH:-}" ]]; then
-    CHARM_PATH_ARG="--charm-path ${CHARM_PATH:-}";
-  fi
-
-  echo "CHARM_PATH is $CHARM_PATH"
-  echo "CHARM_PATH_ARG is $CHARM_PATH_ARG"
-
-  # TODO: check if passing an empty string to --charm-path makes it pack in the test
-  # If so, remove the if above and just pass '--charm-path "${CHARM_PATH:-}"'
-  uvx --from=rust-just just integration -k "$TEST_FILENAME" "${CHARM_PATH_ARG:-}"
+  uvx --from=rust-just just integration -k "$TEST_FILENAME"
 
