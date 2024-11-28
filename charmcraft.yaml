@@ -20,7 +20,7 @@ parts:
       - cryptography
       - jsonschema
     override-build: |
-      just generate-requirements
+      uvx --from rust-just just generate-requirements
       craftctl default
     # charm-requirements defaults to requirements.txt, but without setting it (seems counter-intuitive) 
     # the charm does not respect the requirements.txt when generated dynamically during build.
