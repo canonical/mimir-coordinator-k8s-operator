@@ -3,5 +3,6 @@ systems:
   - ubuntu-24.04
 
 execute: |
-  juju controllers
+  pushd "$SPREAD_PATH"
+  ls -la
   exit 1

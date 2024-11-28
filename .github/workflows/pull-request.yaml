@@ -15,22 +15,73 @@ jobs:
   #   name: Terraform
   #   uses: canonical/observability/.github/workflows/terraform-quality-checks.yaml@main
   #
-  spread-tests:
+  pack-charm:
+    name: Build charm
     runs-on: ubuntu-24.04
-    name: Spread Tests (trying it out)
-    strategy:
-      fail-fast: false
-      matrix:
-        suite:
-          - task_one:juju_3_5
-          - task_two:juju_3_5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Setup LXD
+        uses: canonical/setup-lxd@main
+      - name: Install charmcraft
+        run: sudo snap install charmcraft --classic
+      - name: Cache wheels
+        id: cache-wheels
+        uses: actions/cache@6849a6489940f00c2f30c0fb92c6274307ccb58a # v4
+        with:
+          path: /home/runner/snap/charmcraft/common/cache/charmcraft
+          key: ${{ runner.os }}-wheel-cache-${{ hashFiles('./uv.lock') }}
+          # If the above cache key doesn't match, it's because the uv.lock has changed.
+          # Even so, pre-existing caches may still contain useful cached builds for some
+          # portion of the dependencies, and restore-keys can partially match a cache.
+          restore-keys: |
+            ${{ runner.os }}-wheel-cache-
+      - name: Pack charm
+        run: charmcraft pack -v
+      - name: Upload charm artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: charm
+          path: ./*.charm
+  
+  define-matrix:
+    name: Define Spread matrix
+    runs-on: ubuntu-24.04
+    outputs:
+      suites: ${{ steps.suites.outputs.suites }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: Install charmcraft
+        run: sudo snap install charmcraft --classic
+      - name: Generate matrix list
+        id: suites
+        run: |
+          list="$(charmcraft test --list github-ci | sed "s|github-ci:ubuntu-24.04:tests/spread/||g" | jq -r -ncR '[inputs | select(length>0)]')"
+          echo "suites=$list"
+          echo "suites=$list" >> $GITHUB_OUTPUT
 
+  spread-tests:
+    name: Spread Tests (trying it out)
+    runs-on: ubuntu-24.04
+    needs:
+      - define-matrix
+      - pack-charm
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: ${{ fromJSON(needs.define-matrix.outputs.suites )}}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Download charm artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: charm
+      - name: Setup LXD
+        uses: canonical/setup-lxd@main
       - name: Install Charmcraft
         run: sudo snap install charmcraft --classic
-
       - name: Run spread tests
         run: |
           charmcraft test -v "github-ci:ubuntu-24.04:tests/spread/${{ matrix.suite }}"
