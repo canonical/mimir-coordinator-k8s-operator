@@ -4,6 +4,7 @@
 
 # pyright: reportAttributeAccessIssue=false
 
+import asyncio
 import logging
 
 import pytest
@@ -19,8 +20,6 @@ from helpers import (
 )
 from pytest_operator.plugin import OpsTest
 from tenacity import retry, stop_after_attempt, wait_fixed
-
-from tests.integration.test_charm_ha_scaled import asyncio
 
 logger = logging.getLogger(__name__)
 
