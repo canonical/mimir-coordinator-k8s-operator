@@ -1,6 +1,3 @@
-requirements*.txt
-.venv/
-
 venv/
 build/
 *.charm
@@ -12,6 +9,10 @@ __pycache__/
 .vscode/
 *.egg-info/
 cos-tool-*
+
+# UV-related files
+requirements*.txt
+.venv/
 
 # Local .terraform directories
 **/.terraform/*

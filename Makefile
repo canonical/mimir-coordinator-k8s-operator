@@ -7,23 +7,29 @@ ALL := $(SRC) $(TESTS)
 export PYTHONPATH = $(PROJECT):$(PROJECT)/lib:$(SRC)
 export PY_COLORS=1
 
+# Update uv.lock with the latest deps
 lock:
 	uv lock --upgrade --no-cache
 
+# Generate requirements.txt from pyproject.toml
 generate-requirements:
-	uv pip compile -q --no-cache pyproject.toml -o requirements.txt
+	uv export --frozen --no-hashes --format=requirements-txt > requirements.txt
 
+# Lint the code
 lint:
 	uv tool run ruff check $(ALL)
 	uv tool run ruff format --check --diff $(ALL)
 
+# Run static checks
 static:
 	uv run --extra static pyright
 
+# Format the code
 fmt:
 	uv tool run ruff check --fix-only $(ALL)
 	uv tool run ruff format $(ALL)
 
+# Run unit tests
 unit:
 	uv run --isolated \
 	    --extra unit \
@@ -37,20 +43,7 @@ unit:
 		$(ARGS)
 	uv run --extra unit coverage report
 
-scenario:
-	@echo "Add scenario tests here ..."
-	@# uv run --isolated \
-	# 	--extra scenario \
-	# 	coverage run \
-	# 	--source=$(SRC) \
-	# 	-m pytest \
-	# 	--tb native \
-	# 	-v \
-	# 	-s \
-	# 	$(TESTS)/scenario \
-	# 	$(ARGS)
-	@# uv run --extra scenario coverage report
-
+# Run integration tests
 integration:
 	uv run --isolated \
 		--extra integration \
