@@ -84,7 +84,7 @@ jobs:
         run: sudo snap install charmcraft --classic
       - name: Run spread tests
         run: |
-          # export CHARM_PATH=""
+          export CHARM_PATH="$(find . -maxdepth 1 -name '*.charm' | tail -n1)"
           charmcraft test -v "github-ci:ubuntu-24.04:tests/spread/${{ matrix.suite }}"
 
 
