@@ -113,11 +113,6 @@ prepare: |
 
   pushd "$SPREAD_PATH"
 
-  if [[ -f "$PWD/zinc-k8s_amd64.charm" ]]; then
-    chown $(id -u):$(id -g) $PWD/zinc-k8s_amd64.charm
-  fi
-
-# TODO: how do we `concierge restore` in CI but not locally
 restore: |
   if [[ -z "${CI:-}" ]]; then
     concierge restore --trace
