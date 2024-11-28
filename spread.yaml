@@ -1,4 +1,4 @@
-project: zinc-charm-tests
+project: charm-tests
 kill-timeout: 90m
 workers: 1
 
@@ -18,7 +18,7 @@ backends:
       CPU="${CPU:-4}"
       MEM="${MEM:-8}"
       
-      BASE_CLOUD_CONFIG="""
+      CLOUD_CONFIG_TEMPLATE="""
         #cloud-config
         ssh_pwauth: true
         users:
@@ -30,7 +30,7 @@ backends:
       """
 
       cloud_config="$(mktemp)"
-      echo "$BASE_CLOUD_CONFIG" | sed "s|SPREAD_PASSWORD|$SPREAD_PASSWORD|g" > "$cloud_config"
+      echo "$CLOUD_CONFIG_TEMPLATE" | sed "s|SPREAD_PASSWORD|$SPREAD_PASSWORD|g" > "$cloud_config"
 
       lxc launch --vm \
         "ubuntu:${BASE}" \
@@ -60,6 +60,7 @@ backends:
     type: adhoc
     manual: true
     allocate: |
+      # Configure the local machine to run spread tests
       sudo sed -i "s|#PasswordAuthentication yes|PasswordAuthentication yes|g" /etc/ssh/sshd_config
       sudo sed -i "s|KbdInteractiveAuthentication no|KbdInteractiveAuthentication yes|g" /etc/ssh/sshd_config
       sudo rm -f /etc/ssh/sshd_config.d/60-cloudimg-settings.conf
@@ -72,6 +73,7 @@ backends:
 
       ADDRESS "127.0.0.1"
     discard: |
+      # Restore the machine to its previous state
       sudo userdel -f -r spread || true
       sudo rm -f /etc/sudoers.d/99-spread-user
 
@@ -105,8 +107,9 @@ prepare: |
     systemctl mask unattended-upgrades.service
   fi
 
+  # Provision the machine
   snap install --classic concierge
-  concierge prepare --trace -p microk8s --extra-snaps astral-uv --extra-debs make
+  concierge prepare --trace --preset microk8s --extra-snaps astral-uv/latest/candidate --extra-debs make
 
   pushd "$SPREAD_PATH"
 
@@ -114,9 +117,10 @@ prepare: |
     chown $(id -u):$(id -g) $PWD/zinc-k8s_amd64.charm
   fi
 
+# TODO: how do we `concierge restore` in CI but not locally
 restore: |
   if [[ -z "${CI:-}" ]]; then
-    # concierge restore --trace
+    concierge restore --trace
     
     apt autoremove -y --purge
     rm -Rf "$SPREAD_PATH"

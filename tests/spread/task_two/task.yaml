@@ -3,5 +3,5 @@ systems:
   - ubuntu-24.04
 
 execute: |
-  set -x
-  echo "Wow, this task two doesn't even need a file!"
+  juju controllers
+  exit 1

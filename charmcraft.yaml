@@ -20,7 +20,7 @@ parts:
       - cryptography
       - jsonschema
     override-build: |
-      just requirements
+      uvx --from=rust-just just generate-requirements
       craftctl default
     charm-requirements:
       - requirements.txt

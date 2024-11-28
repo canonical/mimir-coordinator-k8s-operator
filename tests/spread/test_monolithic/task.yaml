@@ -1,0 +1,20 @@
+summary: Test self-monitoring relations
+systems:
+  - ubuntu-24.04
+
+environment:
+  CHARM_PATH: "$(HOST: echo $CHARM_PATH)"
+  TEST_FILENAME: test_charm_monolithic
+
+execute: |
+  pushd "$SPREAD_PATH"
+  chown $(id -u):$(id -g) *.charm
+
+  if [[ -z "${CHARM_PATH:-}" ]]; then
+    CHARM_PATH_ARG="--charm-path ${CHARM_PATH:-}";
+  fi
+
+  # TODO: check if passing an empty string to --charm-path makes it pack in the test
+  # If so, remove the if above and just pass '--charm-path "${CHARM_PATH:-}"'
+  uvx --from=rust-just just integration -k "$TEST_FILENAME" "${CHARM_PATH_ARG:-}"
+

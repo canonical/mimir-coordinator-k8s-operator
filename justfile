@@ -21,7 +21,7 @@ PY_COLORS := "1"
 
 # Generate requirements.txt from pyproject.toml
 @generate-requirements:
-	uv export --format=requirements-txt > requirements.txt
+	uv export --frozen --no-hashes --format=requirements-txt > requirements.txt
 
 # Lint the code
 @lint:
@@ -53,6 +53,7 @@ PY_COLORS := "1"
 
 # Run integration tests
 @integration *args='':
+	charmcraft pack
 	uv run --isolated \
 		--extra integration \
 		pytest \
@@ -61,5 +62,5 @@ PY_COLORS := "1"
 		-s \
 		--tb native \
 		--log-cli-level=INFO \
-		{{tests-dir}}/integration \
+		{{tests-dir}}/spread \
 		"$@"

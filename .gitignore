@@ -48,3 +48,6 @@ override.tf.json
 .terraformrc
 terraform.rc
 .terraform.lock.hcl
+
+# Ignore Spread temporary files
+.spread*
