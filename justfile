@@ -21,7 +21,7 @@ PY_COLORS := "1"
 
 # Generate requirements.txt from pyproject.toml
 @generate-requirements:
-	uv export --format=requirements-txt > requirements.txt
+	uv export --frozen --no-hashes --format=requirements-txt > requirements.txt
 
 # Lint the code
 @lint:
