@@ -53,7 +53,6 @@ PY_COLORS := "1"
 
 # Run integration tests
 @integration *args='':
-	charmcraft pack
 	uv run --isolated \
 		--extra integration \
 		pytest \
