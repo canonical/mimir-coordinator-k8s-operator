@@ -1,10 +1,10 @@
-summary: Test self-monitoring relations (monolithic)
+summary: Test self-monitoring relations (ha, not scaled)
 systems:
   - ubuntu-24.04
 
 environment:
   CHARM_PATH: "$(HOST: echo $CHARM_PATH)"
-  TEST_FILENAME: test_charm_monolithic
+  TEST_FILENAME: test_charm_ha
 
 execute: |
   pushd "$SPREAD_PATH"

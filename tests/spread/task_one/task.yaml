@@ -1,6 +1,0 @@
-summary: Test observability relations with zinc
-systems:
-  - ubuntu-24.04
-
-execute: |
-  bash test.sh
