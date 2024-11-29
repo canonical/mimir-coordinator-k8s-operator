@@ -12,8 +12,8 @@ lock:
 	uv lock --upgrade --no-cache
 
 # Generate requirements.txt from pyproject.toml
-generate-requirements:
-	uv export --frozen --no-hashes --format=requirements-txt > requirements.txt
+requirements:
+	uv export --frozen --no-hashes --format=requirements-txt -o requirements.txt
 
 # Lint the code
 lint:
