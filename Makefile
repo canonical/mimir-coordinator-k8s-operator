@@ -17,8 +17,10 @@ requirements:
 
 # Lint the code
 lint:
-	uv tool run ruff check $(ALL)
-	uv tool run ruff format --check --diff $(ALL)
+	uv run --isolated --extra lint \
+		ruff check $(ALL)
+	uv run --isolated --extra lint \
+		ruff format --check --diff $(ALL)
 
 # Run static checks
 static:
@@ -26,27 +28,28 @@ static:
 
 # Format the code
 fmt:
-	uv tool run ruff check --fix-only $(ALL)
-	uv tool run ruff format $(ALL)
+	uv run --isolated --extra fmt \
+		ruff check --fix-only $(ALL)
+	uv run --isolated --extra fmt \
+		ruff format $(ALL)
 
 # Run unit tests
 unit:
-	uv run --isolated \
-	    --extra unit \
+	uv run --isolated --extra unit \
 		coverage run \
 		--source=$(SRC) \
 		-m pytest \
-		--ignore=$(TESTS)/integration \
 		--tb native \
 		-v \
 		-s \
+		$(TESTS)/unit \
 		$(ARGS)
-	uv run --extra unit coverage report
+	uv run  --isolated --extra unit \
+		coverage report
 
 # Run integration tests
 integration:
-	uv run --isolated \
-		--extra integration \
+	uv run --isolated --extra integration \
 		pytest \
 		-v \
 		-x \

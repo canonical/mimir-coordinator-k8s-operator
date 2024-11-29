@@ -19,6 +19,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+lint = ["ruff"]
+fmt = ["ruff"]
 static = ["pyright==1.1.344"]
 unit = [
     "pytest",
