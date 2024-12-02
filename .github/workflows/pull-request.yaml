@@ -62,7 +62,7 @@ jobs:
           echo "suites=$list" >> $GITHUB_OUTPUT
 
   spread-tests:
-    name: Spread Tests (trying it out)
+    name: Spread Tests
     runs-on: ubuntu-24.04
     needs:
       - define-matrix

@@ -83,8 +83,8 @@ backends:
           workers: 1
 
 suites:
-  tests/integration/:
-    summary: Integration tests
+  tests/spread/:
+    summary: Spread tests
 
 exclude:
   - .coverage

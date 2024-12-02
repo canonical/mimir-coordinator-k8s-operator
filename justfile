@@ -61,5 +61,5 @@ PY_COLORS := "1"
 		-s \
 		--tb native \
 		--log-cli-level=INFO \
-		{{tests-dir}}/integration \
+		{{tests-dir}}/spread \
 		"$@"
