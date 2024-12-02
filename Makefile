@@ -18,6 +18,12 @@ requirements:
 # Lint the code
 lint:
 	uv run --isolated --extra lint \
+		codespell $(PROJECT) \
+		--skip $(PROJECT).git \
+		--skip $(PROJECT).venv \
+		--skip $(PROJECT)build \
+		--skip $(PROJECT)lib
+	uv run --isolated --extra lint \
 		ruff check $(ALL)
 	uv run --isolated --extra lint \
 		ruff format --check --diff $(ALL)
@@ -40,20 +46,20 @@ unit:
 		--source=$(SRC) \
 		-m pytest \
 		--tb native \
-		-v \
-		-s \
+		--verbose \
+		--capture=no \
 		$(TESTS)/unit \
 		$(ARGS)
-	uv run  --isolated --extra unit \
+	uv run --isolated --extra unit \
 		coverage report
 
 # Run integration tests
 integration:
 	uv run --isolated --extra integration \
 		pytest \
-		-v \
-		-x \
-		-s \
+		--verbose \
+		--exitfirst \
+		--capture=no \
 		--tb native \
 		--log-cli-level=INFO \
 		$(TESTS)/integration \

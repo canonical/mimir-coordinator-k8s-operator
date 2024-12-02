@@ -1,7 +1,7 @@
 [project]
 name = "mimir-coordinator-k8s"
-version = "0.1"  # this is in fact irrelevant
-requires-python = ">=3.12"
+version = "0.0"  # this is in fact irrelevant
+requires-python = "~=3.8"  # https://packages.ubuntu.com/focal/python3
 
 dependencies = [
     "ops",
@@ -19,7 +19,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-lint = ["ruff"]
+lint = [
+  "ruff",
+  "codespell",
+]
 fmt = ["ruff"]
 static = ["pyright==1.1.344"]
 unit = [
@@ -95,5 +98,5 @@ pythonPlatform = "Linux"
 reportUnknownParameterType = true
 
 [tool.codespell]
-skip = ".git,.tox,build,venv*"
+skip = ".git,build,.venv"
 ignore-words-list = "assertIn,aNULL"
