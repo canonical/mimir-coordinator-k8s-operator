@@ -19,6 +19,7 @@ requirements:
 lint:
 	uv run --isolated --extra lint \
 		codespell $(PROJECT) \
+		--config $(PROJECT)pyproject.toml \
 		--skip $(PROJECT).git \
 		--skip $(PROJECT).venv \
 		--skip $(PROJECT)build \
