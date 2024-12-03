@@ -17,32 +17,25 @@ requirements:
 
 # Lint the code
 lint:
-	uv run --isolated --extra lint \
-		codespell $(PROJECT) \
-		--config $(PROJECT)pyproject.toml \
-		--skip $(PROJECT).git \
-		--skip $(PROJECT).venv \
-		--skip $(PROJECT)build \
-		--skip $(PROJECT)lib
-	uv run --isolated --extra lint \
+	uv run --frozen --isolated --extra dev \
 		ruff check $(ALL)
-	uv run --isolated --extra lint \
+	uv run --frozen --isolated --extra dev \
 		ruff format --check --diff $(ALL)
 
 # Run static checks
 static:
-	uv run --extra static pyright
+	uv run --frozen --isolated --extra dev pyright
 
 # Format the code
 fmt:
-	uv run --isolated --extra fmt \
+	uv run --frozen --isolated --extra dev \
 		ruff check --fix-only $(ALL)
-	uv run --isolated --extra fmt \
+	uv run --frozen --isolated --extra dev \
 		ruff format $(ALL)
 
 # Run unit tests
 unit:
-	uv run --isolated --extra unit \
+	uv run --frozen --isolated --extra dev \
 		coverage run \
 		--source=$(SRC) \
 		-m pytest \
@@ -51,12 +44,12 @@ unit:
 		--capture=no \
 		$(TESTS)/unit \
 		$(ARGS)
-	uv run --isolated --extra unit \
+	uv run --frozen --isolated --extra dev \
 		coverage report
 
 # Run integration tests
 integration:
-	uv run --isolated --extra integration \
+	uv run --frozen --isolated --extra dev \
 		pytest \
 		--verbose \
 		--exitfirst \

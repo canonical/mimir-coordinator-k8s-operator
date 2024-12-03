@@ -1,7 +1,7 @@
 [project]
 name = "mimir-coordinator-k8s"
 version = "0.0"  # this is in fact irrelevant
-requires-python = "~=3.8"  # https://packages.ubuntu.com/focal/python3
+requires-python = ">=3.8"  # https://packages.ubuntu.com/focal/python3
 
 dependencies = [
     "ops",
@@ -19,25 +19,22 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-lint = [
+dev = [
+  # Linting
   "ruff",
   "codespell",
-]
-fmt = ["ruff"]
-static = ["pyright==1.1.344"]
-unit = [
-    "pytest",
-    "coverage[toml]",
-    "deepdiff",
-    "numpy",
-]
-scenario = []
-integration = [
-    "pytest",
-    "minio",
-    "tenacity",
-    "juju",
-    "pytest-operator",
+  # Static
+  "pyright==1.1.344",
+  # Unit
+  "pytest",
+  "coverage[toml]",
+  "deepdiff",
+  "numpy",
+  # Integration
+  "minio",
+  "tenacity",
+  "juju",
+  "pytest-operator",
 ]
 
 # Testing tools configuration
@@ -51,9 +48,6 @@ show_missing = true
 asyncio_mode = "auto"
 minversion = "6.0"
 log_cli_level = "INFO"
-markers = [
-  'setup: marks tests as setup (deselect with -m "not setup")'
-]
 
 # Formatting tools configuration
 [tool.black]
@@ -98,5 +92,5 @@ pythonPlatform = "Linux"
 reportUnknownParameterType = true
 
 [tool.codespell]
-skip = ".git,build,.venv"
+skip = ".git,.tox,build,venv*"
 ignore-words-list = "assertIn,aNULL"
