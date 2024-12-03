@@ -1,7 +1,7 @@
 [project]
 name = "mimir-coordinator-k8s"
 version = "0.0"  # this is in fact irrelevant
-requires-python = ">=3.8"  # https://packages.ubuntu.com/focal/python3
+requires-python = "==3.10.*"  # https://packages.ubuntu.com/jammy/python3
 
 dependencies = [
     "ops",
@@ -29,7 +29,6 @@ dev = [
   "pytest",
   "coverage[toml]",
   "deepdiff",
-  "numpy",
   # Integration
   "minio",
   "tenacity",
