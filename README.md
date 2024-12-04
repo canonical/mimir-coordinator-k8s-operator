@@ -6,7 +6,7 @@
 
 ## Description
 
-This charm serves as a coordinator for a Mimir HA deployment, together with the [mimir-worker-k8s](https://github.com/canonical/mimir-worker-k8s-operator) charm.  
+This charm serves as a coordinator for a Mimir HA deployment, together with the [mimir-worker-k8s](https://github.com/canonical/mimir-worker-k8s-operator) charm.
 
 ## Contributing
 
