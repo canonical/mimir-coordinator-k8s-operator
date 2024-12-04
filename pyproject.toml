@@ -94,5 +94,5 @@ pythonPlatform = "Linux"
 reportUnknownParameterType = true
 
 [tool.codespell]
-skip = ".git,.tox,build,venv*"
+skip = ".git,build,.venv"
 ignore-words-list = "assertIn,aNULL"
