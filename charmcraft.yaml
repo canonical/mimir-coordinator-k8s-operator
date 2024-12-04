@@ -12,12 +12,29 @@ bases:
 
 parts:
   charm:
+    build-snaps:
+      - astral-uv
     charm-binary-python-packages:
       - pydantic>2.0
-
       # For v2.tls_certificates
       - cryptography
       - jsonschema
+    override-build: |
+      make requirements
+      craftctl default
+    # charm-requirements defaults to requirements.txt, but without setting it (counter-intuitive) 
+    # the charm does not respect the requirements.txt when generated dynamically during build.
+    charm-requirements: [requirements.txt]
+    prime:
+      - -*.charm
+      - -.venv
+      - -CONTRIBUTING.md
+      - -Makefile
+      - -pyproject.toml
+      - -README.md
+      - -tests/
+      - -uv.lock
+      - -*.egg-info
 
   cos-tool:
     plugin: dump
