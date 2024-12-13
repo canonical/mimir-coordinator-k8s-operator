@@ -26,6 +26,7 @@ from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
 from charms.tempo_coordinator_k8s.v0.tracing import charm_tracing_config
 from charms.traefik_k8s.v2.ingress import IngressPerAppReadyEvent, IngressPerAppRequirer
 from cosl.coordinated_workers.coordinator import Coordinator
+from cosl.interfaces.datasource_exchange import DatasourceDict
 from ops.model import ModelError
 from ops.pebble import Error as PebbleError
 
@@ -76,6 +77,8 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                 "charm-tracing": "charm-tracing",
                 "workload-tracing": "workload-tracing",
                 "s3": "s3",
+                "send-datasource": "send-datasource",
+                "receive-datasource": None,
             },
             nginx_config=NginxConfig().config,
             workers_config=MimirConfig(
@@ -110,15 +113,14 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             endpoint_path="/api/v1/push",
         )
 
-        if self._nginx_container.can_connect():
-            self._set_alerts()
+        # do this regardless of what event we are processing
+        self._reconcile()
 
         ######################################
         # === EVENT HANDLER REGISTRATION === #
         ######################################
         self.framework.observe(self.ingress.on.ready, self._on_ingress_ready)
         self.framework.observe(self.ingress.on.revoked, self._on_ingress_revoked)
-        self.framework.observe(self.on.nginx_pebble_ready, self._on_pebble_ready)
 
     ##########################
     # === EVENT HANDLERS === #
@@ -137,10 +139,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         This event refreshes the PrometheusRemoteWriteProvider address.
         """
         logger.info("Ingress for app revoked")
-
-    def _on_pebble_ready(self, _) -> None:
-        """Make sure the `mimirtool` binary is in the workload container."""
-        self._ensure_mimirtool()
 
     ######################
     # === PROPERTIES === #
@@ -255,6 +253,33 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                 logger.info(f"mimirtool: {mimirtool_output.stdout.read().strip()}")
             if mimirtool_output.stderr:
                 logger.error(f"mimirtool (err): {mimirtool_output.stderr.read().strip()}")
+
+    def _update_datasource_exchange(self) -> None:
+        """Update the grafana-datasource-exchange relations."""
+        if not self.unit.is_leader():
+            return
+
+        # we might have multiple grafana-source relations, this method collects them all and returns a mapping from
+        # the `grafana_uid` to the contents of the `datasource_uids` field
+        # for simplicity, we assume that we're sending the same data to different grafanas.
+        # read more in https://discourse.charmhub.io/t/tempo-ha-docs-correlating-traces-metrics-logs/16116
+        grafana_uids_to_units_to_uids = self.grafana_source.get_source_uids()
+        raw_datasources: List[DatasourceDict] = []
+
+        for grafana_uid, ds_uids in grafana_uids_to_units_to_uids.items():
+            for _, ds_uid in ds_uids.items():
+                raw_datasources.append(
+                    {"type": "prometheus", "uid": ds_uid, "grafana_uid": grafana_uid}
+                )
+        self.coordinator.datasource_exchange.publish(datasources=raw_datasources)
+
+    def _reconcile(self):
+        # This method contains unconditional update logic, i.e. logic that should be executed
+        # regardless of the event we are processing.
+        if self._nginx_container.can_connect():
+            self._set_alerts()
+        self._ensure_mimirtool()
+        self._update_datasource_exchange()
 
 
 if __name__ == "__main__":  # pragma: nocover

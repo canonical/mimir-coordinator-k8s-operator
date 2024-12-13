@@ -9,7 +9,7 @@ dependencies = [
     "crossplane",
 
     # ---PYDEPS---
-    "cosl>=0.0.43",
+    "cosl>=0.0.47",
     "pydantic>=2",
     # lib/charms/tempo_k8s/v1/charm_tracing.py
     "opentelemetry-exporter-otlp-proto-http==1.21.0",
@@ -34,6 +34,10 @@ dev = [
   "tenacity",
   "juju",
   "pytest-operator",
+  # scenario
+  "ops[testing]>=2.17",
+  # interface
+  "pytest-interface-tester>2.0.0",
 ]
 
 # Testing tools configuration

@@ -44,6 +44,17 @@ unit:
 		--capture=no \
 		$(TESTS)/unit \
 		$(ARGS)
+	
+	uv run --frozen --isolated --extra dev \
+		coverage run \
+		--source=$(SRC) \
+		--append \
+		-m pytest \
+		--tb native \
+		--verbose \
+		--capture=no \
+		$(TESTS)/scenario \
+		$(ARGS)
 	uv run --frozen --isolated --extra dev \
 		coverage report
 
@@ -57,4 +68,16 @@ integration:
 		--tb native \
 		--log-cli-level=INFO \
 		$(TESTS)/integration \
+		$(ARGS)
+
+# Run interface tests
+interface:
+	uv run --frozen --isolated --extra dev \
+		pytest \
+		--verbose \
+		--exitfirst \
+		--capture=no \
+		--tb native \
+		--log-cli-level=INFO \
+		$(TESTS)/interface \
 		$(ARGS)
