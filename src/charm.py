@@ -24,7 +24,7 @@ from charms.grafana_k8s.v0.grafana_source import GrafanaSourceProvider
 from charms.prometheus_k8s.v1.prometheus_remote_write import PrometheusRemoteWriteProvider
 from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
 from charms.tempo_coordinator_k8s.v0.tracing import charm_tracing_config
-from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer
+from charms.traefik_k8s.v2.ingress import IngressPerAppReadyEvent, IngressPerAppRequirer
 from cosl.coordinated_workers.coordinator import Coordinator
 from cosl.interfaces.datasource_exchange import DatasourceDict
 from ops.model import ModelError
@@ -128,12 +128,14 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
 
     def _on_ingress_ready(self, event: IngressPerAppReadyEvent):
         """Log the obtained ingress address.
+
         This event refreshes the PrometheusRemoteWriteProvider address.
         """
         logger.info("Ingress for app ready on '%s'", event.url)
 
     def _on_ingress_revoked(self, _) -> None:
         """Log the ingress address being revoked.
+
         This event refreshes the PrometheusRemoteWriteProvider address.
         """
         logger.info("Ingress for app revoked")
