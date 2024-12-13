@@ -58,3 +58,27 @@ integration:
 		--log-cli-level=INFO \
 		$(TESTS)/integration \
 		$(ARGS)
+
+# Run scenario tests
+scenario:
+	uv run --frozen --isolated --extra dev \
+		pytest \
+		--verbose \
+		--exitfirst \
+		--capture=no \
+		--tb native \
+		--log-cli-level=INFO \
+		$(TESTS)/scenario \
+		$(ARGS)
+
+# Run interface tests
+interface:
+	uv run --frozen --isolated --extra dev \
+		pytest \
+		--verbose \
+		--exitfirst \
+		--capture=no \
+		--tb native \
+		--log-cli-level=INFO \
+		$(TESTS)/interface \
+		$(ARGS)
