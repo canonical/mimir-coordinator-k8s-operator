@@ -252,8 +252,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     def _reconcile(self):
         # This method contains unconditional update logic, i.e. logic that should be executed
         # regardless of the event we are processing.
-        # reason is, if we miss these events because our coordinator cannot process events (inconsistent status),
-        # we need to 'remember' to run this logic as soon as we become ready, which is hard and error-prone
         if self._nginx_container.can_connect():
             self._set_alerts()
         self._ensure_mimirtool()

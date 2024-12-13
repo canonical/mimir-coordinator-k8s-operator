@@ -44,12 +44,11 @@ unit:
 		--capture=no \
 		$(TESTS)/unit \
 		$(ARGS)
-	uv run --frozen --isolated --extra dev \
-		coverage report
 	
 	uv run --frozen --isolated --extra dev \
 		coverage run \
 		--source=$(SRC) \
+		--append \
 		-m pytest \
 		--tb native \
 		--verbose \
