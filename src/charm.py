@@ -116,6 +116,28 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         # do this regardless of what event we are processing
         self._reconcile()
 
+        ######################################
+        # === EVENT HANDLER REGISTRATION === #
+        ######################################
+        self.framework.observe(self.ingress.on.ready, self._on_ingress_ready)
+        self.framework.observe(self.ingress.on.revoked, self._on_ingress_revoked)
+
+    ##########################
+    # === EVENT HANDLERS === #
+    ##########################
+
+    def _on_ingress_ready(self, event: IngressPerAppReadyEvent):
+        """Log the obtained ingress address.
+        This event refreshes the PrometheusRemoteWriteProvider address.
+        """
+        logger.info("Ingress for app ready on '%s'", event.url)
+
+    def _on_ingress_revoked(self, _) -> None:
+        """Log the ingress address being revoked.
+        This event refreshes the PrometheusRemoteWriteProvider address.
+        """
+        logger.info("Ingress for app revoked")
+
     ######################
     # === PROPERTIES === #
     ######################
