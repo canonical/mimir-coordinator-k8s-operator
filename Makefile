@@ -33,7 +33,7 @@ fmt:
 	uv run --frozen --isolated --extra dev \
 		ruff format $(ALL)
 
-# Run unit tests
+# Run unit and scenario tests
 unit:
 	uv run --frozen --isolated --extra dev \
 		coverage run \
@@ -43,6 +43,18 @@ unit:
 		--verbose \
 		--capture=no \
 		$(TESTS)/unit \
+		$(ARGS)
+	uv run --frozen --isolated --extra dev \
+		coverage report
+	
+	uv run --frozen --isolated --extra dev \
+		coverage run \
+		--source=$(SRC) \
+		-m pytest \
+		--tb native \
+		--verbose \
+		--capture=no \
+		$(TESTS)/scenario \
 		$(ARGS)
 	uv run --frozen --isolated --extra dev \
 		coverage report
@@ -57,18 +69,6 @@ integration:
 		--tb native \
 		--log-cli-level=INFO \
 		$(TESTS)/integration \
-		$(ARGS)
-
-# Run scenario tests
-scenario:
-	uv run --frozen --isolated --extra dev \
-		pytest \
-		--verbose \
-		--exitfirst \
-		--capture=no \
-		--tb native \
-		--log-cli-level=INFO \
-		$(TESTS)/scenario \
 		$(ARGS)
 
 # Run interface tests

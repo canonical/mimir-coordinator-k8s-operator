@@ -24,7 +24,7 @@ from charms.grafana_k8s.v0.grafana_source import GrafanaSourceProvider
 from charms.prometheus_k8s.v1.prometheus_remote_write import PrometheusRemoteWriteProvider
 from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
 from charms.tempo_coordinator_k8s.v0.tracing import charm_tracing_config
-from charms.traefik_k8s.v2.ingress import IngressPerAppReadyEvent, IngressPerAppRequirer
+from charms.traefik_k8s.v2.ingress import IngressPerAppRequirer
 from cosl.coordinated_workers.coordinator import Coordinator
 from cosl.interfaces.datasource_exchange import DatasourceDict
 from ops.model import ModelError
@@ -113,40 +113,8 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             endpoint_path="/api/v1/push",
         )
 
-        if self._nginx_container.can_connect():
-            self._set_alerts()
-
         # do this regardless of what event we are processing
         self._reconcile()
-
-        ######################################
-        # === EVENT HANDLER REGISTRATION === #
-        ######################################
-        self.framework.observe(self.ingress.on.ready, self._on_ingress_ready)
-        self.framework.observe(self.ingress.on.revoked, self._on_ingress_revoked)
-        self.framework.observe(self.on.nginx_pebble_ready, self._on_pebble_ready)
-
-    ##########################
-    # === EVENT HANDLERS === #
-    ##########################
-
-    def _on_ingress_ready(self, event: IngressPerAppReadyEvent):
-        """Log the obtained ingress address.
-
-        This event refreshes the PrometheusRemoteWriteProvider address.
-        """
-        logger.info("Ingress for app ready on '%s'", event.url)
-
-    def _on_ingress_revoked(self, _) -> None:
-        """Log the ingress address being revoked.
-
-        This event refreshes the PrometheusRemoteWriteProvider address.
-        """
-        logger.info("Ingress for app revoked")
-
-    def _on_pebble_ready(self, _) -> None:
-        """Make sure the `mimirtool` binary is in the workload container."""
-        self._ensure_mimirtool()
 
     ######################
     # === PROPERTIES === #
@@ -286,6 +254,9 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         # regardless of the event we are processing.
         # reason is, if we miss these events because our coordinator cannot process events (inconsistent status),
         # we need to 'remember' to run this logic as soon as we become ready, which is hard and error-prone
+        if self._nginx_container.can_connect():
+            self._set_alerts()
+        self._ensure_mimirtool()
         self._update_datasource_exchange()
 
 
