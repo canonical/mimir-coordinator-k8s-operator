@@ -33,7 +33,7 @@ fmt:
 	uv run --frozen --isolated --extra dev \
 		ruff format $(ALL)
 
-# Run unit and scenario tests
+# Run unit tests
 unit:
 	uv run --frozen --isolated --extra dev \
 		coverage run \
