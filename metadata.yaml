@@ -73,6 +73,11 @@ requires:
     description: |
       Configure Mimir to utilize an external Alertmanager to notify the user when an alert is triggered.
 
+  catalogue:
+    interface: catalogue
+    description: |
+      Integration to help users discover Mimir's deployment.
+
 provides:
   mimir-cluster:
     interface: mimir_cluster
