@@ -20,6 +20,7 @@ import cosl.coordinated_workers.nginx
 import ops
 import yaml
 from charms.alertmanager_k8s.v1.alertmanager_dispatch import AlertmanagerConsumer
+from charms.catalogue_k8s.v1.catalogue import CatalogueItem
 from charms.grafana_k8s.v0.grafana_source import GrafanaSourceProvider
 from charms.prometheus_k8s.v1.prometheus_remote_write import PrometheusRemoteWriteProvider
 from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
@@ -68,7 +69,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             roles_config=MIMIR_ROLES_CONFIG,
             external_url=self.external_url,
             worker_metrics_port=8080,
-            endpoints={
+            endpoints={  # pyright: ignore
                 "certificates": "certificates",
                 "cluster": "mimir-cluster",
                 "grafana-dashboards": "grafana-dashboards-provider",
@@ -85,6 +86,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                 alertmanager_urls=self.alertmanager.get_cluster_info()
             ).config,
             workload_tracing_protocols=["jaeger_thrift_http"],
+            catalogue_item=self._catalogue_item,
         )
 
         self.charm_tracing_endpoint, self.server_ca_cert = charm_tracing_config(
@@ -168,6 +170,20 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         except ModelError as e:
             logger.error("Failed obtaining external url: %s.", e)
         return self.internal_url
+
+    @property
+    def _catalogue_item(self) -> CatalogueItem:
+        """A catalogue application entry for this Mimir instance."""
+        return CatalogueItem(
+            name="Mimir",
+            icon="ruler",
+            url="",
+            description=(
+                "Mimir provides horizontally scalable, highly available, "
+                "multi-tenant, long-term storage for Prometheus. "
+                "(no user interface available)"
+            ),
+        )
 
     ###########################
     # === UTILITY METHODS === #
