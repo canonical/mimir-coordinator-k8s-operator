@@ -69,7 +69,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             roles_config=MIMIR_ROLES_CONFIG,
             external_url=self.external_url,
             worker_metrics_port=8080,
-            endpoints={
+            endpoints={  # pyright: ignore
                 "certificates": "certificates",
                 "cluster": "mimir-cluster",
                 "grafana-dashboards": "grafana-dashboards-provider",
