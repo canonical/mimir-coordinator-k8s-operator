@@ -22,6 +22,7 @@ import yaml
 from charms.alertmanager_k8s.v1.alertmanager_dispatch import AlertmanagerConsumer
 from charms.catalogue_k8s.v1.catalogue import CatalogueItem
 from charms.grafana_k8s.v0.grafana_source import GrafanaSourceProvider
+from charms.mimir_coordinator_k8s.v0.prometheus_api import PrometheusApiProvider
 from charms.prometheus_k8s.v1.prometheus_remote_write import PrometheusRemoteWriteProvider
 from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
 from charms.tempo_coordinator_k8s.v0.tracing import charm_tracing_config
@@ -113,6 +114,17 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             charm=self,
             server_url_func=lambda: MimirCoordinatorK8SOperatorCharm.external_url.fget(self),  # type: ignore
             endpoint_path="/api/v1/push",
+        )
+
+        self.prometheus_api_provider = PrometheusApiProvider(
+            charm=self,
+            ingress_url=f"{self.external_url}/prometheus",
+            internal_url=f"{self.internal_url}/prometheus",
+            refresh_event=[
+                self.coordinator.cluster.on.changed,
+                self.on[self.coordinator.cert_handler.certificates_relation_name].relation_changed,
+                self.ingress.on.ready,
+            ],
         )
 
         # do this regardless of what event we are processing
