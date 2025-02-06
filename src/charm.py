@@ -116,7 +116,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             endpoint_path="/api/v1/push",
         )
 
-        self.prometheus_api_provider = PrometheusApiProvider(
+        PrometheusApiProvider(
             charm=self,
             ingress_url=f"{self.external_url}/prometheus",
             internal_url=f"{self.internal_url}/prometheus",
