@@ -29,7 +29,6 @@ dev = [
   "pytest",
   "coverage[toml]",
   "deepdiff",
-  "cosl>=0.0.55",
   # Integration
   "minio",
   "tenacity",
