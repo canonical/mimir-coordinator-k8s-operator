@@ -80,6 +80,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                 "s3": "s3",
                 "send-datasource": "send-datasource",
                 "receive-datasource": None,
+                "catalogue": None,
             },
             nginx_config=NginxConfig().config,
             workers_config=MimirConfig(

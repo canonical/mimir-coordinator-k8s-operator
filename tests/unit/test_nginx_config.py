@@ -1,13 +1,20 @@
-from unittest.mock import MagicMock
+from contextlib import contextmanager
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-import src.nginx_config
+from nginx_config import NginxConfig
+
+
+@contextmanager
+def mock_ipv6(enable: bool):
+    with patch("nginx_config.is_ipv6_enabled", MagicMock(return_value=enable)):
+        yield
 
 
 @pytest.fixture(scope="module")
 def nginx_config():
-    return src.nginx_config.NginxConfig()
+    return NginxConfig()
 
 
 @pytest.fixture(scope="module")
@@ -75,3 +82,19 @@ def test_upstreams_config(nginx_config, coordinator, addresses_by_role):
         }
     ]
     assert upstreams_config == expected_config
+
+
+@pytest.mark.parametrize("tls", (True, False))
+@pytest.mark.parametrize("ipv6", (True, False))
+def test_servers_config(ipv6, tls):
+    port = 8080
+    with mock_ipv6(ipv6):
+        nginx = NginxConfig()
+    server_config = nginx._server(
+        server_name="test", addresses_by_role={}, nginx_port=port, tls=tls
+    )
+    ipv4_args = ["443", "ssl"] if tls else [f"{port}"]
+    assert {"directive": "listen", "args": ipv4_args} in server_config["block"]
+    if ipv6:
+        ipv6_args = ["[::]:443", "ssl"] if tls else [f"[::]:{port}"]
+        assert {"directive": "listen", "args": ipv6_args} in server_config["block"]
