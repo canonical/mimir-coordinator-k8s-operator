@@ -227,10 +227,11 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
 
     def _ensure_mimirtool(self):
         """Copy the `mimirtool` binary to the workload container."""
-        if self._nginx_container.exists("/usr/bin/mimirtool"):
-            return
-        with open("mimirtool", "rb") as f:
-            self._nginx_container.push("/usr/bin/mimirtool", source=f, permissions=0o744)
+        if self._nginx_container.can_connect():
+            if self._nginx_container.exists("/usr/bin/mimirtool"):
+                return
+            with open("mimirtool", "rb") as f:
+                self._nginx_container.push("/usr/bin/mimirtool", source=f, permissions=0o744)
 
     def _set_alerts(self):
         """Create alert rule files for all Mimir consumers."""
