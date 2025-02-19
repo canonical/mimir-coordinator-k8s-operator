@@ -1,21 +1,21 @@
 [project]
 name = "mimir-coordinator-k8s"
-version = "0.0"  # this is in fact irrelevant
-requires-python = "==3.10.*"  # https://packages.ubuntu.com/jammy/python3
+version = "0.0"                # this is in fact irrelevant
+requires-python = "==3.10.*"   # https://packages.ubuntu.com/jammy/python3
 
 dependencies = [
-    "ops",
-    # crossplane is a package from nginxinc to interact with the Nginx config
-    "crossplane",
+  "ops",
+  # crossplane is a package from nginxinc to interact with the Nginx config
+  "crossplane",
 
-    # ---PYDEPS---
-    "cosl>=0.0.47",
-    "pydantic>=2",
-    # lib/charms/tempo_k8s/v1/charm_tracing.py
-    "opentelemetry-exporter-otlp-proto-http==1.21.0",
-    # lib/charms/tls_certificates_interface/v3/tls_certificates.py
-    "jsonschema",
-    "cryptography",
+  # ---PYDEPS---
+  "cosl>=0.0.55",
+  "pydantic>=2",
+  # lib/charms/tempo_k8s/v1/charm_tracing.py
+  "opentelemetry-exporter-otlp-proto-http==1.21.0",
+  # lib/charms/tls_certificates_interface/v3/tls_certificates.py
+  "jsonschema",
+  "cryptography",
 ]
 
 [project.optional-dependencies]
@@ -51,9 +51,7 @@ show_missing = true
 asyncio_mode = "auto"
 minversion = "6.0"
 log_cli_level = "INFO"
-markers = [
-  'setup: marks tests as setup (deselect with -m "not setup")'
-]
+markers = ['setup: marks tests as setup (deselect with -m "not setup")']
 
 # Linting tools configuration
 [tool.ruff]
@@ -76,7 +74,7 @@ extend-ignore = [
   "D413",
 ]
 ignore = ["E501", "D107"]
-per-file-ignores = {"tests/*" = ["D100","D101","D102","D103","D104"]}
+per-file-ignores = { "tests/*" = ["D100", "D101", "D102", "D103", "D104"] }
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"

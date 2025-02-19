@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Set
 
 import crossplane
 from cosl.coordinated_workers.coordinator import Coordinator
-from cosl.coordinated_workers.nginx import CERT_PATH, KEY_PATH
+from cosl.coordinated_workers.nginx import CERT_PATH, KEY_PATH, is_ipv6_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -194,6 +194,7 @@ class NginxConfig:
 
     def __init__(self):
         self.dns_IP_address = _get_dns_ip_address()
+        self.ipv6_enabled = is_ipv6_enabled()
 
     def config(self, coordinator: Coordinator) -> str:
         """Build and return the Nginx configuration."""
@@ -341,8 +342,7 @@ class NginxConfig:
                 "directive": "server",
                 "args": [],
                 "block": [
-                    {"directive": "listen", "args": ["443", "ssl"]},
-                    {"directive": "listen", "args": ["[::]:443", "ssl"]},
+                    *self._listen(443, ssl=True),
                     *self._basic_auth(auth_enabled),
                     {
                         "directive": "proxy_set_header",
@@ -365,8 +365,7 @@ class NginxConfig:
             "directive": "server",
             "args": [],
             "block": [
-                {"directive": "listen", "args": [f"{nginx_port}"]},
-                {"directive": "listen", "args": [f"[::]:{nginx_port}"]},
+                *self._listen(nginx_port, ssl=False),
                 *self._basic_auth(auth_enabled),
                 {
                     "directive": "proxy_set_header",
@@ -376,6 +375,18 @@ class NginxConfig:
                 *self._locations(addresses_by_role, tls),
             ],
         }
+
+    def _listen(self, port: int, ssl: bool) -> List[Dict[str, Any]]:
+        directives = [{"directive": "listen", "args": self._listen_args(port, False, ssl)}]
+        if self.ipv6_enabled:
+            directives.append({"directive": "listen", "args": self._listen_args(port, True, ssl)})
+        return directives
+
+    def _listen_args(self, port: int, ipv6: bool, ssl: bool) -> List[str]:
+        args = [f"[::]:{port}" if ipv6 else f"{port}"]
+        if ssl:
+            args.append("ssl")
+        return args
 
 
 def _get_dns_ip_address():
