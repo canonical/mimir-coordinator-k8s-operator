@@ -96,8 +96,8 @@ def test_servers_config(ipv6, tls):
     ipv4_args = ["443", "ssl"] if tls else [f"{port}"]
     assert {"directive": "listen", "args": ipv4_args} in server_config["block"]
     ipv6_args = ["[::]:443", "ssl"] if tls else [f"[::]:{port}"]
-    assert (
-        ({"directive": "listen", "args": ipv6_args} in server_config["block"])
-        if ipv6
-        else ({"directive": "listen", "args": ipv6_args} not in server_config["block"])
-    )
+    ipv6_directive = {"directive": "listen", "args": ipv6_args}
+    if ipv6:
+        assert ipv6_directive in server_config["block"]
+    else:
+        assert ipv6_directive not in server_config["block"]
