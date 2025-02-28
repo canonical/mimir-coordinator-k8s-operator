@@ -15,7 +15,7 @@ import logging
 import os
 import shutil
 import socket
-from typing import Any, Optional
+from typing import Any, Optional, Tuple
 from urllib.parse import urlparse
 
 import cosl.coordinated_workers.nginx
@@ -64,7 +64,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             charm=self,
             roles_config=MIMIR_ROLES_CONFIG,
             external_url=self.external_url,
-            worker_metrics_port=8080,
+            worker_metrics_port=MimirConfig.http_api_port,
             endpoints={
                 "certificates": "certificates",
                 "cluster": "mimir-cluster",
@@ -73,9 +73,15 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                 "metrics": "self-metrics-endpoint",
                 "tracing": "tracing",
                 "s3": "s3",
+                "charm-tracing":None,
+                "workload-tracing":None,
+                "catalogue":None,
+                "send-datasource":None,
+                "receive-datasource":None,
             },
             nginx_config=NginxConfig().config,
             workers_config=MimirConfig().config,
+            worker_ports=self._get_worker_ports
         )
 
         if port := urlparse(self.internal_url).port:
@@ -151,10 +157,10 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     def internal_url(self) -> str:
         """Returns workload's FQDN. Used for ingress."""
         scheme = "http"
-        port = 8080
+        port = MimirConfig.http_api_port
         if hasattr(self, "coordinator") and self.coordinator.nginx.are_certificates_on_disk:
             scheme = "https"
-            port = 443
+            port = MimirConfig.https_api_port
         return f"{scheme}://{self.hostname}:{port}"
 
     @property
@@ -166,6 +172,10 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         except ModelError as e:
             logger.error("Failed obtaining external url: %s.", e)
         return self.internal_url
+
+    def _get_worker_ports(self, role: str) -> Tuple[int, ...]:
+        """Determine, from the role of a worker, which ports it should open."""
+        return MimirConfig.http_api_port,
 
     ###########################
     # === UTILITY METHODS === #

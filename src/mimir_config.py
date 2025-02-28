@@ -98,11 +98,13 @@ DEFAULT_REPLICATION = 3
 
 class MimirConfig:
     """Config builder for the Mimir Coordinator."""
+    http_api_port = 8080
+    https_api_port = 443
 
     def __init__(
-        self,
-        root_data_dir: Path = Path("/data"),
-        recovery_data_dir: Path = Path("/recovery-data"),
+            self,
+            root_data_dir: Path = Path("/data"),
+            recovery_data_dir: Path = Path("/recovery-data"),
     ):
         self._root_data_dir = root_data_dir
         self._recovery_data_dir = recovery_data_dir
@@ -285,7 +287,7 @@ class MimirConfig:
     # packets and gossip streams. Other members in the memberlist cluster will
     # discard any message whose label doesn't match the configured one, unless the
     def _build_memberlist_config(
-        self, topology: JujuTopology, cluster: ClusterProvider
+            self, topology: JujuTopology, cluster: ClusterProvider
     ) -> Dict[str, Any]:
         top = topology.as_dict()
         return {

@@ -9,6 +9,8 @@ from juju.unit import Unit
 from minio import Minio
 from pytest_operator.plugin import OpsTest
 
+from mimir_config import MimirConfig
+
 logger = logging.getLogger(__name__)
 
 
@@ -129,7 +131,7 @@ async def query_mimir(
     leader_unit_number = await get_leader_unit_number(ops_test, coordinator_app)
     mimir_url = await get_unit_address(ops_test, coordinator_app, leader_unit_number)
     response = requests.get(
-        f"http://{mimir_url}:8080/prometheus/api/v1/query",
+        f"http://{mimir_url}:{MimirConfig.http_api_port}/prometheus/api/v1/query",
         params={"query": query},
     )
     assert response.status_code == 200

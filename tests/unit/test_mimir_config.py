@@ -19,20 +19,20 @@ def coordinator():
     coord.cluster = MagicMock()
     coord.cluster.gather_addresses_by_role = MagicMock(
         return_value={
-            "alertmanager": ["http://some.mimir.worker.0:8080"],
-            "overrides-exporter": ["http://some.mimir.worker.0:8080"],
-            "flusher": ["http://some.mimir.worker.0:8080"],
-            "query-frontend": ["http://some.mimir.worker.0:8080"],
-            "querier": ["http://some.mimir.worker.0:8080"],
-            "store-gateway": ["http://some.mimir.worker.1:8080"],
-            "ingester": ["http://some.mimir.worker.1:8080"],
-            "distributor": ["http://some.mimir.worker.1:8080"],
-            "ruler": ["http://some.mimir.worker.1:8080"],
-            "compactor": ["http://some.mimir.worker.0:8080", "http://some.mimir.worker.1:8080"],
+            "alertmanager": [f"http://some.mimir.worker.0:{MimirConfig.http_api_port}"],
+            "overrides-exporter": [f"http://some.mimir.worker.0:{MimirConfig.http_api_port}"],
+            "flusher": [f"http://some.mimir.worker.0:{MimirConfig.http_api_port}"],
+            "query-frontend": [f"http://some.mimir.worker.0:{MimirConfig.http_api_port}"],
+            "querier": [f"http://some.mimir.worker.0:{MimirConfig.http_api_port}"],
+            "store-gateway": [f"http://some.mimir.worker.1:{MimirConfig.http_api_port}"],
+            "ingester": [f"http://some.mimir.worker.1:{MimirConfig.http_api_port}"],
+            "distributor": [f"http://some.mimir.worker.1:{MimirConfig.http_api_port}"],
+            "ruler": [f"http://some.mimir.worker.1:{MimirConfig.http_api_port}"],
+            "compactor": [f"http://some.mimir.worker.0:{MimirConfig.http_api_port}", f"http://some.mimir.worker.1:{MimirConfig.http_api_port}"],
         }
     )
     coord.cluster.gather_addresses = MagicMock(
-        return_value=["http://some.mimir.worker.0:8080", "http://some.mimir.worker.1:8080"]
+        return_value=[f"http://some.mimir.worker.0:{MimirConfig.http_api_port}", f"http://some.mimir.worker.1:{MimirConfig.http_api_port}"]
     )
     coord.s3_ready = MagicMock(return_value=True)
     coord.nginx = MagicMock()
@@ -183,7 +183,7 @@ def test_build_memberlist_config(mimir_config, topology, coordinator):
     memberlist_config = mimir_config._build_memberlist_config(topology, coordinator.cluster)
     expected_config = {
         "cluster_label": "some-model_some-uuid_mimir",
-        "join_members": ["http://some.mimir.worker.0:8080", "http://some.mimir.worker.1:8080"],
+        "join_members": [f"http://some.mimir.worker.0:{MimirConfig.http_api_port}", f"http://some.mimir.worker.1:{MimirConfig.http_api_port}"],
     }
     assert memberlist_config == expected_config
 

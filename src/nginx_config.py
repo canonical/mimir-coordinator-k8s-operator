@@ -10,6 +10,8 @@ import crossplane
 from cosl.coordinated_workers.coordinator import Coordinator
 from cosl.coordinated_workers.nginx import CERT_PATH, KEY_PATH
 
+from mimir_config import MimirConfig
+
 logger = logging.getLogger(__name__)
 
 
@@ -341,8 +343,8 @@ class NginxConfig:
                 "directive": "server",
                 "args": [],
                 "block": [
-                    {"directive": "listen", "args": ["443", "ssl"]},
-                    {"directive": "listen", "args": ["[::]:443", "ssl"]},
+                    {"directive": "listen", "args": [f"{MimirConfig.https_api_port}", "ssl"]},
+                    {"directive": "listen", "args": [f"[::]:{MimirConfig.https_api_port}", "ssl"]},
                     *self._basic_auth(auth_enabled),
                     {
                         "directive": "proxy_set_header",
