@@ -67,7 +67,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self.coordinator = Coordinator(
             charm=self,
             roles_config=MIMIR_ROLES_CONFIG,
-            external_url=self.external_url,
+            external_url=self.most_external_url,
             worker_metrics_port=8080,
             endpoints={  # pyright: ignore
                 "certificates": "certificates",
@@ -99,7 +99,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self.grafana_source = GrafanaSourceProvider(
             self,
             source_type="prometheus",
-            source_url=f"{self.external_url}/prometheus",
+            source_url=f"{self.most_external_url}/prometheus",
             extra_fields={"httpHeaderName1": "X-Scope-OrgID"},
             secure_extra_fields={"httpHeaderValue1": "anonymous"},
             refresh_event=[
@@ -111,7 +111,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
 
         self.remote_write_provider = PrometheusRemoteWriteProvider(
             charm=self,
-            server_url_func=lambda: MimirCoordinatorK8SOperatorCharm.external_url.fget(self),  # type: ignore
+            server_url_func=lambda: MimirCoordinatorK8SOperatorCharm.most_external_url.fget(self),  # type: ignore
             endpoint_path="/api/v1/push",
         )
 
@@ -162,13 +162,27 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         return f"{scheme}://{self.hostname}:{port}"
 
     @property
-    def external_url(self) -> str:
-        """Return the external hostname to be passed to ingress via the relation."""
+    def external_url(self) -> Optional[str]:
+        """Return the external hostname received from an ingress relation, if it exists."""
         try:
             if ingress_url := self.ingress.url:
                 return ingress_url
         except ModelError as e:
             logger.error("Failed obtaining external url: %s.", e)
+        return None
+
+    @property
+    def most_external_url(self) -> str:
+        """Return the most external url known about by this charm.
+
+        This will return the first of:
+        - the external URL, if the ingress is configured and ready
+        - the internal URL
+        """
+        external_url = self.external_url
+        if external_url:
+            return external_url
+
         return self.internal_url
 
     @property
@@ -261,7 +275,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                     "rules",
                     "sync",
                     *rules_file_paths,
-                    f"--address={self.external_url}",
+                    f"--address={self.most_external_url}",
                     "--id=anonymous",  # multitenancy is disabled, the default tenant is 'anonymous'
                 ],
                 encoding="utf-8",
