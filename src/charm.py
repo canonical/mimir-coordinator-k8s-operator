@@ -22,6 +22,10 @@ import yaml
 from charms.alertmanager_k8s.v1.alertmanager_dispatch import AlertmanagerConsumer
 from charms.catalogue_k8s.v1.catalogue import CatalogueItem
 from charms.grafana_k8s.v0.grafana_source import GrafanaSourceProvider
+from charms.mimir_coordinator_k8s.v0.prometheus_api import (
+    DEFAULT_RELATION_NAME as PROMETHEUS_API_RELATION_NAME,
+)
+from charms.mimir_coordinator_k8s.v0.prometheus_api import PrometheusApiProvider
 from charms.prometheus_k8s.v1.prometheus_remote_write import PrometheusRemoteWriteProvider
 from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
 from charms.tempo_coordinator_k8s.v0.tracing import charm_tracing_config
@@ -285,6 +289,21 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             if mimirtool_output.stderr:
                 logger.error(f"mimirtool (err): {mimirtool_output.stderr.read().strip()}")
 
+    def _update_prometheus_api(self) -> None:
+        """Update all applications related to us via the prometheus-api relation."""
+        if not self.unit.is_leader():
+            return
+
+        prometheus_api = PrometheusApiProvider(
+            relation_mapping=self.model.relations,
+            app=self.app,
+            relation_name=PROMETHEUS_API_RELATION_NAME,
+        )
+        prometheus_api.publish(
+            direct_url=self.internal_url,
+            ingress_url=self.external_url,
+        )
+
     def _update_datasource_exchange(self) -> None:
         """Update the grafana-datasource-exchange relations."""
         if not self.unit.is_leader():
@@ -310,6 +329,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         if self._nginx_container.can_connect():
             self._set_alerts()
         self._ensure_mimirtool()
+        self._update_prometheus_api()
         self._update_datasource_exchange()
 
 
