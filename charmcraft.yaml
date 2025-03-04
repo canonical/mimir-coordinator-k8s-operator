@@ -12,6 +12,8 @@ bases:
 
 parts:
   charm:
+    # include rustc and cargo to compile pydantic
+    build-packages: [rustc, cargo]
     build-snaps:
       - astral-uv
     charm-binary-python-packages:
