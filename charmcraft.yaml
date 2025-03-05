@@ -12,10 +12,13 @@ bases:
 
 parts:
   charm:
-    # include rustc and cargo to compile pydantic
-    build-packages: [rustc, cargo]
+    build-packages:
+      - libffi-dev
+      - libssl-dev
+      - pkg-config
     build-snaps:
       - astral-uv
+      - rustup
     charm-binary-python-packages:
       - pydantic>2.0
       # For v2.tls_certificates
@@ -23,6 +26,7 @@ parts:
       - jsonschema
     override-build: |
       make requirements
+      rustup default stable
       craftctl default
     # charm-requirements defaults to requirements.txt, but without setting it (counter-intuitive) 
     # the charm does not respect the requirements.txt when generated dynamically during build.
