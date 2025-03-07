@@ -106,4 +106,8 @@ provides:
     interface: grafana_datasource_exchange
     description: |
       Integration to share with other COS components this charm's datasources, and receive theirs.
-      
+
+  prometheus-api:
+    interface: prometheus_api
+    description: |
+      The integration point for other charms to consume Mimir's Prometheus API, for example so they can query Mimir.
