@@ -295,7 +295,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         # regardless of the event we are processing.
         if self._nginx_container.can_connect():
             self._set_alerts()
-        self._ensure_mimirtool()
         self._update_datasource_exchange()
 
 
