@@ -226,24 +226,28 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         return paths
 
     def _ensure_mimirtool(self):
-        """Copy the `mimirtool` binary to the workload container."""
-        if self._nginx_container.can_connect():
-            if self._nginx_container.exists("/usr/bin/mimirtool"):
-                return
-            with open("mimirtool", "rb") as f:
-                self._nginx_container.push("/usr/bin/mimirtool", source=f, permissions=0o744)
+        """Copy the `mimirtool` binary to the `nginx` container if it's not there already.
+
+        Assumes the nginx container can connect.
+        """
+        if self._nginx_container.exists("/usr/bin/mimirtool"):
+            return
+        with open("mimirtool", "rb") as f:
+            self._nginx_container.push("/usr/bin/mimirtool", source=f, permissions=0o744)
 
     def _set_alerts(self):
-        """Create alert rule files for all Mimir consumers."""
+        """Create alert rule files for all Mimir consumers.
+
+        Assumes the nginx container can connect.
+        """
+        # obtain mimirtool if this is the first execution
+        self._ensure_mimirtool()
 
         def sha256(hashable: Any) -> str:
             """Use instead of the builtin hash() for repeatable values."""
             if isinstance(hashable, str):
                 hashable = hashable.encode("utf-8")
             return hashlib.sha256(hashable).hexdigest()
-
-        # Get mimirtool if this is the first execution
-        self._ensure_mimirtool()
 
         remote_write_alerts = self.remote_write_provider.alerts
         alerts_hash = sha256(str(remote_write_alerts))
