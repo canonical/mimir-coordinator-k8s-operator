@@ -16,16 +16,16 @@ INTERFACE_NAME = "app-data-interface"
 
 # Note: if this is changed, the PrometheusApiAppData concrete classes below need to change their constructors to match
 SAMPLE_APP_DATA = PrometheusApiAppData(
-    ingress_url="http://www.ingress-url.com/",
-    direct_url="http://www.internal-url.com/",
+    ingress_url="http://www.ingress-url.com/prometheus",
+    direct_url="http://www.internal-url.com/prometheus",
 )
 SAMPLE_APP_DATA_2 = PrometheusApiAppData(
-    ingress_url="http://www.ingress-url2.com/",
-    direct_url="http://www.internal-url2.com/",
+    ingress_url="http://www.ingress-url2.com/prometheus",
+    direct_url="http://www.internal-url2.com/prometheus",
 )
 SAMPLE_APP_DATA_NO_INGRESS_URL = PrometheusApiAppData(
-    ingress_url="http://www.ingress-url.com/",
-    direct_url="http://www.internal-url.com/",
+    ingress_url="http://www.ingress-url.com/prometheus",
+    direct_url="http://www.internal-url.com/prometheus",
 )
 
 
