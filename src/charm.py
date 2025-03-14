@@ -22,6 +22,10 @@ import yaml
 from charms.alertmanager_k8s.v1.alertmanager_dispatch import AlertmanagerConsumer
 from charms.catalogue_k8s.v1.catalogue import CatalogueItem
 from charms.grafana_k8s.v0.grafana_source import GrafanaSourceProvider
+from charms.mimir_coordinator_k8s.v0.prometheus_api import (
+    DEFAULT_RELATION_NAME as PROMETHEUS_API_RELATION_NAME,
+)
+from charms.mimir_coordinator_k8s.v0.prometheus_api import PrometheusApiProvider
 from charms.prometheus_k8s.v1.prometheus_remote_write import PrometheusRemoteWriteProvider
 from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
 from charms.tempo_coordinator_k8s.v0.tracing import charm_tracing_config
@@ -67,7 +71,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self.coordinator = Coordinator(
             charm=self,
             roles_config=MIMIR_ROLES_CONFIG,
-            external_url=self.external_url,
+            external_url=self.most_external_url,
             worker_metrics_port=8080,
             endpoints={  # pyright: ignore
                 "certificates": "certificates",
@@ -99,7 +103,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self.grafana_source = GrafanaSourceProvider(
             self,
             source_type="prometheus",
-            source_url=f"{self.external_url}/prometheus",
+            source_url=f"{self.most_external_url}/prometheus",
             extra_fields={"httpHeaderName1": "X-Scope-OrgID"},
             secure_extra_fields={"httpHeaderValue1": "anonymous"},
             refresh_event=[
@@ -111,7 +115,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
 
         self.remote_write_provider = PrometheusRemoteWriteProvider(
             charm=self,
-            server_url_func=lambda: MimirCoordinatorK8SOperatorCharm.external_url.fget(self),  # type: ignore
+            server_url_func=lambda: MimirCoordinatorK8SOperatorCharm.most_external_url.fget(self),  # type: ignore
             endpoint_path="/api/v1/push",
         )
 
@@ -162,13 +166,27 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         return f"{scheme}://{self.hostname}:{port}"
 
     @property
-    def external_url(self) -> str:
-        """Return the external hostname to be passed to ingress via the relation."""
+    def external_url(self) -> Optional[str]:
+        """Return the external hostname received from an ingress relation, if it exists."""
         try:
             if ingress_url := self.ingress.url:
                 return ingress_url
         except ModelError as e:
             logger.error("Failed obtaining external url: %s.", e)
+        return None
+
+    @property
+    def most_external_url(self) -> str:
+        """Return the most external url known about by this charm.
+
+        This will return the first of:
+        - the external URL, if the ingress is configured and ready
+        - the internal URL
+        """
+        external_url = self.external_url
+        if external_url:
+            return external_url
+
         return self.internal_url
 
     @property
@@ -261,7 +279,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                     "rules",
                     "sync",
                     *rules_file_paths,
-                    f"--address={self.external_url}",
+                    f"--address={self.most_external_url}",
                     "--id=anonymous",  # multitenancy is disabled, the default tenant is 'anonymous'
                 ],
                 encoding="utf-8",
@@ -270,6 +288,21 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                 logger.info(f"mimirtool: {mimirtool_output.stdout.read().strip()}")
             if mimirtool_output.stderr:
                 logger.error(f"mimirtool (err): {mimirtool_output.stderr.read().strip()}")
+
+    def _update_prometheus_api(self) -> None:
+        """Update all applications related to us via the prometheus-api relation."""
+        if not self.unit.is_leader():
+            return
+
+        prometheus_api = PrometheusApiProvider(
+            relation_mapping=self.model.relations,
+            app=self.app,
+            relation_name=PROMETHEUS_API_RELATION_NAME,
+        )
+        prometheus_api.publish(
+            direct_url=self.internal_url,
+            ingress_url=self.external_url,
+        )
 
     def _update_datasource_exchange(self) -> None:
         """Update the grafana-datasource-exchange relations."""
@@ -296,6 +329,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         if self._nginx_container.can_connect():
             self._set_alerts()
         self._ensure_mimirtool()
+        self._update_prometheus_api()
         self._update_datasource_exchange()
 
 
