@@ -12,7 +12,7 @@ from pytest_operator.plugin import OpsTest
 logger = logging.getLogger(__name__)
 
 
-def charm_resources(metadata_file="metadata.yaml") -> Dict[str, str]:
+def charm_resources(metadata_file="charmcraft.yaml") -> Dict[str, str]:
     with open(metadata_file, "r") as file:
         metadata = yaml.safe_load(file)
     resources = {}
