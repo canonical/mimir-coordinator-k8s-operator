@@ -300,8 +300,8 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             relation_name=PROMETHEUS_API_RELATION_NAME,
         )
         prometheus_api.publish(
-            direct_url=self.internal_url,
-            ingress_url=self.external_url,
+            direct_url=f"{self.internal_url}/prometheus",
+            ingress_url=f"{self.external_url}/prometheus" if self.external_url else None,
         )
 
     def _update_datasource_exchange(self) -> None:

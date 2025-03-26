@@ -110,4 +110,5 @@ provides:
   prometheus-api:
     interface: prometheus_api
     description: |
-      The integration point for other charms to consume Mimir's Prometheus API, for example so they can query Mimir.
+      The integration point for other charms to consume Mimir's Prometheus API, for example so they can query Mimir.  
+      This sends one or more URLs that can be consumed by anything that can consume the Prometheus API.
