@@ -54,7 +54,7 @@ parts:
     source-type: file
     permissions:
       - path: cos-tool-${CRAFT_ARCH_BUILD_FOR}
-        mode: "755"
+        mode: "500"
   mimirtool:
     plugin: dump
     source: https://github.com/grafana/mimir/releases/download/mimir-2.14.2/mimirtool-linux-${CRAFT_ARCH_BUILD_FOR}
@@ -63,7 +63,7 @@ parts:
       mimirtool-linux-${CRAFT_ARCH_BUILD_FOR}: mimirtool
     permissions:
       - path: mimirtool
-        mode: "755"
+        mode: "500"
 
 containers:
   nginx:
