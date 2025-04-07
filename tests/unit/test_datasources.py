@@ -31,13 +31,13 @@ def test_datasource_send(
     loki_dsx = Relation(
         "send-datasource",
         remote_app_data=DSExchangeAppData(
-            datasources=json.dumps(sorted(ds_loki, key=lambda raw_ds: raw_ds["uid"]))
+            datasources=json.dumps(sorted(ds_loki, key=lambda raw_ds: raw_ds["uid"]))  # type: ignore
         ).dump(),
     )
     tempo_dsx = Relation(
         "send-datasource",
         remote_app_data=DSExchangeAppData(
-            datasources=json.dumps(sorted(ds_tempo, key=lambda raw_ds: raw_ds["uid"]))
+            datasources=json.dumps(sorted(ds_tempo, key=lambda raw_ds: raw_ds["uid"]))  # type: ignore
         ).dump(),
     )
 

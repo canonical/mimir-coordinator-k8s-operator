@@ -63,6 +63,7 @@ async def get_leader_unit_number(ops_test: OpsTest, app_name: str) -> int:
 
     Raises an exception if no leader is found.
     """
+    assert ops_test.model
     status = await ops_test.model.get_status()
     app = status["applications"][app_name]
     if app is None:
