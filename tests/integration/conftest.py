@@ -4,9 +4,9 @@
 
 import functools
 import logging
+import os
 from collections import defaultdict
 from datetime import datetime
-import os
 from pathlib import Path
 
 import pytest
