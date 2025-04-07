@@ -41,6 +41,8 @@ parts:
     permissions:
       - path: mimirtool-linux-${CRAFT_ARCH_BUILD_FOR}
         mode: "755"
+    organize:
+      mimirtool-linux-${CRAFT_ARCH_BUILD_FOR}: mimirtool
 
 containers:
   nginx:
