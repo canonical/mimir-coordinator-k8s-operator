@@ -1,2 +1,3 @@
+src/prometheus_alert_rules
 # master is used in Minio configuration
 tests/integration

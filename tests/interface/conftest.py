@@ -24,7 +24,7 @@ nginx_container = Container(
     can_connect=True,
     layers={
         "foo": Layer(
-            {
+            {  # type: ignore
                 "summary": "foo",
                 "description": "bar",
                 "services": {
@@ -68,11 +68,11 @@ s3_relation = Relation(
 )
 cluster_relation = Relation(
     "mimir-cluster",
-    remote_app_data=ClusterRequirerAppData(role="all").dump(),
+    remote_app_data=dict(ClusterRequirerAppData(role="all").dump()),
     remote_units_data={
-        0: ClusterRequirerUnitData(
+        0: ClusterRequirerUnitData(  # type: ignore
             address="http://example.com",
-            juju_topology={"application": "app", "unit": "unit", "charm_name": "charmname"},
+            juju_topology={"application": "app", "unit": "unit", "charm_name": "charmname"},  # type: ignore
         ).dump()
     },
 )

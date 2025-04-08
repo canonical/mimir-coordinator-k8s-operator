@@ -1,61 +1,150 @@
 # This file configures Charmcraft.
 # See https://juju.is/docs/sdk/charmcraft-config for guidance.
-
+name: mimir-coordinator-k8s
 type: charm
-bases:
-  - build-on:
-    - name: ubuntu
-      channel: "22.04"
-    run-on:
-    - name: ubuntu
-      channel: "22.04"
+summary: Mimir coordinator
+description: |
+    Mimir coordinator.
+
+links:
+  documentation: https://discourse.charmhub.io/t/mimir-coordinator-index/10531
+  website: https://charmhub.io/mimir-coordinator-k8s
+  source: https://github.com/canonical/mimir-coordinator-k8s-operator
+  issues: https://github.com/canonical/mimir-coordinator-k8s-operator/issues
+
+assumes:
+  - k8s-api
+
+platforms:
+  ubuntu@22.04:amd64:
 
 parts:
   charm:
-    build-packages:
-      - libffi-dev
-      - libssl-dev
-      - pkg-config
-    build-snaps:
-      - astral-uv
-      - rustup
-    charm-binary-python-packages:
-      - pydantic>2.0
-      # For v2.tls_certificates
-      - cryptography
-      - jsonschema
+    source: .
+    plugin: uv
+    build-packages: [git]
+    build-snaps: [astral-uv]
     override-build: |
-      make requirements
-      rustup default stable
       craftctl default
-    # charm-requirements defaults to requirements.txt, but without setting it (counter-intuitive) 
-    # the charm does not respect the requirements.txt when generated dynamically during build.
-    charm-requirements: [requirements.txt]
-    prime:
-      - -*.charm
-      - -.venv
-      - -CONTRIBUTING.md
-      - -Makefile
-      - -pyproject.toml
-      - -README.md
-      - -tests/
-      - -uv.lock
-      - -*.egg-info
-
+      git describe --always > $CRAFT_PART_INSTALL/version
   cos-tool:
     plugin: dump
-    source: .
-    build-packages:
-      - curl
-    override-pull: |
-      curl -L -O https://github.com/canonical/cos-tool/releases/latest/download/cos-tool-${CRAFT_TARGET_ARCH}
-      chmod +x cos-tool-*
+    source: https://github.com/canonical/cos-tool/releases/latest/download/cos-tool-${CRAFT_ARCH_BUILD_FOR}
+    source-type: file
+    permissions:
+      - path: cos-tool-${CRAFT_ARCH_BUILD_FOR}
+        mode: "755"
   mimirtool:
     plugin: dump
-    source: .
-    build-packages:
-      - curl
-    override-pull: |
-      curl -fLo mimirtool https://github.com/grafana/mimir/releases/download/mimir-2.14.2/mimirtool-linux-${CRAFT_TARGET_ARCH}
-      chmod +x mimirtool
+    source: https://github.com/grafana/mimir/releases/download/mimir-2.14.2/mimirtool-linux-${CRAFT_ARCH_BUILD_FOR}
+    source-type: file
+    permissions:
+      - path: mimirtool-linux-${CRAFT_ARCH_BUILD_FOR}
+        mode: "755"
+    organize:
+      mimirtool-linux-${CRAFT_ARCH_BUILD_FOR}: mimirtool
 
+containers:
+  nginx:
+    resource: nginx-image
+  nginx-prometheus-exporter:
+    resource: nginx-prometheus-exporter-image
+
+resources:
+  nginx-image:
+    type: oci-image
+    description: OCI image for nginx
+    upstream-source: ubuntu/nginx:1.24-24.04_beta
+  nginx-prometheus-exporter-image:
+    type: oci-image
+    description: OCI image for nginx-prometheus-exporter
+    upstream-source: nginx/nginx-prometheus-exporter:1.1.0
+
+provides:
+  mimir-cluster:
+    interface: mimir_cluster
+    optional: false
+    description: |
+      The coordinator sends the Mimir configuration to the workers, obtaining
+      the roles they are configured to take on and their addressing information.
+  receive-remote-write:
+    interface: prometheus_remote_write
+    optional: true
+    description: |
+      Expose a Prometheus-remote-write-compatible endpoint to receive metrics.
+  grafana-dashboards-provider:
+    interface: grafana_dashboard
+    optional: true
+    description: |
+      Forward workers' built-in dashboards to grafana
+      (the coordinator, not the worker, owns all dashboards).
+  grafana-source:
+    interface: grafana_datasource
+    optional: true
+    description: |
+      Integrate Mimir as a Grafana datasource.
+  self-metrics-endpoint:
+    interface: prometheus_scrape
+    optional: true
+    description: |
+      The coordinator provides scrape jobs for itself and for the workers.
+  send-datasource:
+    interface: grafana_datasource_exchange
+    optional: true
+    description: |
+      Integration to share with other COS components this charm's datasources, and receive theirs.
+  prometheus-api:
+    interface: prometheus_api
+    optional: true
+    description: |
+      The integration point for other charms to consume Mimir's Prometheus API, for example so they can query Mimir.
+
+requires:
+  s3:
+    interface: s3
+    optional: false
+    limit: 1
+    description: |
+      The coordinator obtains and shares storage details with workers, enabling Mimir's access to an S3 bucket for data storage.
+  logging-consumer:
+    interface: loki_push_api
+    optional: true
+    description: |
+      Forward workers' built-in logging rules to the external Loki
+      (the coordinator, not the worker, owns all rule files).
+      Obtain rules and Loki's API endpoint to later send them to the mimir ruler over another
+      relation.
+  ingress:
+    interface: ingress
+    optional: true
+    limit: 1
+    description: |
+      Ingress-per-app, to load-balance across multiple units of the coordinator.
+  certificates:
+    interface: tls-certificates
+    optional: true
+    limit: 1
+    description: |
+      Certificate and key files for securing Mimir communications with TLS.
+  charm-tracing:
+    interface: tracing
+    optional: true
+    limit: 1
+    description: |
+      Enables sending charm traces to a distributed tracing backend such as Tempo.
+  workload-tracing:
+    interface: tracing
+    optional: true
+    limit: 1
+    description: |
+      Enables sending workload traces to a distributed tracing backend such as Tempo.
+  alertmanager:
+    interface: alertmanager_dispatch
+    optional: true
+    description: |
+      Configure Mimir to utilize an external Alertmanager to notify the user when an alert is triggered.
+  catalogue:
+    interface: catalogue
+    optional: true
+    description: |
+      Integration to help users discover Mimir's deployment.

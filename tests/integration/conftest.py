@@ -4,8 +4,10 @@
 
 import functools
 import logging
+import os
 from collections import defaultdict
 from datetime import datetime
+from pathlib import Path
 
 import pytest
 from pytest_operator.plugin import OpsTest
@@ -35,8 +37,11 @@ def timed_memoizer(func):
 
 @pytest.fixture(scope="module")
 @timed_memoizer
-async def mimir_charm(ops_test: OpsTest) -> str:
+async def mimir_charm(ops_test: OpsTest):
     """Mimir charm used for integration testing."""
+    if charm_file := os.environ.get("CHARM_PATH"):
+        return Path(charm_file)
+
     charm = await ops_test.build_charm(".")
     assert charm
     return str(charm)

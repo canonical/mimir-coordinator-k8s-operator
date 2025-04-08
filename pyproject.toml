@@ -1,19 +1,18 @@
+# Copyright 2024 Canonical Ltd.
+# See LICENSE file for licensing details.
 [project]
 name = "mimir-coordinator-k8s"
-version = "0.0"                # this is in fact irrelevant
-requires-python = "==3.10.*"   # https://packages.ubuntu.com/jammy/python3
+version = "0.0"
+requires-python = "~=3.10"   # https://packages.ubuntu.com/jammy/python3
 
 dependencies = [
   "ops",
-  # crossplane is a package from nginxinc to interact with the Nginx config
-  "crossplane",
-
-  # ---PYDEPS---
   "cosl>=0.0.55",
+  "crossplane",  # crossplane is a package from nginxinc to interact with the Nginx config
   "pydantic>=2",
-  # lib/charms/tempo_k8s/v1/charm_tracing.py
+  # tracing
   "opentelemetry-exporter-otlp-proto-http==1.21.0",
-  # lib/charms/tls_certificates_interface/v3/tls_certificates.py
+  # tls_certificates
   "jsonschema",
   "cryptography",
 ]
@@ -24,7 +23,7 @@ dev = [
   "ruff",
   "codespell",
   # Static
-  "pyright==1.1.344",
+  "pyright",
   # Unit
   "pytest",
   "coverage[toml]",
@@ -52,6 +51,7 @@ asyncio_mode = "auto"
 minversion = "6.0"
 log_cli_level = "INFO"
 markers = ['setup: marks tests as setup (deselect with -m "not setup")']
+addopts = "--tb=native --verbose --capture=no --log-cli-level=INFO"
 
 # Linting tools configuration
 [tool.ruff]
@@ -79,22 +79,14 @@ per-file-ignores = { "tests/*" = ["D100", "D101", "D102", "D103", "D104"] }
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
-[tool.ruff.lint.mccabe]
-max-complexity = 15
-
-[tool.ruff.lint.pep8-naming]
-# Allow Pydantic's `@validator` decorator to trigger class method treatment.
-classmethod-decorators = ["classmethod", "pydantic.validator"]
-
 [tool.ruff.format]
 docstring-code-format = true
 
 [tool.pyright]
-include = ["src"]
-extraPaths = ["lib"]
+extraPaths = ["src", "lib"]
+pythonVersion = "3.10"
 pythonPlatform = "Linux"
-reportUnknownParameterType = true
 
 [tool.codespell]
-skip = ".git,build,.venv"
+skip = ".git,.tox,build,venv*"
 ignore-words-list = "assertIn,aNULL"

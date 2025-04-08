@@ -112,16 +112,16 @@ def test_build_ruler_config(mimir_config):
 @pytest.mark.parametrize(
     "addresses_by_role, replication",
     [
-        ({"store_gateway": ["address.one"]}, 1),
-        ({"store_gateway": ["address.one", "address.two"]}, 1),
-        ({"store_gateway": ["address.one", "address.two", "address.three"]}, 3),
+        ({"store-gateway": ["address.one"]}, 1),
+        ({"store-gateway": ["address.one", "address.two"]}, 1),
+        ({"store-gateway": ["address.one", "address.two", "address.three"]}, 3),
     ],
 )
 def test_build_store_gateway_config(mimir_config, coordinator, addresses_by_role, replication):
     coordinator.cluster.gather_addresses_by_role.return_value = addresses_by_role
     store_gateway_config = mimir_config._build_store_gateway_config(coordinator.cluster)
     expected_config = {"sharding_ring": {"replication_factor": replication}}
-    store_gateway_config == expected_config
+    assert store_gateway_config == expected_config
 
 
 def test_build_ruler_storage_config(mimir_config):
