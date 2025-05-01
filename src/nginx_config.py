@@ -172,6 +172,8 @@ def _locations_compactor(tls: bool) -> List[Dict[str, Any]]:
 
 LOCATIONS_BASIC: List[Dict[str, Any]] = [
     {
+        # TODO PR had a $backend var in "args" and added another directive
+        # https://github.com/canonical/tempo-coordinator-k8s-operator/pull/88/files#diff-0116a9b741399a7bac8d1015f203baf6f53391c2ba9b7320fe04876e006c0f62R175
         "directive": "location",
         "args": ["=", "/"],
         "block": [
@@ -237,7 +239,7 @@ class NginxConfig:
                     # mimir-related
                     {"directive": "sendfile", "args": ["on"]},
                     {"directive": "tcp_nopush", "args": ["on"]},
-                    *self._resolver(custom_resolver=None),
+                    *self._resolver(),
                     # TODO: add custom http block for the user to config?
                     {
                         "directive": "map",
@@ -285,9 +287,27 @@ class NginxConfig:
                 {
                     "directive": "upstream",
                     "args": [role],
+                    # TODO see https://github.com/canonical/tempo-coordinator-k8s-operator/pull/88/files#diff-0116a9b741399a7bac8d1015f203baf6f53391c2ba9b7320fe04876e006c0f62L144
                     "block": [
-                        {"directive": "server", "args": [f"{addr}:{nginx_port}"]}
-                        for addr in address_set
+                        # TODO: uncomment the below directive when nginx version >= 1.27.3
+                        # monitor changes of IP addresses and automatically modify the upstream config without the need of restarting nginx.
+                        # this nginx plus feature has been part of opensource nginx in 1.27.3
+                        # ref: https://nginx.org/en/docs/http/ngx_http_upstream_module.html#upstream
+                        # {
+                        #     "directive": "zone",
+                        #     "args": [f"{role}_zone", "64k"],
+                        # },
+                        *(
+                            {
+                                "directive": "server",
+                                "args": [
+                                    f"{addr}:{nginx_port}",
+                                    # TODO: uncomment the below arg when nginx version >= 1.27.3
+                                    #  "resolve"
+                                ],
+                            }
+                            for addr in address_set
+                        ),
                     ],
                 }
             )
@@ -313,9 +333,16 @@ class NginxConfig:
         return nginx_locations
 
     def _resolver(self, custom_resolver: Optional[str] = None) -> List[Dict[str, Any]]:
+        # pass a custom resolver, such as kube-dns.kube-system.svc.cluster.local.
         if custom_resolver:
             return [{"directive": "resolver", "args": [custom_resolver]}]
-        return [{"directive": "resolver", "args": ["kube-dns.kube-system.svc.cluster.local."]}]
+        # by default, fetch the DNS resolver address from /etc/resolv.conf
+        return [
+            {
+                "directive": "resolver",
+                "args": [self.dns_IP_address],
+            }
+        ]
 
     def _basic_auth(self, enabled: bool) -> List[Optional[Dict[str, Any]]]:
         if enabled:
@@ -356,7 +383,6 @@ class NginxConfig:
                     {"directive": "ssl_ciphers", "args": ["HIGH:!aNULL:!MD5"]},  # pyright: ignore
                     # specify resolver to ensure that if a unit IP changes,
                     # we reroute to the new one
-                    *self._resolver(custom_resolver=self.dns_IP_address),
                     *self._locations(addresses_by_role, tls),
                 ],
             }
@@ -371,7 +397,6 @@ class NginxConfig:
                     "directive": "proxy_set_header",
                     "args": ["X-Scope-OrgID", "$ensured_x_scope_orgid"],
                 },
-                *self._resolver(custom_resolver=self.dns_IP_address),
                 *self._locations(addresses_by_role, tls),
             ],
         }

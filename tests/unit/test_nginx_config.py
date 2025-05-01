@@ -69,6 +69,7 @@ def topology():
     ],
 )
 def test_upstreams_config(nginx_config, coordinator, addresses_by_role):
+    # TODO improve these tests
     nginx_port = 8080
     upstreams_config = nginx_config._upstreams(addresses_by_role, nginx_port)
     expected_config = [
