@@ -11,6 +11,7 @@ from cosl.coordinated_workers.coordinator import Coordinator
 from cosl.coordinated_workers.nginx import CERT_PATH, KEY_PATH, is_ipv6_enabled
 
 logger = logging.getLogger(__name__)
+RESOLV_CONF_PATH = "/etc/resolv.conf"
 
 
 def _locations_distributor(tls: bool) -> List[Dict[str, Any]]:
@@ -416,7 +417,7 @@ class NginxConfig:
 
 def _get_dns_ip_address():
     """Obtain DNS ip address from /etc/resolv.conf."""
-    resolv = Path("/etc/resolv.conf").read_text()
+    resolv = Path(RESOLV_CONF_PATH).read_text()
     for line in resolv.splitlines():
         if line.startswith("nameserver"):
             # assume there's only one
