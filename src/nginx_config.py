@@ -173,8 +173,7 @@ def _locations_compactor(tls: bool) -> List[Dict[str, Any]]:
 
 LOCATIONS_BASIC: List[Dict[str, Any]] = [
     {
-        # TODO PR had a $backend var in "args" and added another directive
-        # https://github.com/canonical/tempo-coordinator-k8s-operator/pull/88/files#diff-0116a9b741399a7bac8d1015f203baf6f53391c2ba9b7320fe04876e006c0f62R175
+        # FIXME update with tempo PR $backend
         "directive": "location",
         "args": ["=", "/"],
         "block": [
@@ -288,7 +287,6 @@ class NginxConfig:
                 {
                     "directive": "upstream",
                     "args": [role],
-                    # TODO see https://github.com/canonical/tempo-coordinator-k8s-operator/pull/88/files#diff-0116a9b741399a7bac8d1015f203baf6f53391c2ba9b7320fe04876e006c0f62L144
                     "block": [
                         # TODO: uncomment the below directive when nginx version >= 1.27.3
                         # monitor changes of IP addresses and automatically modify the upstream config without the need of restarting nginx.
