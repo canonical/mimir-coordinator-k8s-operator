@@ -360,7 +360,7 @@ wheels = [
 [[package]]
 name = "cosl"
 version = "0.1.0"
-source = { git = "https://github.com/canonical/cos-lib?rev=TAP-390#2d039ff529e96542ece720a3b4ea9581a657e8f8" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "lightkube" },
     { name = "ops" },
@@ -368,6 +368,10 @@ dependencies = [
     { name = "pyyaml" },
     { name = "tenacity" },
     { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/57/b9/855defc4c989f17b0304989213832172b9144649b3417712c74e0c1e8669/cosl-0.1.0.tar.gz", hash = "sha256:b85a47f31cd90dd53e4b9224ec588c6c1f3fc6158925b0e179ccfe97ed3ce3e0", size = 87345, upload_time = "2025-05-06T16:47:47.094Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8e/ae/c08e6f411ebe033b877453474cebb598f40ea384296cebca19614a3f0719/cosl-0.1.0-py3-none-any.whl", hash = "sha256:f592eafd76576927498105ab0b77fc7d792d536b9323fd83fedc5a0ad2975621", size = 67669, upload_time = "2025-05-06T16:47:45.435Z" },
 ]
 
 [[package]]
@@ -963,7 +967,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "codespell", marker = "extra == 'dev'" },
-    { name = "cosl", git = "https://github.com/canonical/cos-lib?rev=TAP-390" },
+    { name = "cosl", specifier = ">=0.1.0" },
     { name = "coverage", extras = ["toml"], marker = "extra == 'dev'" },
     { name = "crossplane" },
     { name = "cryptography" },

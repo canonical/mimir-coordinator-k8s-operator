@@ -10,7 +10,6 @@ from cosl.coordinated_workers.nginx import (
     CERT_PATH,
     KEY_PATH,
     NginxLocationConfig,
-    NginxLocationModifier,
     NginxUpstream,
 )
 from ops import Container
@@ -32,7 +31,7 @@ class NginxHelper:
         NginxLocationConfig(path="/prometheus/config/v1/rules", backend="ruler"),
         NginxLocationConfig(path="/prometheus/api/v1/rules", backend="ruler"),
         NginxLocationConfig(path="/prometheus/api/v1/alerts", backend="ruler"),
-        NginxLocationConfig(path="/ruler/ring", backend="ruler", modifier=NginxLocationModifier.EXACT),
+        NginxLocationConfig(path="/ruler/ring", backend="ruler", modifier="="),
     ]
 
 
@@ -46,11 +45,11 @@ class NginxHelper:
     _locations_query_frontend = [
         NginxLocationConfig(path="/prometheus", backend="query-frontend"),
         # Buildinfo endpoint can go to any component
-        NginxLocationConfig(path="/api/v1/status/buildinfo", backend="query-frontend", modifier=NginxLocationModifier.EXACT),
+        NginxLocationConfig(path="/api/v1/status/buildinfo", backend="query-frontend", modifier="="),
     ]
 
     _locations_compactor = [
-        NginxLocationConfig(path="/api/v1/upload/block/", backend="compactor", modifier=NginxLocationModifier.EXACT),
+        NginxLocationConfig(path="/api/v1/upload/block/", backend="compactor", modifier="="),
     ]
 
     _port = 8080
