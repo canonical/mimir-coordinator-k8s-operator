@@ -15,20 +15,13 @@ from cosl.coordinated_workers.nginx import (
 )
 from ops import Container
 
+from mimir_config import ROLES
+
 logger = logging.getLogger(__name__)
 
 
 class NginxHelper:
     """Helper class to generate the nginx configuration."""
-    _upstreams = [
-        "distributor",
-        "compactor",
-        "query-frontend",
-        "ingester",
-        "ruler",
-        "store-gateway",
-        "alertmanager",
-    ]
     _locations_distributor = [
      NginxLocationConfig(path="/distributor", backend="distributor"),
      NginxLocationConfig(path="/api/v1/push", backend="distributor"),
@@ -68,7 +61,7 @@ class NginxHelper:
 
     def upstreams(self) -> List[NginxUpstream]:
         """Generate the list of Nginx upstream metadata configurations."""
-        return [NginxUpstream(upstream, self._port, upstream) for upstream in self._upstreams]
+        return [NginxUpstream(role, self._port, role) for role in ROLES]
 
     def server_ports_to_locations(self) -> Dict[int, List[NginxLocationConfig]]:
         """Generate a mapping from server ports to a list of Nginx location configurations."""
