@@ -31,12 +31,13 @@ from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
 from charms.tempo_coordinator_k8s.v0.tracing import charm_tracing_config
 from charms.traefik_k8s.v2.ingress import IngressPerAppReadyEvent, IngressPerAppRequirer
 from cosl.coordinated_workers.coordinator import Coordinator
+from cosl.coordinated_workers.nginx import NginxConfig
 from cosl.interfaces.datasource_exchange import DatasourceDict
 from ops.model import ModelError
 from ops.pebble import Error as PebbleError
 
 from mimir_config import MIMIR_ROLES_CONFIG, MimirConfig
-from nginx_config import NginxConfig
+from nginx_config import NginxHelper
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
@@ -62,6 +63,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self._nginx_prometheus_exporter_container = self.unit.get_container(
             "nginx-prometheus-exporter"
         )
+        self._nginx_helper = NginxHelper(self._nginx_container)
         self.ingress = IngressPerAppRequirer(
             charm=self,
             strip_prefix=True,
@@ -85,7 +87,13 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                 "send-datasource": "send-datasource",
                 "receive-datasource": None,
             },
-            nginx_config=NginxConfig().config,
+            nginx_config=NginxConfig(
+                server_name=self.hostname,
+                upstream_configs=self._nginx_helper.upstreams(),
+                server_ports_to_locations=self._nginx_helper.server_ports_to_locations(),
+                enable_health_check=True,
+                enable_status_page=True,
+            ),
             workers_config=MimirConfig(
                 alertmanager_urls=self.alertmanager.get_cluster_info()
             ).config,

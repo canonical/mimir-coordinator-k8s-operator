@@ -7,7 +7,9 @@ requires-python = "~=3.10"   # https://packages.ubuntu.com/jammy/python3
 
 dependencies = [
   "ops",
-  "cosl>=0.0.55",
+  # FIXME: pull cosl from pypi
+  "cosl@git+https://github.com/canonical/cos-lib@TAP-390",
+  # FIXME: remove crossplane once https://github.com/canonical/cos-lib/issues/144 is fixed 
   "crossplane",  # crossplane is a package from nginxinc to interact with the Nginx config
   "pydantic>=2",
   # tracing

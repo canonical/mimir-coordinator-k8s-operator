@@ -1,20 +1,28 @@
 from contextlib import contextmanager
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
+from cosl.coordinated_workers.nginx import NginxConfig
 
-from nginx_config import NginxConfig
+from nginx_config import NginxHelper
 
 
 @contextmanager
 def mock_ipv6(enable: bool):
-    with patch("nginx_config.is_ipv6_enabled", MagicMock(return_value=enable)):
+    with patch("cosl.coordinated_workers.nginx.is_ipv6_enabled", MagicMock(return_value=enable)):
         yield
 
 
 @pytest.fixture(scope="module")
 def nginx_config():
-    return NginxConfig()
+    def _nginx_config(tls=False, ipv6=True):
+        with mock_ipv6(ipv6):
+            with patch.object(NginxHelper, "_tls_available", new=PropertyMock(return_value=tls)):
+                nginx_helper = NginxHelper(MagicMock())
+                return NginxConfig(server_name="localhost",
+                                    upstream_configs=nginx_helper.upstreams(),
+                                    server_ports_to_locations=nginx_helper.server_ports_to_locations())
+    return _nginx_config
 
 
 @pytest.fixture(scope="module")
@@ -70,34 +78,24 @@ def topology():
 )
 def test_upstreams_config(nginx_config, coordinator, addresses_by_role):
     nginx_port = 8080
-    upstreams_config = nginx_config._upstreams(addresses_by_role, nginx_port)
-    expected_config = [
-        {
-            "directive": "upstream",
-            "args": ["alertmanager"],
-            "block": [
-                {"directive": "server", "args": [f"{addr}:{nginx_port}"]}
-                for addr in addresses_by_role["alertmanager"]
-            ],
-        }
-    ]
-    assert upstreams_config == expected_config
+    upstreams_config = nginx_config(tls=False).get_config(addresses_by_role, False)
+    for role, addrs in addresses_by_role.items():
+        assert f"upstream {role}" in upstreams_config
+        for addr in addrs:
+            assert f"server {addr}:{nginx_port}" in upstreams_config
 
 
 @pytest.mark.parametrize("tls", (True, False))
 @pytest.mark.parametrize("ipv6", (True, False))
-def test_servers_config(ipv6, tls):
+def test_servers_config(ipv6, tls, nginx_config):
     port = 8080
-    with mock_ipv6(ipv6):
-        nginx = NginxConfig()
-    server_config = nginx._server(
-        server_name="test", addresses_by_role={}, nginx_port=port, tls=tls
+    server_config = nginx_config(tls=tls, ipv6=ipv6).get_config(
+        {"distributor": ["address.one"]}, tls
     )
-    ipv4_args = ["443", "ssl"] if tls else [f"{port}"]
-    assert {"directive": "listen", "args": ipv4_args} in server_config["block"]
-    ipv6_args = ["[::]:443", "ssl"] if tls else [f"[::]:{port}"]
-    ipv6_directive = {"directive": "listen", "args": ipv6_args}
+    ipv4_args = "443 ssl" if tls else f"{port}"
+    assert f"listen {ipv4_args}" in  server_config
+    ipv6_args = "[::]:443 ssl" if tls else f"[::]:{port}"
     if ipv6:
-        assert ipv6_directive in server_config["block"]
+        assert f"listen {ipv6_args}" in server_config
     else:
-        assert ipv6_directive not in server_config["block"]
+        assert f"listen {ipv6_args}" not in server_config
