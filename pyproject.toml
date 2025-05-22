@@ -7,15 +7,13 @@ requires-python = "~=3.10"   # https://packages.ubuntu.com/jammy/python3
 
 dependencies = [
   "ops",
-  "cosl>=0.1.0",
-  # FIXME: remove crossplane once https://github.com/canonical/cos-lib/issues/144 is fixed 
-  "crossplane",  # crossplane is a package from nginxinc to interact with the Nginx config
+  # FIXME: use cosl from pypi
+  "cosl@git+https://github.com/canonical/cos-lib@migrate-coord-workers",
+  # FIXME: use coordinated-worker from pypi
+  "coordinated-workers@git+https://github.com/canonical/cos-coordinated-workers@migrate-coord-workers",
   "pydantic>=2",
   # tracing
   "opentelemetry-exporter-otlp-proto-http==1.21.0",
-  # tls_certificates
-  "jsonschema",
-  "cryptography",
 ]
 
 [project.optional-dependencies]

@@ -9,10 +9,10 @@ from pathlib import Path
 from typing import Any, Dict, Set
 
 import yaml
+from coordinated_workers.coordinator import ClusterRolesConfig, Coordinator
+from coordinated_workers.interfaces.cluster import ClusterProvider
+from coordinated_workers.worker import CERT_FILE, CLIENT_CA_FILE, KEY_FILE
 from cosl import JujuTopology
-from cosl.coordinated_workers.coordinator import ClusterRolesConfig, Coordinator
-from cosl.coordinated_workers.interface import ClusterProvider
-from cosl.coordinated_workers.worker import CERT_FILE, CLIENT_CA_FILE, KEY_FILE
 
 logger = logging.getLogger(__name__)
 
