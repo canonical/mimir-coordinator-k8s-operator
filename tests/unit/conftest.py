@@ -23,7 +23,7 @@ def disable_charm_tracing():
 def mimir_charm(tmp_path):
     with patch("lightkube.core.client.GenericSyncClient"):
         with patch.multiple(
-            "cosl.coordinated_workers.coordinator.KubernetesComputeResourcesPatch",
+            "coordinated_workers.coordinator.KubernetesComputeResourcesPatch",
             _namespace="test-namespace",
             _patch=lambda _: None,
             get_status=lambda _: ActiveStatus(""),
