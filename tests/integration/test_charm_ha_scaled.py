@@ -30,7 +30,7 @@ async def test_build_and_deploy(ops_test: OpsTest, mimir_charm: str):
     """Build the charm-under-test and deploy it together with related charms."""
     assert ops_test.model is not None  # for pyright
     await asyncio.gather(
-        ops_test.model.deploy(mimir_charm, "mimir", resources=charm_resources()),
+        ops_test.model.deploy(mimir_charm, "mimir", resources=charm_resources(), trust=True),
         ops_test.model.deploy("prometheus-k8s", "prometheus", channel="latest/edge", trust=True),
         ops_test.model.deploy("loki-k8s", "loki", channel="latest/edge", trust=True),
         ops_test.model.deploy("grafana-k8s", "grafana", channel="latest/edge", trust=True),
@@ -67,6 +67,7 @@ async def test_deploy_workers(ops_test: OpsTest):
         channel="latest/edge",
         config={"role-read": True},
         num_units=3,
+        trust=True,
     )
     await ops_test.model.deploy(
         "mimir-worker-k8s",
@@ -74,6 +75,7 @@ async def test_deploy_workers(ops_test: OpsTest):
         channel="latest/edge",
         config={"role-write": True},
         num_units=3,
+        trust=True,
     )
     await ops_test.model.deploy(
         "mimir-worker-k8s",
@@ -81,6 +83,7 @@ async def test_deploy_workers(ops_test: OpsTest):
         channel="latest/edge",
         config={"role-backend": True},
         num_units=3,
+        trust=True,
     )
     await ops_test.model.wait_for_idle(
         apps=["worker-read", "worker-write", "worker-backend"], status="blocked"
