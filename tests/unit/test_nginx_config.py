@@ -2,14 +2,14 @@ from contextlib import contextmanager
 from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
-from cosl.coordinated_workers.nginx import NginxConfig
+from coordinated_workers.nginx import NginxConfig
 
 from nginx_config import NginxHelper
 
 
 @contextmanager
 def mock_ipv6(enable: bool):
-    with patch("cosl.coordinated_workers.nginx.is_ipv6_enabled", MagicMock(return_value=enable)):
+    with patch("coordinated_workers.nginx.is_ipv6_enabled", MagicMock(return_value=enable)):
         yield
 
 

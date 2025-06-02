@@ -16,7 +16,7 @@ import socket
 from typing import Any, Dict, List, Optional, cast
 from urllib.parse import urlparse
 
-import cosl.coordinated_workers.nginx
+import coordinated_workers.nginx
 import ops
 import yaml
 from charms.alertmanager_k8s.v1.alertmanager_dispatch import AlertmanagerConsumer
@@ -30,8 +30,8 @@ from charms.prometheus_k8s.v1.prometheus_remote_write import PrometheusRemoteWri
 from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
 from charms.tempo_coordinator_k8s.v0.tracing import charm_tracing_config
 from charms.traefik_k8s.v2.ingress import IngressPerAppReadyEvent, IngressPerAppRequirer
-from cosl.coordinated_workers.coordinator import Coordinator
-from cosl.coordinated_workers.nginx import NginxConfig
+from coordinated_workers.coordinator import Coordinator
+from coordinated_workers.nginx import NginxConfig
 from cosl.interfaces.datasource_exchange import DatasourceDict
 from ops.model import ModelError
 from ops.pebble import Error as PebbleError
@@ -102,7 +102,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         )
 
         self.charm_tracing_endpoint, self.server_ca_cert = charm_tracing_config(
-            self.coordinator.charm_tracing, cosl.coordinated_workers.nginx.CA_CERT_PATH
+            self.coordinator.charm_tracing, coordinated_workers.nginx.CA_CERT_PATH
         )
 
         if port := urlparse(self.internal_url).port:

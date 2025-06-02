@@ -5,7 +5,7 @@
 import logging
 from typing import Dict, List
 
-from cosl.coordinated_workers.nginx import (
+from coordinated_workers.nginx import (
     CA_CERT_PATH,
     CERT_PATH,
     KEY_PATH,
