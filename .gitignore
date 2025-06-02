@@ -49,3 +49,6 @@ override.tf.json
 .terraformrc
 terraform.rc
 .terraform.lock.hcl
+
+# Consolidated alert rules
+src/prometheus_alert_rules/consolidated_rules
