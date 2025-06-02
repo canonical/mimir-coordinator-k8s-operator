@@ -8,12 +8,6 @@ from ops.testing import Relation, State
 RELATION_NAME = "prometheus-api"
 INTERFACE_NAME = "prometheus_api"
 
-# Note: if this is changed, the PrometheusApiAppData concrete classes below need to change their constructors to match
-SAMPLE_APP_DATA = {
-    "ingress_url": "http://www.ingress-url.com/",
-    "direct_url": "http://www.internal-url.com/",
-}
-
 MIMIR_URL = "http://internal.com/"
 MIMIR_INGRESS_URL = "http://www.ingress-url.com/"
 
@@ -63,7 +57,7 @@ def test_provider_sender_sends_data_on_relation_joined(
     with context(context.on.relation_joined(prometheus_api), state=state) as manager:
         state_out = manager.run()
         expected = {
-            "direct_url": MIMIR_URL,
+            "direct_url": f"{MIMIR_URL}/prometheus",
         }
 
     # Assert
@@ -98,8 +92,8 @@ def test_provider_sender_sends_data_with_ingress_url_on_relation_joined(
     with context(context.on.relation_joined(prometheus_api), state=state) as manager:
         state_out = manager.run()
         expected = {
-            "direct_url": MIMIR_URL,
-            "ingress_url": MIMIR_INGRESS_URL,
+            "direct_url": f"{MIMIR_URL}/prometheus",
+            "ingress_url": f"{MIMIR_INGRESS_URL}/prometheus",
         }
 
     # Assert
@@ -130,7 +124,7 @@ def test_provider_sends_data_on_leader_elected(
     with context(context.on.leader_elected(), state=state) as manager:
         state_out = manager.run()
         expected = {
-            "direct_url": MIMIR_URL,
+            "direct_url": f"{MIMIR_URL}/prometheus",
         }
 
     # Assert
