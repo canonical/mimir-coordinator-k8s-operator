@@ -31,7 +31,7 @@ from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
 from charms.tempo_coordinator_k8s.v0.tracing import charm_tracing_config
 from charms.traefik_k8s.v2.ingress import IngressPerAppReadyEvent, IngressPerAppRequirer
 from coordinated_workers.coordinator import Coordinator
-from coordinated_workers.nginx import NginxConfig
+from coordinated_workers.nginx import CA_CERT_PATH, CERT_PATH, KEY_PATH, NginxConfig
 from cosl.interfaces.datasource_exchange import DatasourceDict
 from ops.model import ModelError
 from ops.pebble import Error as PebbleError
@@ -86,6 +86,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                 "s3": "s3",
                 "send-datasource": "send-datasource",
                 "receive-datasource": None,
+                "catalogue": "catalogue",
             },
             nginx_config=NginxConfig(
                 server_name=self.hostname,
@@ -97,6 +98,8 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             workers_config=MimirConfig(
                 alertmanager_urls=self.alertmanager.get_cluster_info()
             ).config,
+            resources_requests=self.get_resource_requests,
+            container_name="charm",  # container to which resource limits will be applied
             workload_tracing_protocols=["jaeger_thrift_http"],
             catalogue_item=self._catalogue_item,
         )
@@ -105,6 +108,8 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             self.coordinator.charm_tracing, coordinated_workers.nginx.CA_CERT_PATH
         )
 
+        # needs to be after the Coordinator definition in order to push certificates before checking
+        # if they exist
         if port := urlparse(self.internal_url).port:
             self.ingress.provide_ingress_requirements(port=port)
 
@@ -126,6 +131,11 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             server_url_func=lambda: MimirCoordinatorK8SOperatorCharm.most_external_url.fget(self),  # type: ignore
             endpoint_path="/api/v1/push",
         )
+
+        # refuse to handle any other event as we can't possibly know what to do.
+        if not self.coordinator.can_handle_events:
+            # logging is handled by the Coordinator object
+            return
 
         # do this regardless of what event we are processing
         self._reconcile()
@@ -209,6 +219,19 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                 "multi-tenant, long-term storage for Prometheus. "
                 "(no user interface available)"
             ),
+        )
+
+    # TODO: make this a static method in the Nginx class
+    @property
+    def are_certificates_on_disk(self) -> bool:
+        """Return True if the certificates files are on disk."""
+        nginx_container = self.unit.get_container("nginx")
+
+        return (
+            nginx_container.can_connect()
+            and nginx_container.exists(CERT_PATH)
+            and nginx_container.exists(KEY_PATH)
+            and nginx_container.exists(CA_CERT_PATH)
         )
 
     ###########################
@@ -335,6 +358,10 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                     {"type": "prometheus", "uid": ds_uid, "grafana_uid": grafana_uid}
                 )
         self.coordinator.datasource_exchange.publish(datasources=raw_datasources)
+
+    def get_resource_requests(self, _) -> Dict[str, str]:
+        """Returns a dictionary for the "requests" portion of the resources requirements."""
+        return {"cpu": "50m", "memory": "100Mi"}
 
     def _reconcile(self):
         # This method contains unconditional update logic, i.e. logic that should be executed

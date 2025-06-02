@@ -5,6 +5,7 @@
 """Mimir coordinator."""
 
 import logging
+from enum import Enum, unique
 from pathlib import Path
 from typing import Any, Dict, Set
 
@@ -16,77 +17,84 @@ from cosl import JujuTopology
 
 logger = logging.getLogger(__name__)
 
-ROLES = {
-    "overrides-exporter",
-    "query-scheduler",
-    "flusher",
-    "query-frontend",
-    "querier",
-    "store-gateway",
-    "ingester",
-    "distributor",
-    "ruler",
-    "alertmanager",
-    "compactor",
-    # meta-roles
-    "read",
-    "write",
-    "backend",
-    "all",
-}
-"""Mimir component role names."""
+
+# TODO: inherit enum.StrEnum when jammy is no longer supported.
+# https://docs.python.org/3/library/enum.html#enum.StrEnum
+@unique
+class MimirRole(str, Enum):
+    """Mimir component role names."""
+
+    # Meta roles
+    all = "all"
+    read = "read"
+    write = "write"
+    backend = "backend"
+
+    # Roles
+    overrides_exporter = "overrides-exporter"
+    query_scheduler = "query-scheduler"
+    flusher = "flusher"
+    query_frontend = "query-frontend"
+    querier = "querier"
+    store_gateway = "store-gateway"
+    ingester = "ingester"
+    distributor = "distributor"
+    ruler = "ruler"
+    alertmanager = "alertmanager"
+    compactor = "compactor"
+
 
 META_ROLES = {
-    "read": {"querier", "query-frontend"},
-    "write": {"distributor", "ingester"},
+    "read": {MimirRole.querier, MimirRole.query_frontend},
+    "write": {MimirRole.distributor, MimirRole.ingester},
     "backend": {
-        "alertmanager",
-        "compactor",
-        "overrides-exporter",
-        "query-scheduler",
-        "ruler",
-        "store-gateway",
+        MimirRole.alertmanager,
+        MimirRole.compactor,
+        MimirRole.overrides_exporter,
+        MimirRole.query_scheduler,
+        MimirRole.ruler,
+        MimirRole.store_gateway,
     },
     "all": {
-        "compactor",
-        "distributor",
-        "ingester",
-        "querier",
-        "query-frontend",
-        "ruler",
-        "store-gateway",
+        MimirRole.compactor,
+        MimirRole.distributor,
+        MimirRole.ingester,
+        MimirRole.querier,
+        MimirRole.query_frontend,
+        MimirRole.ruler,
+        MimirRole.store_gateway,
     },
 }
 
 MINIMAL_DEPLOYMENT = {
     # from official docs:
-    "compactor",
-    "distributor",
-    "ingester",
-    "querier",
-    "query-frontend",
-    "store-gateway",
+    MimirRole.compactor,
+    MimirRole.distributor,
+    MimirRole.ingester,
+    MimirRole.querier,
+    MimirRole.query_frontend,
+    MimirRole.store_gateway,
     # we add:
-    "ruler",
+    MimirRole.ruler,
 }
 """The minimal set of roles that need to be allocated for the
 deployment to be considered consistent (otherwise we set blocked). On top of what mimir itself lists as required,
 we add alertmanager."""
 
 RECOMMENDED_DEPLOYMENT = {
-    "compactor": 1,
-    "distributor": 1,
-    "ingester": 3,
-    "querier": 2,
-    "query-frontend": 1,
-    "store-gateway": 1,
-    "ruler": 1,
+    MimirRole.compactor.value: 1,
+    MimirRole.distributor.value: 1,
+    MimirRole.ingester.value: 3,
+    MimirRole.querier.value: 2,
+    MimirRole.query_frontend.value: 1,
+    MimirRole.store_gateway.value: 1,
+    MimirRole.ruler: 1,
 }
 """The set of roles that need to be allocated for the
 deployment to be considered robust according to the official recommendations/guidelines."""
 
 MIMIR_ROLES_CONFIG = ClusterRolesConfig(
-    roles=ROLES,
+    roles=set(MimirRole),
     meta_roles=META_ROLES,
     minimal_deployment=MINIMAL_DEPLOYMENT,
     recommended_deployment=RECOMMENDED_DEPLOYMENT,
