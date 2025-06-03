@@ -98,7 +98,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             workers_config=MimirConfig(
                 alertmanager_urls=self.alertmanager.get_cluster_info()
             ).config,
-            worker_ports=lambda _: tuple({8080}),
+            worker_ports=lambda _: tuple({8080, 9095}),
             resources_requests=self.get_resource_requests,
             container_name="charm",  # container to which resource limits will be applied
             workload_tracing_protocols=["jaeger_thrift_http"],
