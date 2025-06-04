@@ -162,7 +162,6 @@ class MimirConfig:
         }
         return {
             "http_tls_config": tls_config,
-            "grpc_tls_config": tls_config,
         }
 
     # data_dir:
