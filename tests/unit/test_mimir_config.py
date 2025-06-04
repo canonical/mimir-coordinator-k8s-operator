@@ -200,12 +200,6 @@ def test_build_tls_config(mimir_config):
             "client_ca_file": "/etc/worker/ca.cert",
             "client_auth_type": "RequestClientCert",
         },
-        "grpc_tls_config": {
-            "cert_file": "/etc/worker/server.cert",
-            "key_file": "/etc/worker/private.key",
-            "client_ca_file": "/etc/worker/ca.cert",
-            "client_auth_type": "RequestClientCert",
-        },
     }
     assert tls_config == expected_config
 
