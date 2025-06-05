@@ -162,7 +162,7 @@ class MimirConfig:
         }
         return {
             "http_tls_config": tls_config,
-            "grpc_tls_config": tls_config,
+            # FIXME: investigate adding grpc_tls_config: https://github.com/canonical/mimir-coordinator-k8s-operator/issues/141
         }
 
     # data_dir:
