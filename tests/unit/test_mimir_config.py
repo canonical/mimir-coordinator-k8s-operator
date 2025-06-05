@@ -200,12 +200,7 @@ def test_build_tls_config(mimir_config):
             "client_ca_file": "/etc/worker/ca.cert",
             "client_auth_type": "RequestClientCert",
         },
-        "grpc_tls_config": {
-            "cert_file": "/etc/worker/server.cert",
-            "key_file": "/etc/worker/private.key",
-            "client_ca_file": "/etc/worker/ca.cert",
-            "client_auth_type": "RequestClientCert",
-        },
+        # FIXME: investigate adding grpc_tls_config: https://github.com/canonical/mimir-coordinator-k8s-operator/issues/141
     }
     assert tls_config == expected_config
 
