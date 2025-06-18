@@ -137,6 +137,7 @@ class MimirConfig:
             "store_gateway": self._build_store_gateway_config(coordinator.cluster),
             "blocks_storage": self._build_blocks_storage_config(),
             "memberlist": self._build_memberlist_config(coordinator.topology, coordinator.cluster),
+            "limits": self._build_limits_config(),
         }
 
         if coordinator.s3_ready:
@@ -307,3 +308,8 @@ class MimirConfig:
             "cluster_label": f"{top['model']}_{top['model_uuid']}_{top['application']}",
             "join_members": list(cluster.gather_addresses()),
         }
+
+    # ruler_max_rule_groups_per_tenant: int
+    # Maximum number of rule groups per-tenant. 0 to disable.
+    def _build_limits_config(self) -> Dict[str, Any]:
+        return {"ruler_max_rule_groups_per_tenant": 200}
