@@ -309,7 +309,12 @@ class MimirConfig:
             "join_members": list(cluster.gather_addresses()),
         }
 
+    # ruler_max_rules_per_rule_group
+    # Maximum number of rules per rule group per-tenant. 0 to disable. (default 20)
     # ruler_max_rule_groups_per_tenant: int
-    # Maximum number of rule groups per-tenant. 0 to disable.
+    # Maximum number of rule groups per-tenant. 0 to disable. (default 70)
     def _build_limits_config(self) -> Dict[str, Any]:
-        return {"ruler_max_rule_groups_per_tenant": 200}
+        return {
+            "ruler_max_rules_per_rule_group": 100,
+            "ruler_max_rule_groups_per_tenant": 200,
+        }
