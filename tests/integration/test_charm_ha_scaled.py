@@ -64,7 +64,7 @@ async def test_deploy_workers(ops_test: OpsTest):
     await ops_test.model.deploy(
         "mimir-worker-k8s",
         "worker-read",
-        channel="latest/edge",
+        channel="2/edge",
         config={"role-read": True},
         num_units=3,
         trust=True,
@@ -72,7 +72,7 @@ async def test_deploy_workers(ops_test: OpsTest):
     await ops_test.model.deploy(
         "mimir-worker-k8s",
         "worker-write",
-        channel="latest/edge",
+        channel="2/edge",
         config={"role-write": True},
         num_units=3,
         trust=True,
@@ -80,7 +80,7 @@ async def test_deploy_workers(ops_test: OpsTest):
     await ops_test.model.deploy(
         "mimir-worker-k8s",
         "worker-backend",
-        channel="latest/edge",
+        channel="2/edge",
         config={"role-backend": True},
         num_units=3,
         trust=True,
