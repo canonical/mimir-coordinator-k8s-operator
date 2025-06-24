@@ -317,4 +317,5 @@ class MimirConfig:
         return {
             "ruler_max_rules_per_rule_group": 0,
             "ruler_max_rule_groups_per_tenant": 0,
+            "max_global_exemplars_per_user": 100000
         }
