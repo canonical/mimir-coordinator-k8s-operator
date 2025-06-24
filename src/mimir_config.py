@@ -116,10 +116,12 @@ class MimirConfig:
         alertmanager_urls: Set[str] = set(),
         root_data_dir: Path = Path("/data"),
         recovery_data_dir: Path = Path("/recovery-data"),
+        max_global_exemplars_per_user: int = 100000
     ):
         self._alertmanager_urls = alertmanager_urls
         self._root_data_dir = root_data_dir
         self._recovery_data_dir = recovery_data_dir
+        self._max_global_exemplars_per_user = max_global_exemplars_per_user
 
     def config(self, coordinator: Coordinator) -> str:
         """Generate shared config file for mimir.
@@ -317,5 +319,5 @@ class MimirConfig:
         return {
             "ruler_max_rules_per_rule_group": 0,
             "ruler_max_rule_groups_per_tenant": 0,
-            "max_global_exemplars_per_user": 100000
+            "max_global_exemplars_per_user": self._max_global_exemplars_per_user
         }

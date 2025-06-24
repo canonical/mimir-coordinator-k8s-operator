@@ -150,3 +150,9 @@ requires:
     optional: true
     description: |
       Integration to help users discover Mimir's deployment.
+config:
+  options:
+    max_global_exemplars_per_user:
+      default: 100000
+      description: The limit for exemplars
+      type: int
