@@ -7,7 +7,7 @@
 import logging
 from enum import Enum, unique
 from pathlib import Path
-from typing import Any, Dict, Set, Optional
+from typing import Any, Dict, Optional, Set
 
 import yaml
 from coordinated_workers.coordinator import ClusterRolesConfig, Coordinator
@@ -113,10 +113,10 @@ class MimirConfig:
 
     def __init__(
         self,
+        max_global_exemplars_per_user: Optional[int] = None,
         alertmanager_urls: Set[str] = set(),
         root_data_dir: Path = Path("/data"),
-        recovery_data_dir: Path = Path("/recovery-data"),
-        max_global_exemplars_per_user: Optional[int] = None
+        recovery_data_dir: Path = Path("/recovery-data")
     ):
         self._alertmanager_urls = alertmanager_urls
         self._root_data_dir = root_data_dir
@@ -321,13 +321,16 @@ class MimirConfig:
             "ruler_max_rule_groups_per_tenant": 0,
         }
 
-        # Conditionally add max_global_exemplars_per_user if needed
-        if self._should_include_max_global_exemplars(self._max_global_exemplars_per_user):
-            limits_config["max_global_exemplars_per_user"] = self._max_global_exemplars_per_user
+        # Set the max_global_exemplars_per_user based on the value of _max_global_exemplars_per_user
+        limits_config["max_global_exemplars_per_user"] = self._adjust_max_global_exemplars(self._max_global_exemplars_per_user)
 
         return limits_config
 
-    def _should_include_max_global_exemplars(self, value: int) -> bool:
-        # Determine whether to include max_global_exemplars_per_user in the config.
-        # 100,000 is considered a low number according to Grafana docs. If the config value is set to anything lower than that, the rendered config will have no max_global_exemplars_per_user entry
-        return value >= 100000
+    def _adjust_max_global_exemplars(self, value: int | None) -> int:
+        """Adjusts the max_global_exemplars_per_user value based on the given logic."""
+        if value is None or value <= 0:
+            return 0
+        elif value < 100000:
+            return 100000
+        else:
+            return value
