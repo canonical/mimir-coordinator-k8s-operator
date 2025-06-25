@@ -7,7 +7,7 @@
 import logging
 from enum import Enum, unique
 from pathlib import Path
-from typing import Any, Dict, Set
+from typing import Any, Dict, Set, Optional
 
 import yaml
 from coordinated_workers.coordinator import ClusterRolesConfig, Coordinator
@@ -116,7 +116,7 @@ class MimirConfig:
         alertmanager_urls: Set[str] = set(),
         root_data_dir: Path = Path("/data"),
         recovery_data_dir: Path = Path("/recovery-data"),
-        max_global_exemplars_per_user: int = 100000
+        max_global_exemplars_per_user: Optional[int] = None
     ):
         self._alertmanager_urls = alertmanager_urls
         self._root_data_dir = root_data_dir
@@ -316,8 +316,18 @@ class MimirConfig:
     # ruler_max_rule_groups_per_tenant: int
     # Maximum number of rule groups per-tenant. 0 to disable. (default 70)
     def _build_limits_config(self) -> Dict[str, Any]:
-        return {
+        limits_config: Dict[str, Any] = {
             "ruler_max_rules_per_rule_group": 0,
             "ruler_max_rule_groups_per_tenant": 0,
-            "max_global_exemplars_per_user": self._max_global_exemplars_per_user
         }
+
+        # Conditionally add max_global_exemplars_per_user if needed
+        if self._should_include_max_global_exemplars(self._max_global_exemplars_per_user):
+            limits_config["max_global_exemplars_per_user"] = self._max_global_exemplars_per_user
+
+        return limits_config
+
+    def _should_include_max_global_exemplars(self, value: int) -> bool:
+        # Determine whether to include max_global_exemplars_per_user in the config.
+        # 100,000 is considered a low number according to Grafana docs. If the config value is set to anything lower than that, the rendered config will have no max_global_exemplars_per_user entry
+        return value >= 100000
