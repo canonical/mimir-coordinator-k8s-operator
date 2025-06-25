@@ -77,6 +77,7 @@ def test_build_alertmanager_config(mimir_config, coordinator, addresses_by_role,
     [
         (None, 0),             # When value is None, it should return 0
         (0, 0),                # When value is 0 or negative, it should return 0
+        (-1, 0),
         (50000, 100000),       # When value is between 1 and 100000, it should return 100000
         (100000, 100000),      # When value is exactly 100000, it should return 100000
         (150000, 150000),      # When value is greater than 100000, it should remain unchanged
