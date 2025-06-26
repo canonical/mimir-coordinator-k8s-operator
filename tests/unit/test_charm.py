@@ -68,7 +68,7 @@ def test_recommended(mock_coordinator, roles, expected):
 )
 def test_workers_config_getter(mock_coordinator, max_global_exemplars_per_user, expected_value):
     mc = Coordinator(None, None, "", "", 0, None, None, None)  # pyright: ignore
-    
+
     def side_effect():
         if max_global_exemplars_per_user is None or max_global_exemplars_per_user <= 0:
             return 0
@@ -76,9 +76,9 @@ def test_workers_config_getter(mock_coordinator, max_global_exemplars_per_user, 
             return 100000
         else:
             return max_global_exemplars_per_user
-    
+
     mc._workers_config_getter = MagicMock(side_effect=side_effect)
-    
+
     result = mc._workers_config_getter()
-    
+
     assert result is expected_value
