@@ -10,6 +10,7 @@ import logging
 import pytest
 import requests
 from helpers import (
+    COS_CHANNEL,
     charm_resources,
     configure_minio,
     configure_s3_integrator,
@@ -31,10 +32,10 @@ async def test_build_and_deploy(ops_test: OpsTest, mimir_charm: str):
     assert ops_test.model is not None  # for pyright
     await asyncio.gather(
         ops_test.model.deploy(mimir_charm, "mimir", resources=charm_resources(), trust=True),
-        ops_test.model.deploy("prometheus-k8s", "prometheus", channel="2/edge", trust=True),
-        ops_test.model.deploy("loki-k8s", "loki", channel="2/edge", trust=True),
-        ops_test.model.deploy("grafana-k8s", "grafana", channel="2/edge", trust=True),
-        ops_test.model.deploy("grafana-agent-k8s", "agent", channel="2/edge"),
+        ops_test.model.deploy("prometheus-k8s", "prometheus", channel=COS_CHANNEL, trust=True),
+        ops_test.model.deploy("loki-k8s", "loki", channel=COS_CHANNEL, trust=True),
+        ops_test.model.deploy("grafana-k8s", "grafana", channel=COS_CHANNEL, trust=True),
+        ops_test.model.deploy("grafana-agent-k8s", "agent", channel=COS_CHANNEL),
         ops_test.model.deploy("traefik-k8s", "traefik", channel="latest/edge", trust=True),
         # Deploy and configure Minio and S3
         # Secret must be at least 8 characters: https://github.com/canonical/minio-operator/issues/137
@@ -64,7 +65,7 @@ async def test_deploy_workers(ops_test: OpsTest):
     await ops_test.model.deploy(
         "mimir-worker-k8s",
         "worker-read",
-        channel="2/edge",
+        channel=COS_CHANNEL,
         config={"role-read": True},
         num_units=3,
         trust=True,
@@ -72,7 +73,7 @@ async def test_deploy_workers(ops_test: OpsTest):
     await ops_test.model.deploy(
         "mimir-worker-k8s",
         "worker-write",
-        channel="2/edge",
+        channel=COS_CHANNEL,
         config={"role-write": True},
         num_units=3,
         trust=True,
@@ -80,7 +81,7 @@ async def test_deploy_workers(ops_test: OpsTest):
     await ops_test.model.deploy(
         "mimir-worker-k8s",
         "worker-backend",
-        channel="2/edge",
+        channel=COS_CHANNEL,
         config={"role-backend": True},
         num_units=3,
         trust=True,
