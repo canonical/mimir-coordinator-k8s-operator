@@ -44,6 +44,8 @@ logger = logging.getLogger(__name__)
 
 RULES_DIR = "/etc/mimir-alerts/rules"
 ALERTS_HASH_PATH = "/etc/mimir-alerts/alerts.sha256"
+NGINX_PORT = NginxHelper._port
+NGINX_TLS_PORT = NginxHelper._tls_port
 
 
 @trace_charm(
@@ -178,10 +180,10 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     def internal_url(self) -> str:
         """Returns workload's FQDN. Used for ingress."""
         scheme = "http"
-        port = 8080
+        port = NGINX_PORT
         if hasattr(self, "coordinator") and self.coordinator.nginx.are_certificates_on_disk:
             scheme = "https"
-            port = 443
+            port = NGINX_TLS_PORT
         return f"{scheme}://{self.hostname}:{port}"
 
     @property
