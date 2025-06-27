@@ -11,8 +11,6 @@ from pytest_operator.plugin import OpsTest
 
 logger = logging.getLogger(__name__)
 
-COS_CHANNEL = "2/edge"
-
 
 def charm_resources(metadata_file="charmcraft.yaml") -> Dict[str, str]:
     with open(metadata_file, "r") as file:
