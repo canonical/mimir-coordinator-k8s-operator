@@ -10,7 +10,7 @@ from charms.tempo_coordinator_k8s.v0.charm_tracing import charm_tracing_disabled
 from ops import ActiveStatus
 from scenario import Container, Context, Exec, Relation
 
-from charm import MimirCoordinatorK8SOperatorCharm
+from charm import NGINX_PORT, NGINX_TLS_PORT, MimirCoordinatorK8SOperatorCharm
 
 
 @pytest.fixture(autouse=True, scope="session")
@@ -52,7 +52,17 @@ def nginx_container():
                     "mimirtool",
                     "rules",
                     "sync",
-                    f"--address=http://{socket.getfqdn()}:8080",
+                    f"--address=http://{socket.getfqdn()}:{NGINX_PORT}",
+                    "--id=anonymous",
+                ],
+                return_code=0,
+            ),
+            Exec(
+                [
+                    "mimirtool",
+                    "rules",
+                    "sync",
+                    f"--address=https://{socket.getfqdn()}:{NGINX_TLS_PORT}",
                     "--id=anonymous",
                 ],
                 return_code=0,
