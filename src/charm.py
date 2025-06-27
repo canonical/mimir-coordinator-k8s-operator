@@ -45,8 +45,6 @@ logger = logging.getLogger(__name__)
 RULES_DIR = "/etc/mimir-alerts/rules"
 ALERTS_HASH_PATH = "/etc/mimir-alerts/alerts.sha256"
 
-NGINX_PORT = 8080
-NGINX_TLS_PORT = 443
 
 @trace_charm(
     tracing_endpoint="charm_tracing_endpoint",
