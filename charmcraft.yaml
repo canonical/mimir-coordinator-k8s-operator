@@ -158,5 +158,4 @@ config:
        The global limit for the number of exemplars.
        When unset or set to a non-positive number, exemplar storage is disabled.
        If set to a positive number that falls between 1 and 100,000, the limit is bumped to 100,000.
-       To disable, set to a non-positive number.
       type: int
