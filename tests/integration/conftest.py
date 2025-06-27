@@ -17,6 +17,11 @@ logger = logging.getLogger(__name__)
 store = defaultdict(str)
 
 
+@pytest.fixture(scope="session")
+def cos_channel():
+    return "2/edge"
+
+
 def timed_memoizer(func):
     @functools.wraps(func)
     async def wrapper(*args, **kwargs):
