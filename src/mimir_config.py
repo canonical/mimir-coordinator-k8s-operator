@@ -14,7 +14,6 @@ from coordinated_workers.coordinator import ClusterRolesConfig, Coordinator
 from coordinated_workers.interfaces.cluster import ClusterProvider
 from coordinated_workers.worker import CERT_FILE, CLIENT_CA_FILE, KEY_FILE
 from cosl import JujuTopology
-from coordinated_workers.interfaces.cluster import ClusterProvider
 
 logger = logging.getLogger(__name__)
 

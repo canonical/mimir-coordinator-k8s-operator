@@ -1,11 +1,11 @@
-import unittest
-from unittest.mock import MagicMock, patch, PropertyMock
+from typing import Union
+from unittest.mock import MagicMock, patch
 
 import pytest as pytest
-from coordinated_workers.coordinator import Coordinator
 import scenario
-from scenario import Relation, State
-import yaml
+from coordinated_workers.coordinator import Coordinator
+from helpers import get_worker_config_exemplars
+from scenario import State
 
 from src.mimir_config import (
     MIMIR_ROLES_CONFIG,
@@ -13,11 +13,6 @@ from src.mimir_config import (
     RECOMMENDED_DEPLOYMENT,
 )
 
-from helpers import get_worker_config_exemplars
-
-from ops import testing
-
-from charm import NGINX_PORT, NGINX_TLS_PORT
 
 @patch("coordinated_workers.coordinator.Coordinator.__init__", return_value=None)
 @pytest.mark.parametrize(
@@ -62,25 +57,23 @@ def test_recommended(mock_coordinator, roles, expected):
 
     assert mc.is_recommended is expected
 
-def test_config_exemplars(
-    context,
-    s3,
-    all_worker,
-    nginx_container,
-    nginx_prometheus_exporter_container,
-):
-    # GIVEN Loki is related over the ingress and certificates endpoints
-    ingress = Relation("ingress")
-    certificates = Relation("certificates")
-    worker = testing.Relation("mimir-cluster")
-    config = {"max_global_exemplars_per_user":0}
+@pytest.mark.parametrize(
+    "config_value, expected_exemplars",
+    [
+        (0, 0),               # when max_global_exemplars_per_user is 0
+        (50000, 100000),      # when max_global_exemplars_per_user is between 1 and 100k
+        (500000, 500000),     # when max_global_exemplars_per_user is above 100k
+    ]
+)
+def test_config_exemplars(context, s3, all_worker, nginx_container, nginx_prometheus_exporter_container, config_value, expected_exemplars):
+    """Test config for max_global_exemplars_per_user."""
+    config_value: Union[str, int, float, bool] = config_value
+    config = {"max_global_exemplars_per_user": config_value}
+
     state_in = State(
         relations=[
             s3,
             all_worker,
-            ingress,
-            certificates,
-            worker,
         ],
         containers=[nginx_container, nginx_prometheus_exporter_container],
         unit_status=scenario.ActiveStatus(),
@@ -88,59 +81,10 @@ def test_config_exemplars(
         config=config
     )
 
-    # WHEN the config for max_global_exemplars_per_user is unset
-    with context(context.on.relation_joined(ingress), state_in) as mgr:
+    # WHEN the config for max_global_exemplars_per_user is set
+    with context(context.on.relation_joined(all_worker), state_in) as mgr:
         state_out = mgr.run()
 
-        # AND Loki publishes its Nginx non-TLS port in the ingress databag
-        rel = get_worker_config_exemplars(state_out.relations, "mimir-cluster")
-        #rel = get_relation_data(state_out.relations, "mimir-cluster",'worker_config')
-        assert rel == 0
-    
-    config = {"max_global_exemplars_per_user":50000}
-    state_in = State(
-        relations=[
-            s3,
-            all_worker,
-            ingress,
-            certificates,
-            worker,
-        ],
-        containers=[nginx_container, nginx_prometheus_exporter_container],
-        unit_status=scenario.ActiveStatus(),
-        leader=True,
-        config=config
-    )
-
-    # WHEN the config for max_global_exemplars_per_user is unset
-    with context(context.on.relation_joined(ingress), state_in) as mgr:
-        state_out = mgr.run()
-
-        # AND Loki publishes its Nginx non-TLS port in the ingress databag
-        rel = get_worker_config_exemplars(state_out.relations, "mimir-cluster")
-        #rel = get_relation_data(state_out.relations, "mimir-cluster",'worker_config')
-        assert rel == 100000
-
-    config = {"max_global_exemplars_per_user":500000}
-    state_in = State(
-        relations=[
-            s3,
-            all_worker,
-            ingress,
-            certificates,
-            worker,
-        ],
-        containers=[nginx_container, nginx_prometheus_exporter_container],
-        unit_status=scenario.ActiveStatus(),
-        leader=True,
-        config=config
-    )
-
-    # WHEN the config for max_global_exemplars_per_user is unset
-    with context(context.on.relation_joined(ingress), state_in) as mgr:
-        state_out = mgr.run()
-
-        # AND Loki publishes its Nginx non-TLS port in the ingress databag
-        rel = get_worker_config_exemplars(state_out.relations, "mimir-cluster")
-        #rel = get_relation_data(state_out.relations, "mimir-cluster",'worker_config')
-        assert rel == 500000
+        # CHECK we get the right value in workers_config
+        config = get_worker_config_exemplars(state_out.relations, "mimir-cluster")
+        assert config == expected_exemplars
