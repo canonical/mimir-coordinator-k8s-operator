@@ -58,16 +58,16 @@ def test_recommended(mock_coordinator, roles, expected):
     assert mc.is_recommended is expected
 
 @pytest.mark.parametrize(
-    "config_value, expected_exemplars",
+    "set_config, expected_exemplars",
     [
         (0, 0),               # when max_global_exemplars_per_user is 0
         (50000, 100000),      # when max_global_exemplars_per_user is between 1 and 100k
         (500000, 500000),     # when max_global_exemplars_per_user is above 100k
     ]
 )
-def test_config_exemplars(context, s3, all_worker, nginx_container, nginx_prometheus_exporter_container, config_value, expected_exemplars):
+def test_config_exemplars(context, s3, all_worker, nginx_container, nginx_prometheus_exporter_container, set_config, expected_exemplars):
     """Test config for max_global_exemplars_per_user."""
-    config_value: Union[str, int, float, bool] = config_value
+    config_value: Union[str, int, float, bool] = set_config
     config = {"max_global_exemplars_per_user": config_value}
 
     state_in = State(
