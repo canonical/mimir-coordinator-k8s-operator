@@ -14,6 +14,7 @@ from coordinated_workers.coordinator import ClusterRolesConfig, Coordinator
 from coordinated_workers.interfaces.cluster import ClusterProvider
 from coordinated_workers.worker import CERT_FILE, CLIENT_CA_FILE, KEY_FILE
 from cosl import JujuTopology
+from coordinated_workers.interfaces.cluster import ClusterProvider
 
 logger = logging.getLogger(__name__)
 
@@ -106,13 +107,15 @@ REPLICATION_MIN_WORKERS = 3
 # The default amount of replicas to set when there are enough workers per role;
 # otherwise, replicas will be "disabled" by setting the amount to 1
 DEFAULT_REPLICATION = 3
-
+# The mimimum number of exemplars per user
+EXEMPLARS_FLOOR = 100000
 
 class MimirConfig:
     """Config builder for the Mimir Coordinator."""
 
     def __init__(
         self,
+        *,
         max_global_exemplars_per_user: Optional[int] = None,
         alertmanager_urls: Set[str] = set(),
         root_data_dir: Path = Path("/data"),
@@ -322,15 +325,11 @@ class MimirConfig:
         }
 
         # Set the max_global_exemplars_per_user based on the value of _max_global_exemplars_per_user
-        limits_config["max_global_exemplars_per_user"] = self._adjust_max_global_exemplars(self._max_global_exemplars_per_user)
+        if val := max(self._max_global_exemplars_per_user or 0, 0):
+            limits_config["max_global_exemplars_per_user"] = max(val, EXEMPLARS_FLOOR)
+        else:
+            limits_config["max_global_exemplars_per_user"] = 0
 
         return limits_config
 
-    def _adjust_max_global_exemplars(self, value: int | None) -> int:
-        """Adjusts the max_global_exemplars_per_user value based on the given logic."""
-        if value is None or value <= 0:
-            return 0
-        elif value < 100000:
-            return 100000
-        else:
-            return value
+
