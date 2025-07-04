@@ -325,9 +325,8 @@ class MimirConfig:
 
         # Set the max_global_exemplars_per_user based on the value of _max_global_exemplars_per_user
         if val := max(self._max_global_exemplars_per_user or 0, 0):
-            limits_config["max_global_exemplars_per_user"] = max(val, EXEMPLARS_FLOOR)
-        else:
-            limits_config["max_global_exemplars_per_user"] = 0
+            val = max(val, EXEMPLARS_FLOOR)
+        limits_config["max_global_exemplars_per_user"] = val
 
         return limits_config
 

@@ -61,8 +61,8 @@ def test_recommended(mock_coordinator, roles, expected):
     "set_config, expected_exemplars",
     [
         (0, 0),               # when max_global_exemplars_per_user is 0
-        (50000, 100000),      # when max_global_exemplars_per_user is between 1 and 100k
-        (500000, 500000),     # when max_global_exemplars_per_user is above 100k
+        (99_999, 100_000),      # when max_global_exemplars_per_user is between 1 and 100k
+        (100_001, 100_001),     # when max_global_exemplars_per_user is above 100k
     ]
 )
 def test_config_exemplars(context, s3, all_worker, nginx_container, nginx_prometheus_exporter_container, set_config, expected_exemplars):

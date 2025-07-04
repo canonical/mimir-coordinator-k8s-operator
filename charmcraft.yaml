@@ -158,5 +158,5 @@ config:
        The global limit for the number of exemplars.
        When unset or set to a non-positive number, exemplar storage is disabled.
        Otherwise, the value is set to the greater of the setpoint or 100,000.
-       Ref to upstream docs: https://grafana.com/docs/mimir/latest/manage/use-exemplars/store-exemplars/
+       Ref: https://grafana.com/docs/mimir/latest/manage/use-exemplars/store-exemplars/
       type: int
