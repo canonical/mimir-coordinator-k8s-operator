@@ -101,8 +101,18 @@ async def test_integrate(ops_test: OpsTest):
     assert write_app is not None, "mimir-write application not found"
     assert read_app is not None, "mimir-read application not found"
 
-    write_address = write_app.units['mimir-write/0'].public_address
-    read_address = read_app.units['mimir-read/0'].public_address
+    write_unit = write_app.units.get('mimir-write/0')
+    read_unit = read_app.units.get('mimir-read/0')
+
+    if write_unit:
+        write_address = write_unit.public_address
+    else:
+        raise ValueError("mimir-write/0 unit not found")
+
+    if read_unit:
+        read_address = read_unit.public_address
+    else:
+        raise ValueError("mimir-read/0 unit not found")
 
     assert write_address is not None, "Write address is None"
     assert read_address is not None, "Read address is None"
