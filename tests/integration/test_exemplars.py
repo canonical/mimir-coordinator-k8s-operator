@@ -75,7 +75,7 @@ async def test_deploy_workers(ops_test: OpsTest, cos_channel):
 async def test_integrate(ops_test: OpsTest):
     assert ops_test.model is not None
     await asyncio.gather(
-        ops_test.model.integrate("mimir", "s3"),
+        ops_test.model.integrate("mimir:s3", "s3"),
         ops_test.model.integrate("mimir:mimir-cluster", "mimir-read"),
         ops_test.model.integrate("mimir:mimir-cluster", "mimir-write"),
         ops_test.model.integrate("mimir:mimir-cluster", "mimir-backend"),
@@ -94,8 +94,19 @@ async def test_integrate(ops_test: OpsTest):
 
     # Push example payload to the `mimir-write` API
     status = await ops_test.model.get_status()
-    write_address = status.applications['mimir-write'].units['mimir-write/0'].public_address
-    read_address = status.applications['mimir-read'].units['mimir-read/0'].public_address
+
+    write_app = status.applications.get('mimir-write')
+    read_app = status.applications.get('mimir-read')
+
+    assert write_app is not None, "mimir-write application not found"
+    assert read_app is not None, "mimir-read application not found"
+
+    write_address = write_app.units['mimir-write/0'].public_address
+    read_address = read_app.units['mimir-read/0'].public_address
+
+    assert write_address is not None, "Write address is None"
+    assert read_address is not None, "Read address is None"
+
     # Prepare the payload (timeseries data)
     trace_id = "da061bde6e64e89172071263d7adb68r"
     timestamp = int(time.time() * 1000)  # Current time in milliseconds
