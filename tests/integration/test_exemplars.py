@@ -14,8 +14,11 @@ import requests
 from helpers import (
     charm_resources,
     configure_s3_integrator,
+    configure_minio
 )
 from pytest_operator.plugin import OpsTest
+
+import snappy
 
 logger = logging.getLogger(__name__)
 
@@ -26,14 +29,24 @@ async def test_build_and_deploy(ops_test: OpsTest, mimir_charm: str, cos_channel
     assert ops_test.model is not None  # for pyright
     await asyncio.gather(
         ops_test.model.deploy(mimir_charm, "mimir", resources=charm_resources(), trust=True),
+        ops_test.model.deploy(
+            "minio",
+            channel="ckf-1.9/stable",
+            config={"access-key": "access", "secret-key": "secretsecret"},
+        ),
         ops_test.model.deploy("s3-integrator", "s3", channel="latest/stable"),
     )
-
     # Configure the S3 integrator
+    await ops_test.model.wait_for_idle(apps=["minio"], status="active")
     await ops_test.model.wait_for_idle(apps=["s3"], status="blocked")
+    await configure_minio(ops_test)
     await configure_s3_integrator(ops_test)
 
     await ops_test.model.wait_for_idle(apps=["s3"])
+
+    await ops_test.model.wait_for_idle(
+        apps=["minio", "s3"], status="active"
+    )
 
     # Wait for Mimir to be blocked
     await ops_test.model.wait_for_idle(
@@ -84,7 +97,7 @@ async def test_integrate(ops_test: OpsTest):
     await ops_test.model.wait_for_idle(
         apps=[
             "mimir",
-            "s3",
+            "s3", 
             "mimir-read",
             "mimir-write",
             "mimir-backend"
@@ -105,18 +118,21 @@ async def test_integrate(ops_test: OpsTest):
     read_unit = read_app.units.get('mimir-read/0')
 
     if write_unit:
-        write_address = write_unit.public_address
+        write_address = write_unit.address
     else:
         raise ValueError("mimir-write/0 unit not found")
 
     if read_unit:
-        read_address = read_unit.public_address
+        read_address = read_unit.address
     else:
         raise ValueError("mimir-read/0 unit not found")
 
     assert write_address is not None, "Write address is None"
     assert read_address is not None, "Read address is None"
 
+    read_endpoint = f"http://{read_address}:8080/prometheus/api/v1/query_exemplars"
+    write_endpoint = f"http://{write_address}:8080/api/v1/push"
+    
     # Prepare the payload (timeseries data)
     trace_id = "da061bde6e64e89172071263d7adb68r"
     timestamp = int(time.time() * 1000)  # Current time in milliseconds
@@ -150,17 +166,18 @@ async def test_integrate(ops_test: OpsTest):
 
     headers = {
         "Content-Type": "application/json",
+        "Content-Encoding": "snappy"
     }
 
     # Push the data to the Mimir Write API
-    response = requests.post(write_address, json=payload, headers=headers)
+    response = requests.post(write_endpoint, json=payload, headers=headers)
     assert response.status_code == 200, f"Failed to push data to mimir-write: {response.text}"
 
     logger.info("Successfully pushed data to mimir-write")
 
     # Query the Mimir Read HTTP API to check the exemplars
     query = '{"query": "example_metric"}'
-    response = requests.get(read_address, params={"query": query})
+    response = requests.get(read_endpoint, params={"query": query})
     assert response.status_code == 200, f"Failed to query exemplars: {response.text}"
 
     data = response.json()
