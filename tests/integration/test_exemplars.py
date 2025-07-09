@@ -5,7 +5,9 @@
 # pyright: reportAttributeAccessIssue=false
 
 import asyncio
+import json
 import logging
+import time
 
 import pytest
 import requests
@@ -25,12 +27,10 @@ async def test_build_and_deploy(ops_test: OpsTest, mimir_charm: str, cos_channel
     await asyncio.gather(
         ops_test.model.deploy(mimir_charm, "mimir", resources=charm_resources(), trust=True),
         ops_test.model.deploy("s3-integrator", "s3", channel="latest/stable"),
-        ops_test.model.deploy("prometheus-scrape-target-k8s", "prometheus-scrape", channel=cos_channel, trust=True),
-        ops_test.model.deploy("grafana-agent-k8s", "agent", channel=cos_channel, trust=True),
     )
 
     # Configure the S3 integrator
-    await ops_test.model.wait_for_idle(apps=["s3", "prometheus-scrape", "agent"], status="blocked")
+    await ops_test.model.wait_for_idle(apps=["s3"], status="blocked")
     await configure_s3_integrator(ops_test)
 
     await ops_test.model.wait_for_idle(apps=["s3"])
@@ -39,7 +39,6 @@ async def test_build_and_deploy(ops_test: OpsTest, mimir_charm: str, cos_channel
     await ops_test.model.wait_for_idle(
         apps=["mimir"], status="blocked"
     )
-
 
 @pytest.mark.setup
 @pytest.mark.abort_on_fail
@@ -68,9 +67,8 @@ async def test_deploy_workers(ops_test: OpsTest, cos_channel):
         trust=True,
     )
     await ops_test.model.wait_for_idle(
-        apps=["mimir-read", "wmimir-write", "mimir-backend"], status="blocked"
+        apps=["mimir-read", "mimir-write", "mimir-backend"], status="blocked"
     )
-
 
 @pytest.mark.setup
 @pytest.mark.abort_on_fail
@@ -81,14 +79,11 @@ async def test_integrate(ops_test: OpsTest):
         ops_test.model.integrate("mimir:mimir-cluster", "mimir-read"),
         ops_test.model.integrate("mimir:mimir-cluster", "mimir-write"),
         ops_test.model.integrate("mimir:mimir-cluster", "mimir-backend"),
-        ops_test.model.integrate("mimir:receive-remote-write", "agent:send-remote-write"),
-        ops_test.model.integrate("prometheus-scrape: metrics-endpoint", "agent: metrics-endpoint"),
     )
 
     await ops_test.model.wait_for_idle(
         apps=[
             "mimir",
-            "agent",
             "s3",
             "mimir-read",
             "mimir-write",
@@ -97,3 +92,65 @@ async def test_integrate(ops_test: OpsTest):
         status="active",
     )
 
+    # Push example payload to the `mimir-write` API
+    status = await ops_test.model.get_status()
+    write_address = status.applications['mimir-write'].units['mimir-write/0'].public_address
+    read_address = status.applications['mimir-read'].units['mimir-read/0'].public_address
+    # Prepare the payload (timeseries data)
+    trace_id = "da061bde6e64e89172071263d7adb68r"
+    timestamp = int(time.time() * 1000)  # Current time in milliseconds
+
+    payload = {
+        "timeseries": [
+            {
+                "labels": [
+                    {"name": "__name__", "value": "example_metric"},
+                    {"name": "job", "value": "example_job"},
+                    {"name": "trace_id", "value": trace_id}
+                ],
+                "samples": [
+                    {
+                        "value": 42,
+                        "timestamp": timestamp
+                    }
+                ],
+                "exemplars": [
+                    {
+                        "labels": [
+                            {"name": "trace_id", "value": trace_id}
+                        ],
+                        "value": 55,
+                        "timestamp": timestamp / 1000  # Convert to seconds
+                    }
+                ]
+            }
+        ]
+    }
+
+    headers = {
+        "Content-Type": "application/json",
+    }
+
+    # Push the data to the Mimir Write API
+    response = requests.post(write_address, json=payload, headers=headers)
+    assert response.status_code == 200, f"Failed to push data to mimir-write: {response.text}"
+
+    logger.info("Successfully pushed data to mimir-write")
+
+    # Query the Mimir Read HTTP API to check the exemplars
+    query = '{"query": "example_metric"}'
+    response = requests.get(read_address, params={"query": query})
+    assert response.status_code == 200, f"Failed to query exemplars: {response.text}"
+
+    data = response.json()
+    logger.info("Query response: %s", json.dumps(data, indent=2))
+
+    # Check if the exemplar with the trace_id is present in the response
+    exemplars = data.get("data", {}).get("result", [])
+    found = any(
+        exemplar.get("labels", {}).get("trace_id") == trace_id
+        for exemplar in exemplars
+    )
+
+    assert found, f"Exemplar with trace_id {trace_id} not found in the response"
+    logger.info(f"Exemplar with trace_id {trace_id} found in the response")
