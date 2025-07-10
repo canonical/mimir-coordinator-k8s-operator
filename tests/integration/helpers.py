@@ -8,6 +8,9 @@ from juju.application import Application
 from juju.unit import Unit
 from minio import Minio
 from pytest_operator.plugin import OpsTest
+from remote_pb2 import WriteRequest
+import snappy
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -146,3 +149,74 @@ async def get_traefik_proxied_endpoints(
     action = await traefik_leader.run_action("show-proxied-endpoints")
     action_result = await action.wait()
     return json.loads(action_result.results["proxied-endpoints"])
+
+async def remote_write_mimir(ops_test: OpsTest, worker_app: str, traceId:str, queryName: str) -> int:
+    leader_unit_number = await get_leader_unit_number(ops_test, worker_app)
+    mimir_write_url = await get_unit_address(ops_test, worker_app, leader_unit_number)
+
+    # Create the WriteRequest Protobuf object
+    remote_write = WriteRequest()
+
+    # Add timeseries data
+    series = remote_write.timeseries.add()
+
+    # Add labels (metric name, job name, etc.)
+    series.labels.add(name="__name__", value=queryName)
+    series.labels.add(name="job", value="example_job")
+
+    ts = int(time.time() * 1000)  # Convert to milliseconds
+    
+    series.labels.add(name="trace_id", value=traceId)
+
+    # Add sample with value and timestamp
+    sample = series.samples.add()
+    sample.timestamp = ts
+    sample.value = 42  # Sample value
+
+    # Create exemplar with timestamp
+    exemplar = series.exemplars.add()
+    exemplar.value = 50000  # Exemplar value
+    exemplar.timestamp = ts 
+
+    # Add the trace_id label to the exemplar (as part of the exemplar)
+    exemplar.labels.add(name="trace_id", value=traceId)
+
+    # Serialize the Protobuf payload to binary format
+    serialized_payload = remote_write.SerializeToString()
+
+    # Compress the Protobuf payload with Snappy
+    compressed_payload = snappy.compress(serialized_payload)
+
+    # Set headers for the request
+    headers = {
+        "Content-Type": "application/x-protobuf",  # Specify Protobuf content type
+        "Content-Encoding": "snappy",              # Indicate Snappy compression
+    }
+
+    # Push the data to the Mimir Write API
+    logger.info("Mimir write url %s", mimir_write_url)
+    response = requests.post(f"http://{mimir_write_url}:8080/api/v1/push", data=compressed_payload, headers=headers)
+    return response.status_code
+
+async def query_exemplars(
+    ops_test: OpsTest, queryName: str, worker_app: str
+) -> str | None:
+
+    leader_unit_number = await get_leader_unit_number(ops_test, worker_app)
+    mimir_read_url = await get_unit_address(ops_test, worker_app, leader_unit_number)
+    
+    response = requests.get(f"http://{mimir_read_url}:8080/prometheus/api/v1/query_exemplars", params={'query': queryName})
+    
+    assert response.status_code == 200
+
+    response_data = response.json()
+
+    # Check if the exemplar with the trace_id is present in the response
+    exemplars = response_data.get("data", [])[0].get("exemplars", [])
+
+    # Find the `trace_id` from the first exemplar's labels
+    trace_id = None
+    if exemplars:
+        trace_id = exemplars[0].get("labels", {}).get("trace_id")
+
+    return trace_id
