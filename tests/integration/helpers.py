@@ -153,52 +153,37 @@ async def get_traefik_proxied_endpoints(
     return json.loads(action_result.results["proxied-endpoints"])
 
 async def push_to_otelcol(ops_test: OpsTest, metric_name: str) -> str:
-    # Get leader unit number and unit address
+    """Push a metric along with a trace ID to an Opentelemetry Collector that is related to Mimir so that the exemplar can be stored in Mimir.
+
+    This block creates an exemplars by attaching a trace ID provided by the Opentelemetry SDK to a metric.
+    Please visit https://opentelemetry.io/docs/languages/python/instrumentation/ for more info on how the instrumentation works and/or how to modify it.
+    """
     leader_unit_number = await get_leader_unit_number(ops_test, "otel-col")
     otel_url = await get_unit_address(ops_test, "otel-col", leader_unit_number)
     collector_endpoint = f"http://{otel_url}:4318/v1/metrics"
 
-    # Resource information
     resource = Resource(attributes={
         SERVICE_NAME: "service",
         SERVICE_VERSION: "1.0.0"
     })
 
-    # Create the OTLP Metric Exporter (HTTP)
     otlp_exporter = OTLPMetricExporter(endpoint=collector_endpoint)
     metric_reader = PeriodicExportingMetricReader(otlp_exporter, export_interval_millis=5000)
-
-    # Set up the MeterProvider with the exporter
     meter_provider = MeterProvider(resource=resource, metric_readers=[metric_reader])
     metrics.set_meter_provider(meter_provider)
-
-    # Create a Meter instance
     meter = metrics.get_meter("meter", "1.0.0")
     counter = meter.create_counter(metric_name, description="A placeholder counter metric")
-
-    # Set up tracing (TracerProvider) to generate trace_id
     tracer_provider = TracerProvider()
 
-    # Function to simulate metric data and include exemplar (trace_id)
-    def generate_and_record_metrics():
-        # Generate a trace_id using OpenTelemetry's tracing system
-        with tracer_provider.get_tracer("service").start_as_current_span("generate_metrics_span") as span:
-            # Extract trace_id from the current span
-            span_ctx = span.get_span_context()
-            trace_id = span_ctx.trace_id
-            # Now, we have to convert the decimal trace ID above into Hex because when querying the exemplars, the trace ID returned will be base 16
-            trace_id_hex = format_trace_id(trace_id)
+    with tracer_provider.get_tracer("service").start_as_current_span("generate_metrics_span") as span:
+        span_ctx = span.get_span_context()
+        trace_id = span_ctx.trace_id
 
-            # Record an arbitray value for the counter and include the trace_id as part of the exemplar.
-            counter.add(100, {"trace_id":trace_id_hex})
+        trace_id_hex = format_trace_id(trace_id)
 
-        return trace_id_hex  # Return the trace_id to the caller
+        counter.add(100, {"trace_id":trace_id_hex})
 
-    # Generate and record metrics, and get the trace_id
-    trace_id = generate_and_record_metrics()
-
-    # Return the generated trace_id so we can confirm it matches the trace_id returned when querying the exemplars in the next step
-    return trace_id
+    return trace_id_hex
 
 async def query_exemplars(
     ops_test: OpsTest, query_name: str, worker_app: str

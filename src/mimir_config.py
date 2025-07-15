@@ -106,7 +106,8 @@ REPLICATION_MIN_WORKERS = 3
 # The default amount of replicas to set when there are enough workers per role;
 # otherwise, replicas will be "disabled" by setting the amount to 1
 DEFAULT_REPLICATION = 3
-# The mimimum number of exemplars per user
+# The mimimum number of exemplars per user as per the Grafana Mimir docs
+# Please visit https://grafana.com/docs/mimir/latest/manage/use-exemplars/store-exemplars/ for more info.
 EXEMPLARS_FLOOR = 100000
 
 class MimirConfig:
@@ -118,7 +119,7 @@ class MimirConfig:
         max_global_exemplars_per_user: Optional[int] = None,
         alertmanager_urls: Set[str] = set(),
         root_data_dir: Path = Path("/data"),
-        recovery_data_dir: Path = Path("/recovery-data")
+        recovery_data_dir: Path = Path("/recovery-data"),
     ):
         self._alertmanager_urls = alertmanager_urls
         self._root_data_dir = root_data_dir
@@ -323,7 +324,7 @@ class MimirConfig:
             "ruler_max_rule_groups_per_tenant": 0,
         }
 
-        # Set the max_global_exemplars_per_user based on the value of _max_global_exemplars_per_user
+        # Set the max global exemplars per user based on the value of _max_global_exemplars_per_user
         if val := max(self._max_global_exemplars_per_user or 0, 0):
             val = max(val, EXEMPLARS_FLOOR)
         limits_config["max_global_exemplars_per_user"] = val
