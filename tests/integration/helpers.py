@@ -179,7 +179,7 @@ async def push_to_otelcol(ops_test: OpsTest, metric_name: str) -> str:
 
     # Set up tracing (TracerProvider) to generate trace_id
     tracer_provider = TracerProvider()
-    ########counter.add(100)
+
     # Function to simulate metric data and include exemplar (trace_id)
     def generate_and_record_metrics():
         # Generate a trace_id using OpenTelemetry's tracing system
@@ -187,12 +187,11 @@ async def push_to_otelcol(ops_test: OpsTest, metric_name: str) -> str:
             # Extract trace_id from the current span
             span_ctx = span.get_span_context()
             trace_id = span_ctx.trace_id
-
             # Now, we have to convert the decimal trace ID above into Hex because when querying the exemplars, the trace ID returned will be base 16
             trace_id_hex = format_trace_id(trace_id)
 
             # Record a random value for the counter and include the trace_id as part of the exemplar
-            counter.add(random.randint(1, 10), {"trace_id":trace_id})
+            counter.add(random.randint(1, 10), {"trace_id":trace_id_hex})
 
         return trace_id_hex  # Return the trace_id to the caller
 
