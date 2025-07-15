@@ -153,11 +153,11 @@ async def get_traefik_proxied_endpoints(
     action_result = await action.wait()
     return json.loads(action_result.results["proxied-endpoints"])
 
-async def push_to_otelcol(ops_test: OpsTest, metricName: str) -> str:
+async def push_to_otelcol(ops_test: OpsTest, metric_name: str) -> str:
     # Get leader unit number and unit address
     leader_unit_number = await get_leader_unit_number(ops_test, "otel-col")
     otel_url = await get_unit_address(ops_test, "otel-col", leader_unit_number)
-    COLLECTOR_ENDPOINT = f"http://{otel_url}:4318/v1/metrics"
+    collector_endpoint = f"http://{otel_url}:4318/v1/metrics"
 
     # Resource information
     resource = Resource(attributes={
@@ -166,7 +166,7 @@ async def push_to_otelcol(ops_test: OpsTest, metricName: str) -> str:
     })
 
     # Create the OTLP Metric Exporter (HTTP)
-    otlp_exporter = OTLPMetricExporter(endpoint=COLLECTOR_ENDPOINT)
+    otlp_exporter = OTLPMetricExporter(endpoint=collector_endpoint)
     metric_reader = PeriodicExportingMetricReader(otlp_exporter, export_interval_millis=5000)
 
     # Set up the MeterProvider with the exporter
@@ -175,7 +175,7 @@ async def push_to_otelcol(ops_test: OpsTest, metricName: str) -> str:
 
     # Create a Meter instance
     meter = metrics.get_meter("meter", "1.0.0")
-    counter = meter.create_counter(metricName, description="A placeholder counter metric")
+    counter = meter.create_counter(metric_name, description="A placeholder counter metric")
 
     # Set up tracing (TracerProvider) to generate trace_id
     tracer_provider = TracerProvider()
@@ -203,13 +203,13 @@ async def push_to_otelcol(ops_test: OpsTest, metricName: str) -> str:
     return trace_id
 
 async def query_exemplars(
-    ops_test: OpsTest, queryName: str, worker_app: str
+    ops_test: OpsTest, query_name: str, worker_app: str
 ) -> str | None:
 
     leader_unit_number = await get_leader_unit_number(ops_test, worker_app)
     mimir_read_url = await get_unit_address(ops_test, worker_app, leader_unit_number)
 
-    response = requests.get(f"http://{mimir_read_url}:8080/prometheus/api/v1/query_exemplars", params={'query': f"{queryName}_total"})
+    response = requests.get(f"http://{mimir_read_url}:8080/prometheus/api/v1/query_exemplars", params={'query': f"{query_name}_total"})
 
     assert response.status_code == 200
 

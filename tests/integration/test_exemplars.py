@@ -106,13 +106,13 @@ async def test_integrate(ops_test: OpsTest):
     )
 
     # Prepare the payload (timeseries data)
-    METRICNAME = "sample_metric"
-    traceId = await push_to_otelcol(ops_test, metricName=METRICNAME)
+    metric_name = "sample_metric"
+    trace_id = await push_to_otelcol(ops_test, metric_name=metric_name)
 
     # Delay to ensure we are not querying the Mimir exemplars endpoint too soon
     time.sleep(10)
 
     # Query the Mimir Read HTTP API to check the exemplars
 
-    found_trace_id = await query_exemplars(ops_test, queryName=METRICNAME, worker_app="mimir-read")
-    assert found_trace_id == traceId
+    found_trace_id = await query_exemplars(ops_test, query_name=metric_name, worker_app="mimir-read")
+    assert found_trace_id == trace_id

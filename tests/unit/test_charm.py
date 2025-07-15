@@ -2,7 +2,6 @@ from typing import Union
 from unittest.mock import MagicMock, patch
 
 import pytest as pytest
-import scenario
 from coordinated_workers.coordinator import Coordinator
 from helpers import get_worker_config_exemplars
 from scenario import State
@@ -66,7 +65,9 @@ def test_recommended(mock_coordinator, roles, expected):
     ]
 )
 def test_config_exemplars(context, s3, all_worker, nginx_container, nginx_prometheus_exporter_container, set_config, expected_exemplars):
-    """Test config for max_global_exemplars_per_user."""
+    """Ensure the correct config for max_global_exemplars_per_user are sent to the worker by the coordinator."""
+    
+    # GIVEN that the exemplars are enabled in Mimir Coordinator
     config_value: Union[str, int, float, bool] = set_config
     config = {"max_global_exemplars_per_user": config_value}
 
@@ -76,15 +77,14 @@ def test_config_exemplars(context, s3, all_worker, nginx_container, nginx_promet
             all_worker,
         ],
         containers=[nginx_container, nginx_prometheus_exporter_container],
-        unit_status=scenario.ActiveStatus(),
         leader=True,
         config=config
     )
 
-    # WHEN the config for max_global_exemplars_per_user is set
+    # WHEN a worker joines enters a relation to a coordinator
     with context(context.on.relation_joined(all_worker), state_in) as mgr:
         state_out = mgr.run()
 
-        # CHECK we get the right value in workers_config
+        # THEN the worker should have the correct exemplar limit
         config = get_worker_config_exemplars(state_out.relations, "mimir-cluster")
         assert config == expected_exemplars
