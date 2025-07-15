@@ -189,7 +189,7 @@ async def push_to_otelcol(ops_test: OpsTest, metric_name: str) -> str:
             # Now, we have to convert the decimal trace ID above into Hex because when querying the exemplars, the trace ID returned will be base 16
             trace_id_hex = format_trace_id(trace_id)
 
-            # Record an arbitray value for the counter and include the trace_id as part of the exemplar. 
+            # Record an arbitray value for the counter and include the trace_id as part of the exemplar.
             counter.add(100, {"trace_id":trace_id_hex})
 
         return trace_id_hex  # Return the trace_id to the caller
