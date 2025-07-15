@@ -1,6 +1,5 @@
 import json
 import logging
-import random
 from typing import Any, Dict, List
 
 import requests
@@ -190,8 +189,8 @@ async def push_to_otelcol(ops_test: OpsTest, metric_name: str) -> str:
             # Now, we have to convert the decimal trace ID above into Hex because when querying the exemplars, the trace ID returned will be base 16
             trace_id_hex = format_trace_id(trace_id)
 
-            # Record a random value for the counter and include the trace_id as part of the exemplar
-            counter.add(random.randint(1, 10), {"trace_id":trace_id_hex})
+            # Record an arbitray value for the counter and include the trace_id as part of the exemplar. 
+            counter.add(100, {"trace_id":trace_id_hex})
 
         return trace_id_hex  # Return the trace_id to the caller
 
@@ -214,12 +213,16 @@ async def query_exemplars(
 
     response_data = response.json()
 
+    assert response_data.get("data", []), "No exemplar data found in Mimir's API."
+
     # Check if the exemplar with the trace_id is present in the response
-    exemplars = response_data.get("data", [])[0].get("exemplars", [])
+    exemplars = response_data["data"][0].get("exemplars", [])
+
+    assert exemplars, "No exemplars found in data returned from Mimir"
+    assert exemplars[0].get("labels", {})
 
     # Find the `trace_id` from the first exemplar's labels
-    trace_id = None
-    if exemplars:
-        trace_id = exemplars[0].get("labels", {}).get("trace_id")
+    assert exemplars[0].get("labels").get("trace_id"), "No trace_id found in data returned from Mimir"
+    trace_id = exemplars[0].get("labels").get("trace_id")
 
     return trace_id
