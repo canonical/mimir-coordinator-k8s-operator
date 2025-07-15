@@ -66,7 +66,6 @@ def test_recommended(mock_coordinator, roles, expected):
 )
 def test_config_exemplars(context, s3, all_worker, nginx_container, nginx_prometheus_exporter_container, set_config, expected_exemplars):
     """Ensure the correct config for max_global_exemplars_per_user are sent to the worker by the coordinator."""
-    
     # GIVEN that the exemplars are enabled in Mimir Coordinator
     config_value: Union[str, int, float, bool] = set_config
     config = {"max_global_exemplars_per_user": config_value}
