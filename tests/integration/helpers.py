@@ -1,5 +1,6 @@
 import json
 import logging
+import random
 from typing import Any, Dict, List
 
 import requests
@@ -7,13 +8,16 @@ import yaml
 from juju.application import Application
 from juju.unit import Unit
 from minio import Minio
+from opentelemetry import metrics
+from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+from opentelemetry.sdk.resources import SERVICE_NAME, SERVICE_VERSION, Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.trace import format_trace_id
 from pytest_operator.plugin import OpsTest
-from remote_pb2 import WriteRequest
-import snappy
-import time
 
 logger = logging.getLogger(__name__)
-
 
 def charm_resources(metadata_file="charmcraft.yaml") -> Dict[str, str]:
     with open(metadata_file, "r") as file:
@@ -59,7 +63,6 @@ async def configure_s3_integrator(ops_test: OpsTest):
     action = await s3_integrator_leader.run_action("sync-s3-credentials", **config)
     action_result = await action.wait()
     assert action_result.status == "completed"
-
 
 async def get_leader_unit_number(ops_test: OpsTest, app_name: str) -> int:
     """Get the unit number of the leader of an application.
@@ -150,53 +153,54 @@ async def get_traefik_proxied_endpoints(
     action_result = await action.wait()
     return json.loads(action_result.results["proxied-endpoints"])
 
-async def remote_write_mimir(ops_test: OpsTest, worker_app: str, traceId:str, queryName: str) -> int:
-    leader_unit_number = await get_leader_unit_number(ops_test, worker_app)
-    mimir_write_url = await get_unit_address(ops_test, worker_app, leader_unit_number)
+async def push_to_otelcol(ops_test: OpsTest, metricName: str) -> str:
+    # Get leader unit number and unit address
+    leader_unit_number = await get_leader_unit_number(ops_test, "otel-col")
+    otel_url = await get_unit_address(ops_test, "otel-col", leader_unit_number)
+    COLLECTOR_ENDPOINT = f"http://{otel_url}:4318/v1/metrics"
 
-    # Create the WriteRequest Protobuf object
-    remote_write = WriteRequest()
+    # Resource information
+    resource = Resource(attributes={
+        SERVICE_NAME: "service",
+        SERVICE_VERSION: "1.0.0"
+    })
 
-    # Add timeseries data
-    series = remote_write.timeseries.add()
+    # Create the OTLP Metric Exporter (HTTP)
+    otlp_exporter = OTLPMetricExporter(endpoint=COLLECTOR_ENDPOINT)
+    metric_reader = PeriodicExportingMetricReader(otlp_exporter, export_interval_millis=5000)
 
-    # Add labels (metric name, job name, etc.)
-    series.labels.add(name="__name__", value=queryName)
-    series.labels.add(name="job", value="example_job")
+    # Set up the MeterProvider with the exporter
+    meter_provider = MeterProvider(resource=resource, metric_readers=[metric_reader])
+    metrics.set_meter_provider(meter_provider)
 
-    ts = int(time.time() * 1000)  # Convert to milliseconds
-    
-    series.labels.add(name="trace_id", value=traceId)
+    # Create a Meter instance
+    meter = metrics.get_meter("meter", "1.0.0")
+    counter = meter.create_counter(metricName, description="A placeholder counter metric")
 
-    # Add sample with value and timestamp
-    sample = series.samples.add()
-    sample.timestamp = ts
-    sample.value = 42  # Sample value
+    # Set up tracing (TracerProvider) to generate trace_id
+    tracer_provider = TracerProvider()
+    ########counter.add(100)
+    # Function to simulate metric data and include exemplar (trace_id)
+    def generate_and_record_metrics():
+        # Generate a trace_id using OpenTelemetry's tracing system
+        with tracer_provider.get_tracer("service").start_as_current_span("generate_metrics_span") as span:
+            # Extract trace_id from the current span
+            span_ctx = span.get_span_context()
+            trace_id = span_ctx.trace_id
 
-    # Create exemplar with timestamp
-    exemplar = series.exemplars.add()
-    exemplar.value = 50000  # Exemplar value
-    exemplar.timestamp = ts 
+            # Now, we have to convert the decimal trace ID above into Hex because when querying the exemplars, the trace ID returned will be base 16
+            trace_id_hex = format_trace_id(trace_id)
 
-    # Add the trace_id label to the exemplar (as part of the exemplar)
-    exemplar.labels.add(name="trace_id", value=traceId)
+            # Record a random value for the counter and include the trace_id as part of the exemplar
+            counter.add(random.randint(1, 10), {"trace_id":trace_id})
 
-    # Serialize the Protobuf payload to binary format
-    serialized_payload = remote_write.SerializeToString()
+        return trace_id_hex  # Return the trace_id to the caller
 
-    # Compress the Protobuf payload with Snappy
-    compressed_payload = snappy.compress(serialized_payload)
+    # Generate and record metrics, and get the trace_id
+    trace_id = generate_and_record_metrics()
 
-    # Set headers for the request
-    headers = {
-        "Content-Type": "application/x-protobuf",  # Specify Protobuf content type
-        "Content-Encoding": "snappy",              # Indicate Snappy compression
-    }
-
-    # Push the data to the Mimir Write API
-    logger.info("Mimir write url %s", mimir_write_url)
-    response = requests.post(f"http://{mimir_write_url}:8080/api/v1/push", data=compressed_payload, headers=headers)
-    return response.status_code
+    # Return the generated trace_id so we can confirm it matches the trace_id returned when querying the exemplars in the next step
+    return trace_id
 
 async def query_exemplars(
     ops_test: OpsTest, queryName: str, worker_app: str
@@ -204,9 +208,9 @@ async def query_exemplars(
 
     leader_unit_number = await get_leader_unit_number(ops_test, worker_app)
     mimir_read_url = await get_unit_address(ops_test, worker_app, leader_unit_number)
-    
-    response = requests.get(f"http://{mimir_read_url}:8080/prometheus/api/v1/query_exemplars", params={'query': queryName})
-    
+
+    response = requests.get(f"http://{mimir_read_url}:8080/prometheus/api/v1/query_exemplars", params={'query': f"{queryName}_total"})
+
     assert response.status_code == 200
 
     response_data = response.json()

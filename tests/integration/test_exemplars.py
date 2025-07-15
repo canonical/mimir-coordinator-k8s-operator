@@ -5,20 +5,18 @@
 # pyright: reportAttributeAccessIssue=false
 
 import asyncio
-import json
 import logging
 import time
+
 import pytest
-import requests
-from pytest_operator.plugin import OpsTest
 from helpers import (
     charm_resources,
     configure_minio,
     configure_s3_integrator,
-    remote_write_mimir,
-    query_exemplars
+    push_to_otelcol,
+    query_exemplars,
 )
-import uuid
+from pytest_operator.plugin import OpsTest
 
 logger = logging.getLogger(__name__)
 
@@ -28,13 +26,14 @@ async def test_build_and_deploy(ops_test: OpsTest, mimir_charm: str, cos_channel
     """Build the charm-under-test and deploy it together with related charms."""
     assert ops_test.model is not None  # for pyright
     await asyncio.gather(
-        ops_test.model.deploy(mimir_charm, "mimir", resources=charm_resources(), trust=True, config={"max_global_exemplars_per_user": 100000}),
+        ops_test.model.deploy(mimir_charm, "mimir", resources=charm_resources(), trust=True, config={"max_global_exemplars_per_user": 100000}), # Enable exemplars by setting the config value to a positive number
         ops_test.model.deploy(
             "minio",
             channel="ckf-1.9/stable",
             config={"access-key": "access", "secret-key": "secretsecret"},
         ),
         ops_test.model.deploy("s3-integrator", "s3", channel="latest/stable"),
+        ops_test.model.deploy("opentelemetry-collector-k8s", "otel-col", trust=True, channel=cos_channel)
     )
     # Configure the S3 integrator
     await ops_test.model.wait_for_idle(apps=["minio"], status="active")
@@ -45,7 +44,7 @@ async def test_build_and_deploy(ops_test: OpsTest, mimir_charm: str, cos_channel
     await ops_test.model.wait_for_idle(apps=["s3"])
 
     await ops_test.model.wait_for_idle(
-        apps=["minio", "s3"], status="active"
+        apps=["minio", "s3", "otel-col"], status="active"
     )
 
     # Wait for Mimir to be blocked
@@ -92,31 +91,28 @@ async def test_integrate(ops_test: OpsTest):
         ops_test.model.integrate("mimir:mimir-cluster", "mimir-read"),
         ops_test.model.integrate("mimir:mimir-cluster", "mimir-write"),
         ops_test.model.integrate("mimir:mimir-cluster", "mimir-backend"),
+        ops_test.model.integrate("mimir:receive-remote-write", "otel-col:send-remote-write"),
     )
 
     await ops_test.model.wait_for_idle(
         apps=[
             "mimir",
-            "s3", 
+            "s3",
             "mimir-read",
             "mimir-write",
-            "mimir-backend"
+            "mimir-backend",
         ],
         status="active",
     )
-    
+
     # Prepare the payload (timeseries data)
-    trace_id = str(uuid.uuid4())
-    QUERYNAME = "sample_metric"
-    response_code = await remote_write_mimir(ops_test, worker_app="mimir-write", traceId=trace_id, queryName=QUERYNAME)
-    assert response_code == 200
+    METRICNAME = "sample_metric"
+    traceId = await push_to_otelcol(ops_test, metricName=METRICNAME)
 
-    logger.info("Successfully pushed data to mimir-write")
-
-    # Delay to ensure we are not querying the exemplars endpoint too soon
-    time.sleep(10) 
+    # Delay to ensure we are not querying the Mimir exemplars endpoint too soon
+    time.sleep(10)
 
     # Query the Mimir Read HTTP API to check the exemplars
 
-    found_trace_id = await query_exemplars(ops_test, queryName=QUERYNAME, worker_app="mimir-read")
-    assert found_trace_id == trace_id
+    found_trace_id = await query_exemplars(ops_test, queryName=METRICNAME, worker_app="mimir-read")
+    assert found_trace_id == traceId
