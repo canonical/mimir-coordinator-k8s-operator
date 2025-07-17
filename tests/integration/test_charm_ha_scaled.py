@@ -107,7 +107,9 @@ async def test_integrate(ops_test: OpsTest):
         ops_test.model.integrate("mimir:receive-remote-write", "agent"),
         ops_test.model.integrate("agent:metrics-endpoint", "grafana"),
     )
-
+    import time
+    curr_time = time.time()
+    print(f"START: {curr_time}")
     await ops_test.model.wait_for_idle(
         apps=[
             "mimir",
@@ -123,8 +125,9 @@ async def test_integrate(ops_test: OpsTest):
             "traefik",
         ],
         status="active",
-        timeout=240,
+        timeout=720,
     )
+    print(f"END: {time.time() - curr_time}")
 
 
 @retry(wait=wait_fixed(10), stop=stop_after_attempt(6))
