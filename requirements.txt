@@ -1,4 +1,0 @@
-ops
-pydantic
-git+https://github.com/canonical/interface-tester-pytest@main
-
