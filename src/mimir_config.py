@@ -7,7 +7,7 @@
 import logging
 from enum import Enum, unique
 from pathlib import Path
-from typing import Any, Dict, Set
+from typing import Any, Dict, Optional, Set
 
 import yaml
 from coordinated_workers.coordinator import ClusterRolesConfig, Coordinator
@@ -106,13 +106,17 @@ REPLICATION_MIN_WORKERS = 3
 # The default amount of replicas to set when there are enough workers per role;
 # otherwise, replicas will be "disabled" by setting the amount to 1
 DEFAULT_REPLICATION = 3
-
+# The mimimum number of exemplars per user as per the Grafana Mimir docs
+# Please visit https://grafana.com/docs/mimir/latest/manage/use-exemplars/store-exemplars/ for more info.
+EXEMPLARS_FLOOR = 100000
 
 class MimirConfig:
     """Config builder for the Mimir Coordinator."""
 
     def __init__(
         self,
+        *,
+        max_global_exemplars_per_user: Optional[int] = None,
         alertmanager_urls: Set[str] = set(),
         root_data_dir: Path = Path("/data"),
         recovery_data_dir: Path = Path("/recovery-data"),
@@ -120,6 +124,7 @@ class MimirConfig:
         self._alertmanager_urls = alertmanager_urls
         self._root_data_dir = root_data_dir
         self._recovery_data_dir = recovery_data_dir
+        self._max_global_exemplars_per_user = max_global_exemplars_per_user
 
     def config(self, coordinator: Coordinator) -> str:
         """Generate shared config file for mimir.
@@ -314,7 +319,16 @@ class MimirConfig:
     # ruler_max_rule_groups_per_tenant: int
     # Maximum number of rule groups per-tenant. 0 to disable. (default 70)
     def _build_limits_config(self) -> Dict[str, Any]:
-        return {
+        limits_config: Dict[str, Any] = {
             "ruler_max_rules_per_rule_group": 0,
             "ruler_max_rule_groups_per_tenant": 0,
         }
+
+        # Set the max global exemplars per user based on the value of _max_global_exemplars_per_user
+        if val := max(self._max_global_exemplars_per_user or 0, 0):
+            val = max(val, EXEMPLARS_FLOOR)
+        limits_config["max_global_exemplars_per_user"] = val
+
+        return limits_config
+
+

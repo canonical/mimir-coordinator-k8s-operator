@@ -98,7 +98,8 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                 enable_status_page=True,
             ),
             workers_config=MimirConfig(
-                alertmanager_urls=self.alertmanager.get_cluster_info()
+                alertmanager_urls=self.alertmanager.get_cluster_info(),
+                max_global_exemplars_per_user=int(self.config['max_global_exemplars_per_user'])
             ).config,
             worker_ports=lambda _: tuple({8080, 9095}),
             resources_requests=self.get_resource_requests,

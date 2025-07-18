@@ -72,6 +72,28 @@ def test_build_alertmanager_config(mimir_config, coordinator, addresses_by_role,
     }
     assert alertmanager_config == expected_config
 
+@pytest.mark.parametrize(
+    "max_global_exemplars_per_user, expected_value",
+    [
+        (None, 0),             # When value is None, it should return 0
+        (0, 0),                # When value is 0 or negative, it should return 0
+        (-1, 0),
+        (50_000, 100_000),       # When value is between 1 and 100000, it should return 100000
+        (99_999, 100_000),
+        (100_000, 100_000),      # When value is exactly 100000, it should return 100000
+        (150_000, 150_000),      # When value is greater than 100000, it should remain unchanged
+        (100_001, 100_001)
+    ],
+)
+def test_max_global_exemplars_per_user_logic(mimir_config, max_global_exemplars_per_user, expected_value):
+    # Set the _max_global_exemplars_per_user to the value being tested
+    mimir_config._max_global_exemplars_per_user = max_global_exemplars_per_user
+
+    # Build the limits config
+    limits_config = mimir_config._build_limits_config()
+
+    # Assert that the value for max_global_exemplars_per_user matches the expected value
+    assert limits_config["max_global_exemplars_per_user"] == expected_value
 
 def test_build_alertmanager_storage_config(mimir_config):
     alertmanager_storage_config = mimir_config._build_alertmanager_storage_config()

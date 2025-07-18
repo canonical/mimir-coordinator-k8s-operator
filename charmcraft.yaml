@@ -150,3 +150,13 @@ requires:
     optional: true
     description: |
       Integration to help users discover Mimir's deployment.
+config:
+  options:
+    max_global_exemplars_per_user:
+      default: 0
+      description: |
+       The global limit for the number of exemplars.
+       When unset or set to a non-positive number, exemplar storage is disabled.
+       Otherwise, the value is set to the greater of the setpoint or 100,000.
+       Ref: https://grafana.com/docs/mimir/latest/manage/use-exemplars/store-exemplars/
+      type: int
