@@ -128,6 +128,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                 self.on[self.coordinator.cert_handler.certificates_relation_name].relation_changed,
                 self.ingress.on.ready,
             ],
+            is_ingress_per_app=self.ingress.is_ready(),
         )
 
         self.remote_write_provider = PrometheusRemoteWriteProvider(
