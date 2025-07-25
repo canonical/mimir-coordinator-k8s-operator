@@ -6,13 +6,8 @@ version = "0.0"
 requires-python = "~=3.10"   # https://packages.ubuntu.com/jammy/python3
 
 dependencies = [
-  "ops",
-  "cosl>=1.0",
-  "coordinated-workers",
-  "pydantic>=2",
-  # tracing
-  "opentelemetry-exporter-otlp-proto-http==1.35.0",
-  "opentelemetry-sdk==1.35.0",
+  # TODO: use a tagged version 
+  "coordinated-workers@git+https://github.com/canonical/cos-coordinated-workers@TAP-359",
 ]
 
 [project.optional-dependencies]
@@ -31,6 +26,8 @@ dev = [
   "tenacity",
   "juju",
   "pytest-operator",
+  "opentelemetry-sdk",
+  "opentelemetry-exporter-otlp-proto-http",
   # scenario
   "ops[testing]>=2.17",
   # interface

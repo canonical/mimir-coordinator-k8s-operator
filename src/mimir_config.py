@@ -116,6 +116,7 @@ class MimirConfig:
     def __init__(
         self,
         *,
+        topology: JujuTopology,
         max_global_exemplars_per_user: Optional[int] = None,
         alertmanager_urls: Set[str] = set(),
         root_data_dir: Path = Path("/data"),
@@ -125,6 +126,7 @@ class MimirConfig:
         self._root_data_dir = root_data_dir
         self._recovery_data_dir = recovery_data_dir
         self._max_global_exemplars_per_user = max_global_exemplars_per_user
+        self._topology = topology
 
     def config(self, coordinator: Coordinator) -> str:
         """Generate shared config file for mimir.
@@ -141,7 +143,7 @@ class MimirConfig:
             "ruler_storage": self._build_ruler_storage_config(),
             "store_gateway": self._build_store_gateway_config(coordinator.cluster),
             "blocks_storage": self._build_blocks_storage_config(),
-            "memberlist": self._build_memberlist_config(coordinator.topology, coordinator.cluster),
+            "memberlist": self._build_memberlist_config(coordinator.cluster),
             "limits": self._build_limits_config(),
         }
 
@@ -306,11 +308,11 @@ class MimirConfig:
     # packets and gossip streams. Other members in the memberlist cluster will
     # discard any message whose label doesn't match the configured one, unless the
     def _build_memberlist_config(
-        self, topology: JujuTopology, cluster: ClusterProvider
+        self, cluster: ClusterProvider
     ) -> Dict[str, Any]:
-        top = topology.as_dict()
+        topology_dict = self._topology.as_dict()
         return {
-            "cluster_label": f"{top['model']}_{top['model_uuid']}_{top['application']}",
+            "cluster_label": f"{topology_dict['model']}_{topology_dict['model_uuid']}_{topology_dict['application']}",
             "join_members": list(cluster.gather_addresses()),
         }
 
