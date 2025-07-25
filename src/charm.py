@@ -16,7 +16,6 @@ import socket
 from typing import Any, Dict, List, Optional, cast
 from urllib.parse import urlparse
 
-import coordinated_workers.nginx
 import ops
 import yaml
 from charms.alertmanager_k8s.v1.alertmanager_dispatch import AlertmanagerConsumer
@@ -27,11 +26,10 @@ from charms.mimir_coordinator_k8s.v0.prometheus_api import (
 )
 from charms.mimir_coordinator_k8s.v0.prometheus_api import PrometheusApiProvider
 from charms.prometheus_k8s.v1.prometheus_remote_write import PrometheusRemoteWriteProvider
-from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
-from charms.tempo_coordinator_k8s.v0.tracing import charm_tracing_config
 from charms.traefik_k8s.v2.ingress import IngressPerAppReadyEvent, IngressPerAppRequirer
 from coordinated_workers.coordinator import Coordinator
 from coordinated_workers.nginx import CA_CERT_PATH, CERT_PATH, KEY_PATH, NginxConfig
+from cosl import JujuTopology
 from cosl.interfaces.datasource_exchange import DatasourceDict
 from ops.model import ModelError
 from ops.pebble import Error as PebbleError
@@ -48,13 +46,6 @@ NGINX_PORT = NginxHelper._port
 NGINX_TLS_PORT = NginxHelper._tls_port
 
 
-@trace_charm(
-    tracing_endpoint="charm_tracing_endpoint",
-    server_cert="server_ca_cert",
-    extra_types=[
-        Coordinator,
-    ],
-)
 class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     """Charm the service."""
 
@@ -98,6 +89,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                 enable_status_page=True,
             ),
             workers_config=MimirConfig(
+                topology=JujuTopology.from_charm(self),
                 alertmanager_urls=self.alertmanager.get_cluster_info(),
                 max_global_exemplars_per_user=int(self.config['max_global_exemplars_per_user'])
             ).config,
@@ -108,9 +100,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             catalogue_item=self._catalogue_item,
         )
 
-        self.charm_tracing_endpoint, self.server_ca_cert = charm_tracing_config(
-            self.coordinator.charm_tracing, coordinated_workers.nginx.CA_CERT_PATH
-        )
 
         # needs to be after the Coordinator definition in order to push certificates before checking
         # if they exist
@@ -123,11 +112,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             source_url=f"{self.most_external_url}/prometheus",
             extra_fields={"httpHeaderName1": "X-Scope-OrgID"},
             secure_extra_fields={"httpHeaderValue1": "anonymous"},
-            refresh_event=[
-                self.coordinator.cluster.on.changed,
-                self.on[self.coordinator.cert_handler.certificates_relation_name].relation_changed,
-                self.ingress.on.ready,
-            ],
         )
 
         self.remote_write_provider = PrometheusRemoteWriteProvider(
@@ -375,6 +359,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self._ensure_mimirtool()
         self._update_prometheus_api()
         self._update_datasource_exchange()
+        self.grafana_source.update_source(source_url=f"{self.most_external_url}/prometheus")
 
 
 if __name__ == "__main__":  # pragma: nocover
