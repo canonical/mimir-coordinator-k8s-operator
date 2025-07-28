@@ -199,9 +199,9 @@ async def query_exemplars(
     assert response.status_code == 200
 
     response_data = response.json()
-
+    logger.info("response data %s", response_data)
     assert response_data.get("data", []), "No exemplar data found in Mimir's API."
-
+    
     # Check if the exemplar with the trace_id is present in the response
     exemplars = response_data["data"][0].get("exemplars", [])
 

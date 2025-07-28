@@ -32,7 +32,7 @@ async def test_build_and_deploy(ops_test: OpsTest, mimir_charm: str, cos_channel
     """Build the charm-under-test and deploy it together with related charms."""
     assert ops_test.model is not None  # for pyright
     await asyncio.gather(
-        ops_test.model.deploy(mimir_charm, "mimir", resources=charm_resources(), trust=True),
+        ops_test.model.deploy(mimir_charm, "mimir", resources=charm_resources(), trust=True, config={"max_global_exemplars_per_user": 100000}),
         ops_test.model.deploy("prometheus-k8s", "prometheus", channel=cos_channel, trust=True),
         ops_test.model.deploy("loki-k8s", "loki", channel=cos_channel, trust=True),
         ops_test.model.deploy("grafana-k8s", "grafana", channel=cos_channel, trust=True),
