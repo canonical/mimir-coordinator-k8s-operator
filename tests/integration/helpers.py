@@ -157,8 +157,8 @@ async def push_to_otelcol(ops_test: OpsTest, metric_name: str) -> str:
     This block creates an exemplars by attaching a trace ID provided by the Opentelemetry SDK to a metric.
     Please visit https://opentelemetry.io/docs/languages/python/instrumentation/ for more info on how the instrumentation works and/or how to modify it.
     """
-    leader_unit_number = await get_leader_unit_number(ops_test, "otel-col")
-    otel_url = await get_unit_address(ops_test, "otel-col", leader_unit_number)
+    leader_unit_number = await get_leader_unit_number(ops_test, "otelcol")
+    otel_url = await get_unit_address(ops_test, "otelcol", leader_unit_number)
     collector_endpoint = f"http://{otel_url}:4318/v1/metrics"
 
     resource = Resource(attributes={
@@ -186,13 +186,13 @@ async def push_to_otelcol(ops_test: OpsTest, metric_name: str) -> str:
 
 @retry(wait=wait_fixed(10), stop=stop_after_attempt(6))
 async def query_exemplars(
-    ops_test: OpsTest, query_name: str, worker_app: str
+    ops_test: OpsTest, query_name: str, coordinator_app: str
 ) -> str | None:
 
-    leader_unit_number = await get_leader_unit_number(ops_test, worker_app)
-    mimir_read_url = await get_unit_address(ops_test, worker_app, leader_unit_number)
+    leader_unit_number = await get_leader_unit_number(ops_test, coordinator_app)
+    mimir_url = await get_unit_address(ops_test, coordinator_app, leader_unit_number)
 
-    response = requests.get(f"http://{mimir_read_url}:8080/prometheus/api/v1/query_exemplars", params={'query': f"{query_name}_total"})
+    response = requests.get(f"http://{mimir_url}:8080/prometheus/api/v1/query_exemplars", params={'query': f"{query_name}_total"})
 
     assert response.status_code == 200
 

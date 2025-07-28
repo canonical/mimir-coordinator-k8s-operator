@@ -38,7 +38,7 @@ async def test_build_and_deploy(ops_test: OpsTest, mimir_charm: str, cos_channel
         ops_test.model.deploy("grafana-k8s", "grafana", channel=cos_channel, trust=True),
         ops_test.model.deploy("grafana-agent-k8s", "agent", channel=cos_channel, trust=True),
         ops_test.model.deploy("traefik-k8s", "traefik", channel="latest/edge", trust=True),
-        ops_test.model.deploy("opentelemetry-collector-k8s", "otel-col", trust=True, channel=cos_channel),
+        ops_test.model.deploy("opentelemetry-collector-k8s", "otel", trust=True, channel=cos_channel),
         # Deploy and configure Minio and S3
         # Secret must be at least 8 characters: https://github.com/canonical/minio-operator/issues/137
         ops_test.model.deploy(
@@ -54,7 +54,7 @@ async def test_build_and_deploy(ops_test: OpsTest, mimir_charm: str, cos_channel
     await configure_s3_integrator(ops_test)
 
     await ops_test.model.wait_for_idle(
-        apps=["prometheus", "loki", "grafana", "minio", "s3", "otel-col"], status="active"
+        apps=["prometheus", "loki", "grafana", "minio", "s3", "otel"], status="active"
     )
     await ops_test.model.wait_for_idle(apps=["mimir", "agent"], status="blocked")
 
@@ -109,7 +109,7 @@ async def test_integrate(ops_test: OpsTest):
         ops_test.model.integrate("mimir:ingress", "traefik"),
         ops_test.model.integrate("mimir:receive-remote-write", "agent"),
         ops_test.model.integrate("agent:metrics-endpoint", "grafana"),
-        ops_test.model.integrate("mimir:receive-remote-write", "otel-col:send-remote-write"),
+        ops_test.model.integrate("mimir:receive-remote-write", "otel:send-remote-write"),
     )
 
     await ops_test.model.wait_for_idle(
@@ -173,5 +173,5 @@ async def test_exemplars(ops_test: OpsTest):
     metric_name = "sample_metric"
     trace_id = await push_to_otelcol(ops_test, metric_name=metric_name)
 
-    found_trace_id = await query_exemplars(ops_test, query_name=metric_name, worker_app="worker-read")
+    found_trace_id = await query_exemplars(ops_test, query_name=metric_name, coordinator_app="mimir")
     assert found_trace_id == trace_id
