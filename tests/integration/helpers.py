@@ -1,5 +1,4 @@
 import json
-import logging
 from typing import Any, Dict, List
 
 import requests
@@ -17,7 +16,6 @@ from opentelemetry.trace import format_trace_id
 from pytest_operator.plugin import OpsTest
 from tenacity import retry, stop_after_attempt, wait_fixed
 
-logger = logging.getLogger(__name__)
 
 def charm_resources(metadata_file="charmcraft.yaml") -> Dict[str, str]:
     with open(metadata_file, "r") as file:
@@ -199,7 +197,7 @@ async def query_exemplars(
     assert response.status_code == 200
 
     response_data = response.json()
-    logger.info("response data %s", response_data)
+
     assert response_data.get("data", []), "No exemplar data found in Mimir's API."
 
     # Check if the exemplar with the trace_id is present in the response
