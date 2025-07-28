@@ -8,14 +8,27 @@ from src.mimir_config import MimirConfig
 
 
 @pytest.fixture(scope="module")
-def mimir_config():
-    return MimirConfig(alertmanager_urls={"http://some.am.0:9093", "http://some.am.1:9093"})
+def topology():
+    top = MagicMock()
+    top.as_dict = MagicMock(
+        return_value={
+            "model": "some-model",
+            "model_uuid": "some-uuid",
+            "application": "mimir",
+            "unit": "mimir-0",
+            "charm_name": "mimir-coordinator-k8s",
+        }
+    )
+    return top
+
+@pytest.fixture(scope="module")
+def mimir_config(topology):
+    return MimirConfig(topology=topology, alertmanager_urls={"http://some.am.0:9093", "http://some.am.1:9093"})
 
 
 @pytest.fixture(scope="module")
 def coordinator():
     coord = MagicMock()
-    coord.topology = MagicMock()
     coord.cluster = MagicMock()
     coord.cluster.gather_addresses_by_role = MagicMock(
         return_value={
@@ -40,19 +53,7 @@ def coordinator():
     return coord
 
 
-@pytest.fixture(scope="module")
-def topology():
-    top = MagicMock()
-    top.as_dict = MagicMock(
-        return_value={
-            "model": "some-model",
-            "model_uuid": "some-uuid",
-            "application": "mimir",
-            "unit": "mimir-0",
-            "charm_name": "mimir-coordinator-k8s",
-        }
-    )
-    return top
+
 
 
 @pytest.mark.parametrize(
@@ -204,8 +205,8 @@ def test_empty_update_s3_storage_config(mimir_config):
     assert storage_config == expected_config
 
 
-def test_build_memberlist_config(mimir_config, topology, coordinator):
-    memberlist_config = mimir_config._build_memberlist_config(topology, coordinator.cluster)
+def test_build_memberlist_config(mimir_config, coordinator):
+    memberlist_config = mimir_config._build_memberlist_config(coordinator.cluster)
     expected_config = {
         "cluster_label": "some-model_some-uuid_mimir",
         "join_members": ["http://some.mimir.worker.0:8080", "http://some.mimir.worker.1:8080"],
