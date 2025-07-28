@@ -16,6 +16,8 @@ from helpers import (
     get_grafana_datasources,
     get_prometheus_targets,
     get_traefik_proxied_endpoints,
+    push_to_otelcol,
+    query_exemplars,
     query_mimir,
 )
 from pytest_operator.plugin import OpsTest
@@ -163,3 +165,11 @@ async def test_traefik(ops_test: OpsTest):
 
     response = requests.get(f"{proxied_endpoints['mimir']['url']}/status")
     assert response.status_code == 200
+
+async def test_exemplars(ops_test: OpsTest):
+    """Check that Mimir successfully receives and stores exemplars."""
+    metric_name = "sample_metric"
+    trace_id = await push_to_otelcol(ops_test, metric_name=metric_name)
+
+    found_trace_id = await query_exemplars(ops_test, query_name=metric_name, worker_app="worker-read")
+    assert found_trace_id == trace_id

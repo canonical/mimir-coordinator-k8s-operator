@@ -15,6 +15,7 @@ from opentelemetry.sdk.resources import SERVICE_NAME, SERVICE_VERSION, Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.trace import format_trace_id
 from pytest_operator.plugin import OpsTest
+from tenacity import retry, stop_after_attempt, wait_fixed
 
 logger = logging.getLogger(__name__)
 
@@ -185,6 +186,7 @@ async def push_to_otelcol(ops_test: OpsTest, metric_name: str) -> str:
 
     return trace_id_hex
 
+@retry(wait=wait_fixed(10), stop=stop_after_attempt(6))
 async def query_exemplars(
     ops_test: OpsTest, query_name: str, worker_app: str
 ) -> str | None:
