@@ -6,7 +6,6 @@ from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
 
 import pytest
-from charms.tempo_coordinator_k8s.v0.charm_tracing import charm_tracing_disabled
 from coordinated_workers.interfaces.cluster import (
     ClusterRequirerAppData,
     ClusterRequirerUnitData,
@@ -96,7 +95,6 @@ def patch_all():
                 get_status=lambda _: ActiveStatus(""),
             )
         )
-        stack.enter_context(charm_tracing_disabled())
         stack.enter_context(
             patch(
                 "charm.MimirCoordinatorK8SOperatorCharm._ensure_mimirtool",
