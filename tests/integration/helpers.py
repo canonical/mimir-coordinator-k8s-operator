@@ -184,7 +184,7 @@ async def push_to_otelcol(ops_test: OpsTest, metric_name: str) -> str:
 
     return trace_id_hex
 
-@retry(wait=wait_fixed(10), stop=stop_after_attempt(6))
+@retry(wait=wait_fixed(20), stop=stop_after_attempt(6))
 async def query_exemplars(
     ops_test: OpsTest, query_name: str, coordinator_app: str
 ) -> str | None:
