@@ -91,7 +91,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             workers_config=MimirConfig(
                 topology=JujuTopology.from_charm(self),
                 alertmanager_urls=self.alertmanager.get_cluster_info(),
-                max_global_exemplars_per_user=int(self.config['max_global_exemplars_per_user'])
+                max_global_exemplars_per_user=int(self.config["max_global_exemplars_per_user"]),
             ).config,
             worker_ports=lambda _: tuple({8080, 9095}),
             resources_requests=self.get_resource_requests,
@@ -112,6 +112,13 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             source_url=f"{self.most_external_url}/prometheus",
             extra_fields={"httpHeaderName1": "X-Scope-OrgID"},
             secure_extra_fields={"httpHeaderValue1": "anonymous"},
+            refresh_event=[
+                self.coordinator.cluster.on.changed,
+                self.on[self.coordinator._certificates.relationship_name].relation_changed,
+                self.ingress.on.ready,
+                self.ingress.on.revoked,
+            ],
+            is_ingress_per_app=self.ingress.is_ready(),
         )
 
         self.remote_write_provider = PrometheusRemoteWriteProvider(
