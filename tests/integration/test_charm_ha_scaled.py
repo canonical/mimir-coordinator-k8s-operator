@@ -16,6 +16,8 @@ from helpers import (
     get_grafana_datasources,
     get_prometheus_targets,
     get_traefik_proxied_endpoints,
+    push_to_otelcol,
+    query_exemplars,
     query_mimir,
 )
 from pytest_operator.plugin import OpsTest
@@ -31,13 +33,21 @@ async def test_build_and_deploy(ops_test: OpsTest, mimir_charm: str, cos_channel
     assert ops_test.model is not None  # for pyright
     await asyncio.gather(
         ops_test.model.deploy(
-            mimir_charm, "mimir", resources=charm_resources(), num_units=3, trust=True
+            mimir_charm,
+            "mimir",
+            config={"max_global_exemplars_per_user": 100000},
+            num_units=3,
+            resources=charm_resources(),
+            trust=True,
         ),
         ops_test.model.deploy("prometheus-k8s", "prometheus", channel=cos_channel, trust=True),
         ops_test.model.deploy("loki-k8s", "loki", channel=cos_channel, trust=True),
         ops_test.model.deploy("grafana-k8s", "grafana", channel=cos_channel, trust=True),
         ops_test.model.deploy("grafana-agent-k8s", "agent", channel=cos_channel, trust=True),
         ops_test.model.deploy("traefik-k8s", "traefik", channel="latest/edge", trust=True),
+        ops_test.model.deploy(
+            "opentelemetry-collector-k8s", "otelcol", trust=True, channel=cos_channel
+        ),
         # Deploy and configure Minio and S3
         # Secret must be at least 8 characters: https://github.com/canonical/minio-operator/issues/137
         ops_test.model.deploy(
@@ -53,7 +63,7 @@ async def test_build_and_deploy(ops_test: OpsTest, mimir_charm: str, cos_channel
     await configure_s3_integrator(ops_test)
 
     await ops_test.model.wait_for_idle(
-        apps=["prometheus", "loki", "grafana", "minio", "s3"], status="active"
+        apps=["prometheus", "loki", "grafana", "minio", "s3", "otelcol"], status="active"
     )
     await ops_test.model.wait_for_idle(apps=["mimir", "agent"], status="blocked")
 
@@ -108,6 +118,7 @@ async def test_integrate(ops_test: OpsTest):
         ops_test.model.integrate("mimir:ingress", "traefik"),
         ops_test.model.integrate("mimir:receive-remote-write", "agent"),
         ops_test.model.integrate("agent:metrics-endpoint", "grafana"),
+        ops_test.model.integrate("mimir:receive-remote-write", "otelcol:send-remote-write"),
     )
 
     await ops_test.model.wait_for_idle(
@@ -167,3 +178,14 @@ async def test_traefik(ops_test: OpsTest):
 
     response = requests.get(f"{proxied_endpoints['mimir']['url']}/status")
     assert response.status_code == 200
+
+
+async def test_exemplars(ops_test: OpsTest):
+    """Check that Mimir successfully receives and stores exemplars."""
+    metric_name = "sample_metric"
+    trace_id = await push_to_otelcol(ops_test, metric_name=metric_name)
+
+    found_trace_id = await query_exemplars(
+        ops_test, query_name=metric_name, coordinator_app="mimir"
+    )
+    assert found_trace_id == trace_id
