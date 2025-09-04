@@ -316,14 +316,34 @@ class MimirConfig:
             "join_members": list(cluster.gather_addresses()),
         }
 
-    # ruler_max_rules_per_rule_group
-    # Maximum number of rules per rule group per-tenant. 0 to disable. (default 20)
-    # ruler_max_rule_groups_per_tenant: int
-    # Maximum number of rule groups per-tenant. 0 to disable. (default 70)
     def _build_limits_config(self) -> Dict[str, Any]:
+        """Default and per-tenant limits imposed by components.
+
+        Our deployment does not support multi-tenancy, so per-user limits are effectively global limits.
+
+        Ref: https://grafana.com/docs/mimir/latest/configure/configuration-parameters/#limits
+        """
         limits_config: Dict[str, Any] = {
-            "ruler_max_rules_per_rule_group": 0,
-            "ruler_max_rule_groups_per_tenant": 0,
+            # Maximum number of rules per rule group per-tenant. 0 to disable.
+            # CLI flag: -ruler.max-rules-per-rule-group
+            "ruler_max_rules_per_rule_group": 0,  # default = 20
+
+            # Maximum number of rule groups per-tenant. 0 to disable.
+            # CLI flag: -ruler.max-rule-groups-per-tenant
+            "ruler_max_rule_groups_per_tenant": 0,  # default = 70
+
+            # The maximum number of in-memory series per tenant, across the cluster before
+            # replication. 0 to disable.
+            # CLI flag: -ingester.max-global-series-per-user
+            "max_global_series_per_user": 0,  # default = 150000
+
+            # Per-tenant ingestion rate limit in samples per second.
+            # CLI flag: -distributor.ingestion-rate-limit
+            "ingestion_rate": 100_000,  # default = 10000
+
+            # Per-tenant allowed ingestion burst size (in number of samples).
+            # CLI flag: -distributor.ingestion-burst-size
+            "ingestion_burst_size": 2_000_000,  # default = 200000]
         }
 
         # Set the max global exemplars per user based on the value of _max_global_exemplars_per_user
@@ -332,5 +352,3 @@ class MimirConfig:
         limits_config["max_global_exemplars_per_user"] = val
 
         return limits_config
-
-
