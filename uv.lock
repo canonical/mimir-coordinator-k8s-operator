@@ -389,7 +389,7 @@ wheels = [
 
 [[package]]
 name = "coordinated-workers"
-version = "2.0.9"
+version = "2.0.14"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cosl" },
@@ -399,9 +399,9 @@ dependencies = [
     { name = "ops", extra = ["tracing"] },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/9f/3a/4caef2022f25dbdb00891e0de7b6e8c9a16b0d13b0de7d52368810c2f3ca/coordinated_workers-2.0.9.tar.gz", hash = "sha256:4ed46032c96014f27dd7178cb1fdde48d80599f5917133b94b47886ab8cb21ec", size = 141272, upload-time = "2025-08-22T06:40:21.903Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ae/4d/7e06291aaa92729394185e792f106b80932ef1dc40e85689321383bfcd7b/coordinated_workers-2.0.14.tar.gz", hash = "sha256:07226c4e47c6a9f70c02ebb7ac79ba65fa5ced9dbb06d1d9a23318926d898348", size = 141406, upload-time = "2025-09-08T22:51:18.373Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fa/55/0ab23d2c8f2c11fc1c5a3f610b35ee39eb0a25198fc3c5cd75a097c5589a/coordinated_workers-2.0.9-py3-none-any.whl", hash = "sha256:5e5c22916a4960ed7cfb9e2a10511b9c796e43e9dcd8f5e305c586de37f79245", size = 46355, upload-time = "2025-08-22T06:40:20.763Z" },
+    { url = "https://files.pythonhosted.org/packages/25/e9/111fa0ff2491fed82db3b3ee9e55a497ef1eb1259de5f26300c902c27837/coordinated_workers-2.0.14-py3-none-any.whl", hash = "sha256:d45b874e0716746be970149051aca88fb7f91c10c51e5f2db3b8f47baaf376c5", size = 46177, upload-time = "2025-09-08T22:51:16.638Z" },
 ]
 
 [[package]]
@@ -592,7 +592,7 @@ name = "exceptiongroup"
 version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0b/9f/a65090624ecf468cdca03533906e7c69ed7588582240cfe7cc9e770b50eb/exceptiongroup-1.3.0.tar.gz", hash = "sha256:b241f5885f560bc56a59ee63ca4c6a8bfa46ae4ad651af316d4e81817bb9fd88", size = 29749, upload-time = "2025-05-10T17:42:51.123Z" }
 wheels = [
@@ -1008,7 +1008,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "codespell", marker = "extra == 'dev'" },
-    { name = "coordinated-workers", specifier = ">=2.0.6" },
+    { name = "coordinated-workers" },
     { name = "coverage", extras = ["toml"], marker = "extra == 'dev'" },
     { name = "deepdiff", marker = "extra == 'dev'" },
     { name = "juju", marker = "extra == 'dev'" },
