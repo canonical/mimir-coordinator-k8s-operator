@@ -6,7 +6,9 @@ version = "0.0"
 requires-python = "~=3.10"   # https://packages.ubuntu.com/jammy/python3
 
 dependencies = [
-  "coordinated-workers",
+  # "coordinated-workers",
+  # TODO: UPDATE coordinated-workers depedency to pypi package bvefore merging
+  "coordinated-workers @ git+https://github.com/canonical/cos-coordinated-workers.git@feature/route-metrics-traffic-via-nginx",
 ]
 
 [project.optional-dependencies]
