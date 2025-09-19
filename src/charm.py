@@ -204,6 +204,13 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
 
     @property
     def _catalogue_item(self) -> CatalogueItem:
+        api_endpoints = {
+            "Prometheus rules": "/prometheus/api/v1/rules",
+            "Active alerts": "/promtheus/api/v1/alerts",
+            "Query": "/prometheus/api/v1/query",
+            "Push": "/api/v1/push",
+            "OTLP metrics": "/otlp/v1/metrics",
+        }
         """A catalogue application entry for this Mimir instance."""
         return CatalogueItem(
             name="Mimir",
@@ -214,6 +221,8 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                 "multi-tenant, long-term storage for Prometheus. "
                 "(no user interface available)"
             ),
+            api_docs="https://grafana.com/docs/mimir/latest/references/http-api/",
+            api_endpoints={key: f"{self.external_url}{path}" for key, path in api_endpoints.items()},
         )
 
     # TODO: make this a static method in the Nginx class
