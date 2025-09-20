@@ -5,13 +5,12 @@ import pytest as pytest
 from coordinated_workers.coordinator import Coordinator
 from helpers import get_key_from_worker_config_exemplars
 from scenario import State
-
+from ops.testing import ActiveStatus, BlockedStatus
 from src.mimir_config import (
     MIMIR_ROLES_CONFIG,
     MINIMAL_DEPLOYMENT,
     RECOMMENDED_DEPLOYMENT,
 )
-
 
 @patch("coordinated_workers.coordinator.Coordinator.__init__", return_value=None)
 @pytest.mark.parametrize(
@@ -89,16 +88,16 @@ def test_config_exemplars(context, s3, all_worker, nginx_container, nginx_promet
         assert config == expected_exemplars
 
 @pytest.mark.parametrize(
-    "set_config, expected_value",
+    "set_config, expected_value, expected_status",
     [
-        ("1m", "1m"),               # when max_global_exemplars_per_user is 0
-        ("1w", "1w"),      # when max_global_exemplars_per_user is between 1 and 100k
-        ("1d", "1d"),     # when max_global_exemplars_per_user is above 100k
-        ("1y", "1y"),
-        ("1xyz", 0),
+        ("1m", "1m", ActiveStatus),               
+        ("1w", "1w", ActiveStatus),      
+        ("1d", "1d", ActiveStatus),
+        ("1y", "1y", ActiveStatus),
+        ("1xyz", 0, BlockedStatus),
     ]
 )
-def test_config_retention_period(context, s3, all_worker, nginx_container, nginx_prometheus_exporter_container, set_config, expected_value):
+def test_config_retention_period(context, s3, all_worker, nginx_container, nginx_prometheus_exporter_container, set_config, expected_value, expected_status):
     """Ensure the correct config for max_global_exemplars_per_user are sent to the worker by the coordinator."""
     # GIVEN that the retention period is set in Mimir Coordinator
     config = {"blocks_retention_period": set_config}
@@ -117,6 +116,7 @@ def test_config_retention_period(context, s3, all_worker, nginx_container, nginx
     with context(context.on.relation_joined(all_worker), state_in) as mgr:
         state_out = mgr.run()
 
-        # THEN the worker should have the correct exemplar limit
+        # THEN the worker should have the correct expected value
         config = get_key_from_worker_config_exemplars(state_out.relations, "mimir-cluster", "compactor_blocks_retention_period")
         assert config == expected_value
+        assert isinstance(state_out.unit_status, expected_status)

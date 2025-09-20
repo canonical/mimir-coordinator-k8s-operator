@@ -232,7 +232,7 @@ def test_build_tls_config(mimir_config):
     [
         ("1m", "1m"),
         ("1w", "1w"),
-        ("1x", 0)
+        ("0", 0)
     ],
 )
 def test_retention_period_logic(mimir_config, retention_period_config, expected_value):

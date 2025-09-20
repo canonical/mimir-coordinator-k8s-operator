@@ -33,9 +33,11 @@ from cosl import JujuTopology
 from cosl.interfaces.datasource_exchange import DatasourceDict
 from ops.model import ModelError
 from ops.pebble import Error as PebbleError
+from ops import BlockedStatus
 
 from mimir_config import MIMIR_ROLES_CONFIG, MimirConfig
 from nginx_config import NginxHelper
+import re
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
@@ -92,7 +94,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                 topology=JujuTopology.from_charm(self),
                 alertmanager_urls=self.alertmanager.get_cluster_info(),
                 max_global_exemplars_per_user=int(self.config["max_global_exemplars_per_user"]),
-                blocks_retention_period=self.config["blocks_retention_period"],
+                blocks_retention_period=self._validate_retention_period(str(self.config["blocks_retention_period"])),
             ).config,
             worker_ports=lambda _: tuple({8080, 9095}),
             resources_requests=self.get_resource_requests,
@@ -367,6 +369,31 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     def get_resource_requests(self, _) -> Dict[str, str]:
         """Returns a dictionary for the "requests" portion of the resources requirements."""
         return {"cpu": "50m", "memory": "100Mi"}
+
+    def _is_valid_timespec(self, timeval: str) -> bool:
+        """Is a time interval unit and value valid.
+
+        Args:
+            timeval: a string representing a time specification .e.g "1d", "1w"
+
+        Returns:
+            True if time specification is valid and False otherwise.
+        """
+        try:
+            timespec_re = re.compile(
+                r"^((([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?|0)$"
+            )
+            matched = timespec_re.search(timeval)
+            return bool(matched)
+        except:
+            return False
+    
+    def _validate_retention_period(self, config_value: str) -> str:
+        if self._is_valid_timespec(config_value):
+            return config_value
+        self.unit.status = BlockedStatus(f"Data deletion suspended. Invalid retention: {config_value}")
+        logger.info(f"Invalid retention period set: {config_value}. Suspending data deletion until the value is set to a valid option.")
+        return "0"
 
     def _reconcile(self):
         # This method contains unconditional update logic, i.e. logic that should be executed

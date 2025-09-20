@@ -5,7 +5,6 @@
 """Mimir coordinator."""
 
 import logging
-import re
 from enum import Enum, unique
 from pathlib import Path
 from typing import Any, Dict, Optional, Set
@@ -354,24 +353,11 @@ class MimirConfig:
             val = max(val, EXEMPLARS_FLOOR)
         limits_config["max_global_exemplars_per_user"] = val
 
-        limits_config["compactor_blocks_retention_period"] = self._blocks_retention_period if self._is_valid_timespec(self._blocks_retention_period) else 0
+        # If the config value is invalid, the charm will pass the string "0" to MimirConfig. 
+        # We'll turn that into an int so it shows up like compactor_blocks_retention_period: 0 in the worker's config YAML file
+        # And not compactor_blocks_retention_period: '0'. Both are valid, but the Grafana docs use 0 (https://grafana.com/docs/mimir/latest/configure/configure-metrics-storage-retention/).
+        # This is for consistency.
+        limits_config["compactor_blocks_retention_period"] = int(self._blocks_retention_period) if self._blocks_retention_period == "0" else self._blocks_retention_period
 
         return limits_config
 
-    def _is_valid_timespec(self, timeval: str) -> bool:
-        """Is a time interval unit and value valid.
-
-        Args:
-            timeval: a string representing a time specification .e.g "1d", "1w"
-
-        Returns:
-            True if time specification is valid and False otherwise.
-        """
-        try:
-            timespec_re = re.compile(
-                r"^((([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?|0)$"
-            )
-            matched = timespec_re.search(timeval)
-            return bool(matched)
-        except:
-            return False
