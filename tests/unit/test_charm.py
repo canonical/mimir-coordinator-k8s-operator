@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest as pytest
 from coordinated_workers.coordinator import Coordinator
-from helpers import get_worker_config_exemplars
+from helpers import get_key_from_worker_config_exemplars
 from scenario import State
 
 from src.mimir_config import (
@@ -80,10 +80,43 @@ def test_config_exemplars(context, s3, all_worker, nginx_container, nginx_promet
         config=config
     )
 
-    # WHEN a worker joines enters a relation to a coordinator
+    # WHEN a worker joins a relation to a coordinator
     with context(context.on.relation_joined(all_worker), state_in) as mgr:
         state_out = mgr.run()
 
         # THEN the worker should have the correct exemplar limit
-        config = get_worker_config_exemplars(state_out.relations, "mimir-cluster")
+        config = get_key_from_worker_config_exemplars(state_out.relations, "mimir-cluster", "max_global_exemplars_per_user")
         assert config == expected_exemplars
+
+@pytest.mark.parametrize(
+    "set_config, expected_value",
+    [
+        ("1m", "1m"),               # when max_global_exemplars_per_user is 0
+        ("1w", "1w"),      # when max_global_exemplars_per_user is between 1 and 100k
+        ("1d", "1d"),     # when max_global_exemplars_per_user is above 100k
+        ("1y", "1y"),
+        ("1xyz", 0),
+    ]
+)
+def test_config_retention_period(context, s3, all_worker, nginx_container, nginx_prometheus_exporter_container, set_config, expected_value):
+    """Ensure the correct config for max_global_exemplars_per_user are sent to the worker by the coordinator."""
+    # GIVEN that the retention period is set in Mimir Coordinator
+    config = {"blocks_retention_period": set_config}
+
+    state_in = State(
+        relations=[
+            s3,
+            all_worker,
+        ],
+        containers=[nginx_container, nginx_prometheus_exporter_container],
+        leader=True,
+        config=config
+    )
+
+    # WHEN a worker joins a relation to a coordinator
+    with context(context.on.relation_joined(all_worker), state_in) as mgr:
+        state_out = mgr.run()
+
+        # THEN the worker should have the correct exemplar limit
+        config = get_key_from_worker_config_exemplars(state_out.relations, "mimir-cluster", "compactor_blocks_retention_period")
+        assert config == expected_value
