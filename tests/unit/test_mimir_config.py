@@ -236,13 +236,13 @@ def test_build_tls_config(mimir_config):
     ],
 )
 def test_retention_period_logic(mimir_config, retention_period_config, expected_value):
-    # Set the _max_global_exemplars_per_user to the value being tested
+    # Set the compactor_blocks_retention_period to the value being tested
     mimir_config._blocks_retention_period = retention_period_config
 
     # Build the limits config
     limits_config = mimir_config._build_limits_config()
 
-    # Assert that the value for max_global_exemplars_per_user matches the expected value
+    # Assert that the value for compactor_blocks_retention_period matches the expected value
     assert limits_config["compactor_blocks_retention_period"] == expected_value
 
 if __name__ == "__main__":
