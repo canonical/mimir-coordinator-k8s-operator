@@ -353,7 +353,7 @@ class MimirConfig:
             val = max(val, EXEMPLARS_FLOOR)
         limits_config["max_global_exemplars_per_user"] = val
 
-        # If the config value is invalid, the charm will pass the string "0" to MimirConfig. 
+        # If the config value is invalid, the charm will pass the string "0" to MimirConfig.
         # We'll turn that into an int so it shows up like compactor_blocks_retention_period: 0 in the worker's config YAML file
         # And not compactor_blocks_retention_period: '0'. Both are valid, but the Grafana docs use 0 (https://grafana.com/docs/mimir/latest/configure/configure-metrics-storage-retention/).
         # This is for consistency.

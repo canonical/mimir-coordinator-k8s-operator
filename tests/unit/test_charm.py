@@ -4,13 +4,15 @@ from unittest.mock import MagicMock, patch
 import pytest as pytest
 from coordinated_workers.coordinator import Coordinator
 from helpers import get_key_from_worker_config_exemplars
-from scenario import State
 from ops.testing import ActiveStatus, BlockedStatus
+from scenario import State
+
 from src.mimir_config import (
     MIMIR_ROLES_CONFIG,
     MINIMAL_DEPLOYMENT,
     RECOMMENDED_DEPLOYMENT,
 )
+
 
 @patch("coordinated_workers.coordinator.Coordinator.__init__", return_value=None)
 @pytest.mark.parametrize(
@@ -90,11 +92,12 @@ def test_config_exemplars(context, s3, all_worker, nginx_container, nginx_promet
 @pytest.mark.parametrize(
     "set_config, expected_value, expected_status",
     [
-        ("1m", "1m", ActiveStatus),               
-        ("1w", "1w", ActiveStatus),      
+        ("1m", "1m", ActiveStatus),
+        ("1w", "1w", ActiveStatus),
         ("1d", "1d", ActiveStatus),
         ("1y", "1y", ActiveStatus),
         ("1xyz", 0, BlockedStatus),
+        ("0", 0, ActiveStatus),
     ]
 )
 def test_config_retention_period(context, s3, all_worker, nginx_container, nginx_prometheus_exporter_container, set_config, expected_value, expected_status):

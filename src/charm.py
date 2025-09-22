@@ -12,6 +12,7 @@ https://discourse.charmhub.io/t/4208
 
 import hashlib
 import logging
+import re
 import socket
 from typing import Any, Dict, List, Optional, cast
 from urllib.parse import urlparse
@@ -31,13 +32,12 @@ from coordinated_workers.coordinator import Coordinator
 from coordinated_workers.nginx import CA_CERT_PATH, CERT_PATH, KEY_PATH, NginxConfig
 from cosl import JujuTopology
 from cosl.interfaces.datasource_exchange import DatasourceDict
+from ops import ActiveStatus, BlockedStatus
 from ops.model import ModelError
 from ops.pebble import Error as PebbleError
-from ops import BlockedStatus
 
 from mimir_config import MIMIR_ROLES_CONFIG, MimirConfig
 from nginx_config import NginxHelper
-import re
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
@@ -65,6 +65,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             scheme=lambda: urlparse(self.internal_url).scheme,
         )
         self.alertmanager = AlertmanagerConsumer(charm=self, relation_name="alertmanager")
+        self.retention_period = str(self.config['blocks_retention_period'])
         self.coordinator = Coordinator(
             charm=self,
             roles_config=MIMIR_ROLES_CONFIG,
@@ -94,7 +95,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                 topology=JujuTopology.from_charm(self),
                 alertmanager_urls=self.alertmanager.get_cluster_info(),
                 max_global_exemplars_per_user=int(self.config["max_global_exemplars_per_user"]),
-                blocks_retention_period=self._validate_retention_period(str(self.config["blocks_retention_period"])),
+                blocks_retention_period=self.retention_period if self._is_valid_timespec(self.retention_period) else "0",
             ).config,
             worker_ports=lambda _: tuple({8080, 9095}),
             resources_requests=self.get_resource_requests,
@@ -102,7 +103,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             workload_tracing_protocols=["jaeger_thrift_http"],
             catalogue_item=self._catalogue_item,
         )
-
 
         # needs to be after the Coordinator definition in order to push certificates before checking
         # if they exist
@@ -143,6 +143,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         ######################################
         self.framework.observe(self.ingress.on.ready, self._on_ingress_ready)
         self.framework.observe(self.ingress.on.revoked, self._on_ingress_revoked)
+        self.framework.observe(self.on.collect_unit_status, self._on_collect_unit_status)
 
     ##########################
     # === EVENT HANDLERS === #
@@ -379,21 +380,18 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         Returns:
             True if time specification is valid and False otherwise.
         """
-        try:
-            timespec_re = re.compile(
-                r"^((([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?|0)$"
-            )
-            matched = timespec_re.search(timeval)
-            return bool(matched)
-        except:
-            return False
-    
-    def _validate_retention_period(self, config_value: str) -> str:
-        if self._is_valid_timespec(config_value):
-            return config_value
-        self.unit.status = BlockedStatus(f"Data deletion suspended. Invalid retention: {config_value}")
-        logger.info(f"Invalid retention period set: {config_value}. Suspending data deletion until the value is set to a valid option.")
-        return "0"
+        timespec_re = re.compile(
+            r"^((([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?|0)$"
+        )
+        matched = timespec_re.search(timeval)
+        return bool(matched)
+
+
+    def _on_collect_unit_status(self, event: ops.CollectStatusEvent):
+        event.add_status(ActiveStatus())
+        if not self._is_valid_timespec(self.retention_period):
+            logger.info(f"Suspending data deletion due to invalid option set in config: {self.retention_period}. To resume data deletion, please reset value to a valid option.")
+            event.add_status(BlockedStatus(f"Data deletion suspended. Invalid retention: {self.retention_period}"))
 
     def _reconcile(self):
         # This method contains unconditional update logic, i.e. logic that should be executed
