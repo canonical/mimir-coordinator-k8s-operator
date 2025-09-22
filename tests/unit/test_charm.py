@@ -123,3 +123,36 @@ def test_config_retention_period(context, s3, all_worker, nginx_container, nginx
         config = get_key_from_worker_config_exemplars(state_out.relations, "mimir-cluster", "compactor_blocks_retention_period")
         assert config == expected_value
         assert isinstance(state_out.unit_status, expected_status)
+
+@pytest.mark.parametrize(
+    "set_config, expected_string",
+    [
+        ("1x", "1x;"),
+        ("1xxx", "1xxx;"),
+        ("1xxxx", "1xxx..."),
+        ("One week", "One ..."),
+    ]
+)
+def test_blocked_status_message_truncation(context, s3, all_worker, nginx_container, nginx_prometheus_exporter_container, set_config, expected_string):
+    """When setting BlockedStatus message, ensure values too long are truncated using ... (if >= 5 characters)."""
+    # GIVEN that the retention period is set in Mimir Coordinator
+    config = {"blocks_retention_period": set_config}
+
+    state_in = State(
+        relations=[
+            s3,
+            all_worker,
+        ],
+        containers=[nginx_container, nginx_prometheus_exporter_container],
+        leader=True,
+        config=config
+    )
+
+    # WHEN a worker joins a relation to a coordinator
+    with context(context.on.relation_joined(all_worker), state_in) as mgr:
+        state_out = mgr.run()
+
+        # We check whether the retention period shown in the status message is truncated or not.
+        # If it's not truncated (i.e. it has less than 5 characters), we expect to see it the exact value followed by a ; as defined in charm code.
+        # Otherwise, we expect to see the first four letters of it followed by ... in the string.
+        assert expected_string in state_out.unit_status.message

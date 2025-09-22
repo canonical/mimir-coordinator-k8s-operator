@@ -371,6 +371,13 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         """Returns a dictionary for the "requests" portion of the resources requirements."""
         return {"cpu": "50m", "memory": "100Mi"}
 
+    def _truncate_string_if_too_long(self, string: str) -> str:
+        """Returns a string unchanged if it's under 5 characters or truncates it using ... if 5 characters or more."""
+        max_length = 4
+        if len(string) <= max_length:
+            return string
+        return f"{string[:max_length]}..."
+
     def _is_valid_timespec(self, timeval: str) -> bool:
         """Is a time interval unit and value valid.
 
@@ -391,7 +398,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         event.add_status(ActiveStatus())
         if not self._is_valid_timespec(self.retention_period):
             logger.info(f"Suspending data deletion due to invalid option set in config: {self.retention_period}. To resume data deletion, please reset value to a valid option.")
-            event.add_status(BlockedStatus(f"Data deletion suspended. Invalid retention: {self.retention_period}"))
+            event.add_status(BlockedStatus(f"Invalid config option: retention_period={self._truncate_string_if_too_long(self.retention_period)}; see debug-log"))
 
     def _reconcile(self):
         # This method contains unconditional update logic, i.e. logic that should be executed
