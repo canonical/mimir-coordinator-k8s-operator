@@ -12,7 +12,6 @@ https://discourse.charmhub.io/t/4208
 
 import hashlib
 import logging
-import re
 import socket
 from typing import Any, Dict, List, Optional, cast
 from urllib.parse import urlparse
@@ -32,6 +31,7 @@ from coordinated_workers.coordinator import Coordinator
 from coordinated_workers.nginx import CA_CERT_PATH, CERT_PATH, KEY_PATH, NginxConfig
 from cosl import JujuTopology
 from cosl.interfaces.datasource_exchange import DatasourceDict
+from cosl.time_validation import is_valid_timespec
 from ops import ActiveStatus, BlockedStatus
 from ops.model import ModelError
 from ops.pebble import Error as PebbleError
@@ -95,7 +95,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                 topology=JujuTopology.from_charm(self),
                 alertmanager_urls=self.alertmanager.get_cluster_info(),
                 max_global_exemplars_per_user=int(self.config["max_global_exemplars_per_user"]),
-                blocks_retention_period=self.retention_period if self._is_valid_timespec(self.retention_period) else "0",
+                blocks_retention_period=self.retention_period if is_valid_timespec(self.retention_period) else "0",
             ).config,
             worker_ports=lambda _: tuple({8080, 9095}),
             resources_requests=self.get_resource_requests,
@@ -378,25 +378,9 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             return string
         return f"{string[:max_length]}..."
 
-    def _is_valid_timespec(self, timeval: str) -> bool:
-        """Is a time interval unit and value valid.
-
-        Args:
-            timeval: a string representing a time specification .e.g "1d", "1w"
-
-        Returns:
-            True if time specification is valid and False otherwise.
-        """
-        timespec_re = re.compile(
-            r"^((([0-9]+)y)?(([0-9]+)w)?(([0-9]+)d)?(([0-9]+)h)?(([0-9]+)m)?(([0-9]+)s)?(([0-9]+)ms)?|0)$"
-        )
-        matched = timespec_re.search(timeval)
-        return bool(matched)
-
-
     def _on_collect_unit_status(self, event: ops.CollectStatusEvent):
         event.add_status(ActiveStatus())
-        if not self._is_valid_timespec(self.retention_period):
+        if not is_valid_timespec(self.retention_period):
             logger.info(f"Suspending data deletion due to invalid option set in config: {self.retention_period}. To resume data deletion, please reset value to a valid option.")
             event.add_status(BlockedStatus(f"Invalid config option: retention_period={self._truncate_string_if_too_long(self.retention_period)}; see debug-log"))
 
