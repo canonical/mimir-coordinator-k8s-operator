@@ -98,6 +98,8 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             container_name="nginx",  # container to which resource limits will be applied
             workload_tracing_protocols=["jaeger_thrift_http"],
             catalogue_item=self._catalogue_item,
+            proxy_worker_telemetry=True,
+            proxy_worker_telemetry_port=self.get_nginx_port,
         )
 
 
@@ -232,6 +234,11 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     ###########################
     # === UTILITY METHODS === #
     ###########################
+    @staticmethod
+    def get_nginx_port(tls_available: bool) -> int:
+        if tls_available:
+            return NGINX_TLS_PORT
+        return NGINX_PORT
 
     def _pull(self, path: str) -> Optional[str]:
         """Pull file from container (without raising pebble errors).
