@@ -65,7 +65,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             scheme=lambda: urlparse(self.internal_url).scheme,
         )
         self.alertmanager = AlertmanagerConsumer(charm=self, relation_name="alertmanager")
-        self.retention_period = str(self.config['blocks_retention_period'])
+        self.retention_period = str(self.config['metrics_retention_period'])
         self.coordinator = Coordinator(
             charm=self,
             roles_config=MIMIR_ROLES_CONFIG,
@@ -95,7 +95,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                 topology=JujuTopology.from_charm(self),
                 alertmanager_urls=self.alertmanager.get_cluster_info(),
                 max_global_exemplars_per_user=int(self.config["max_global_exemplars_per_user"]),
-                blocks_retention_period=self.retention_period if is_valid_timespec(self.retention_period) else "0",
+                metrics_retention_period=self.retention_period if is_valid_timespec(self.retention_period) else None
             ).config,
             worker_ports=lambda _: tuple({8080, 9095}),
             resources_requests=self.get_resource_requests,
@@ -371,18 +371,11 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         """Returns a dictionary for the "requests" portion of the resources requirements."""
         return {"cpu": "50m", "memory": "100Mi"}
 
-    def _truncate_string_if_too_long(self, string: str) -> str:
-        """Returns a string unchanged if it's under 5 characters or truncates it using ... if 5 characters or more."""
-        max_length = 4
-        if len(string) <= max_length:
-            return string
-        return f"{string[:max_length]}..."
-
     def _on_collect_unit_status(self, event: ops.CollectStatusEvent):
         event.add_status(ActiveStatus())
         if not is_valid_timespec(self.retention_period):
             logger.info(f"Suspending data deletion due to invalid option set in config: {self.retention_period}. To resume data deletion, please reset value to a valid option.")
-            event.add_status(BlockedStatus(f"Invalid config option: retention_period={self._truncate_string_if_too_long(self.retention_period)}; see debug-log"))
+            event.add_status(BlockedStatus(f"Invalid config option (see debug-log): retention_period={self.retention_period}"))
 
     def _reconcile(self):
         # This method contains unconditional update logic, i.e. logic that should be executed

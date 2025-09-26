@@ -232,12 +232,12 @@ def test_build_tls_config(mimir_config):
     [
         ("1m", "1m"),
         ("1w", "1w"),
-        ("0", 0)
+        ("0", 0),
     ],
 )
 def test_retention_period_logic(mimir_config, retention_period_config, expected_value):
     # Set the compactor_blocks_retention_period to the value being tested
-    mimir_config._blocks_retention_period = retention_period_config
+    mimir_config._metrics_retention_period = retention_period_config
 
     # Build the limits config
     limits_config = mimir_config._build_limits_config()

@@ -160,7 +160,7 @@ config:
         Otherwise, the value is set to the greater of the setpoint or 100,000.
         Ref: https://grafana.com/docs/mimir/latest/manage/use-exemplars/store-exemplars/
       type: int
-    blocks_retention_period:
+    metrics_retention_period:
       default: "0"
       description: |
         Sets a global retention period for metrics in Mimir. Supported units: d, w, m, y, h, s, ms or 0 for no limit (disable)
