@@ -31,6 +31,8 @@ from coordinated_workers.coordinator import Coordinator
 from coordinated_workers.nginx import CA_CERT_PATH, CERT_PATH, KEY_PATH, NginxConfig
 from cosl import JujuTopology
 from cosl.interfaces.datasource_exchange import DatasourceDict
+from cosl.time_validation import is_valid_timespec
+from ops import ActiveStatus, BlockedStatus
 from ops.model import ModelError
 from ops.pebble import Error as PebbleError
 
@@ -63,6 +65,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             scheme=lambda: urlparse(self.internal_url).scheme,
         )
         self.alertmanager = AlertmanagerConsumer(charm=self, relation_name="alertmanager")
+        self.retention_period = str(self.config['metrics_retention_period'])
         self.coordinator = Coordinator(
             charm=self,
             roles_config=MIMIR_ROLES_CONFIG,
@@ -92,6 +95,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                 topology=JujuTopology.from_charm(self),
                 alertmanager_urls=self.alertmanager.get_cluster_info(),
                 max_global_exemplars_per_user=int(self.config["max_global_exemplars_per_user"]),
+                metrics_retention_period=self.retention_period if is_valid_timespec(self.retention_period) else None
             ).config,
             worker_ports=lambda _: tuple({8080, 9095}),
             resources_requests=self.get_resource_requests,
@@ -99,7 +103,6 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             workload_tracing_protocols=["jaeger_thrift_http"],
             catalogue_item=self._catalogue_item,
         )
-
 
         # needs to be after the Coordinator definition in order to push certificates before checking
         # if they exist
@@ -140,6 +143,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         ######################################
         self.framework.observe(self.ingress.on.ready, self._on_ingress_ready)
         self.framework.observe(self.ingress.on.revoked, self._on_ingress_revoked)
+        self.framework.observe(self.on.collect_unit_status, self._on_collect_unit_status)
 
     ##########################
     # === EVENT HANDLERS === #
@@ -366,6 +370,12 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
     def get_resource_requests(self, _) -> Dict[str, str]:
         """Returns a dictionary for the "requests" portion of the resources requirements."""
         return {"cpu": "50m", "memory": "100Mi"}
+
+    def _on_collect_unit_status(self, event: ops.CollectStatusEvent):
+        event.add_status(ActiveStatus())
+        if not is_valid_timespec(self.retention_period):
+            logger.info(f"Suspending data deletion due to invalid option set in config: {self.retention_period}. To resume data deletion, please reset value to a valid option.")
+            event.add_status(BlockedStatus(f"Invalid config option (see debug-log): retention_period={self.retention_period}"))
 
     def _reconcile(self):
         # This method contains unconditional update logic, i.e. logic that should be executed

@@ -4,7 +4,7 @@ name: mimir-coordinator-k8s
 type: charm
 summary: Mimir coordinator
 description: |
-    Mimir coordinator.
+  Mimir coordinator.
 
 links:
   documentation: https://discourse.charmhub.io/t/mimir-coordinator-index/10531
@@ -155,8 +155,15 @@ config:
     max_global_exemplars_per_user:
       default: 0
       description: |
-       The global limit for the number of exemplars.
-       When unset or set to a non-positive number, exemplar storage is disabled.
-       Otherwise, the value is set to the greater of the setpoint or 100,000.
-       Ref: https://grafana.com/docs/mimir/latest/manage/use-exemplars/store-exemplars/
+        The global limit for the number of exemplars.
+        When unset or set to a non-positive number, exemplar storage is disabled.
+        Otherwise, the value is set to the greater of the setpoint or 100,000.
+        Ref: https://grafana.com/docs/mimir/latest/manage/use-exemplars/store-exemplars/
       type: int
+    metrics_retention_period:
+      default: "0"
+      description: |
+        Sets a global retention period for metrics in Mimir. Supported units: d, w, m, y, h, s, ms or 0 for no limit (disable)
+        When this value is set to an invalid value (e.g. "1week"), the charm will be blocked along with a relevant message.
+        To avoid data loss, the retention period will be set to the default of 0 in the worker config, effectively disabling data deletion.
+      type: string

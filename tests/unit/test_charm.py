@@ -3,7 +3,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest as pytest
 from coordinated_workers.coordinator import Coordinator
-from helpers import get_worker_config_exemplars
+from helpers import get_key_from_worker_config_exemplars
+from ops.testing import ActiveStatus, BlockedStatus
 from scenario import State
 
 from src.mimir_config import (
@@ -80,10 +81,44 @@ def test_config_exemplars(context, s3, all_worker, nginx_container, nginx_promet
         config=config
     )
 
-    # WHEN a worker joines enters a relation to a coordinator
+    # WHEN a worker joins a relation to a coordinator
     with context(context.on.relation_joined(all_worker), state_in) as mgr:
         state_out = mgr.run()
 
         # THEN the worker should have the correct exemplar limit
-        config = get_worker_config_exemplars(state_out.relations, "mimir-cluster")
+        config = get_key_from_worker_config_exemplars(state_out.relations, "mimir-cluster", "max_global_exemplars_per_user")
         assert config == expected_exemplars
+
+@pytest.mark.parametrize(
+    "set_config, expected_value, expected_status",
+    [
+        ("1m", "1m", ActiveStatus),
+        ("1w", "1w", ActiveStatus),
+        ("1d", "1d", ActiveStatus),
+        ("1y", "1y", ActiveStatus),
+        ("1xyz", 0, BlockedStatus),
+        ("0", 0, ActiveStatus),
+    ]
+)
+def test_config_retention_period(context, s3, all_worker, nginx_container, nginx_prometheus_exporter_container, set_config, expected_value, expected_status):
+    """Ensure the correct config for max_global_exemplars_per_user are sent to the worker by the coordinator."""
+    # GIVEN that the retention period is set in Mimir Coordinator
+    config = {"metrics_retention_period": set_config}
+
+    state_in = State(
+        relations=[
+            s3,
+            all_worker,
+        ],
+        containers=[nginx_container, nginx_prometheus_exporter_container],
+        leader=True,
+        config=config
+    )
+
+    # WHEN a worker joins a relation to a coordinator
+    with context(context.on.relation_joined(all_worker), state_in) as mgr:
+        state_out = mgr.run()
+        # THEN the worker should have the correct expected value
+        config = get_key_from_worker_config_exemplars(state_out.relations, "mimir-cluster", "compactor_blocks_retention_period")
+        assert config == expected_value
+        assert isinstance(state_out.unit_status, expected_status)

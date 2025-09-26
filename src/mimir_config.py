@@ -121,12 +121,14 @@ class MimirConfig:
         alertmanager_urls: Set[str] = set(),
         root_data_dir: Path = Path("/data"),
         recovery_data_dir: Path = Path("/recovery-data"),
+        metrics_retention_period: Optional[str] = None,
     ):
         self._alertmanager_urls = alertmanager_urls
         self._root_data_dir = root_data_dir
         self._recovery_data_dir = recovery_data_dir
         self._max_global_exemplars_per_user = max_global_exemplars_per_user
         self._topology = topology
+        self._metrics_retention_period: str = metrics_retention_period or "0"
 
     def config(self, coordinator: Coordinator) -> str:
         """Generate shared config file for mimir.
@@ -351,4 +353,11 @@ class MimirConfig:
             val = max(val, EXEMPLARS_FLOOR)
         limits_config["max_global_exemplars_per_user"] = val
 
+        # If the config value is invalid, the charm will pass None to MimirConfig, which sets its_metrics_retention_period attribute to "0".
+        # We'll turn that into an int so it shows up like compactor_blocks_retention_period: 0 in the worker's config YAML file
+        # And not compactor_blocks_retention_period: '0'. Both are valid, but the Grafana docs use 0 (https://grafana.com/docs/mimir/latest/configure/configure-metrics-storage-retention/).
+        # This is for consistency.
+        limits_config["compactor_blocks_retention_period"] = 0 if self._metrics_retention_period == "0" else self._metrics_retention_period
+
         return limits_config
+
