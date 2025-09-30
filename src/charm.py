@@ -29,6 +29,7 @@ from charms.prometheus_k8s.v1.prometheus_remote_write import PrometheusRemoteWri
 from charms.traefik_k8s.v2.ingress import IngressPerAppReadyEvent, IngressPerAppRequirer
 from coordinated_workers.coordinator import Coordinator
 from coordinated_workers.nginx import CA_CERT_PATH, CERT_PATH, KEY_PATH, NginxConfig
+from coordinated_workers.worker_telemetry import WorkerTelemetryProxyConfig
 from cosl import JujuTopology
 from cosl.interfaces.datasource_exchange import DatasourceDict
 from ops.model import ModelError
@@ -98,8 +99,7 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             container_name="nginx",  # container to which resource limits will be applied
             workload_tracing_protocols=["jaeger_thrift_http"],
             catalogue_item=self._catalogue_item,
-            proxy_worker_telemetry=True,
-            proxy_worker_telemetry_port=self._get_nginx_port,
+            worker_telemetry_proxy_config=self._worker_telemetry_proxy_config,
         )
 
 
@@ -229,6 +229,14 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             and nginx_container.exists(CERT_PATH)
             and nginx_container.exists(KEY_PATH)
             and nginx_container.exists(CA_CERT_PATH)
+        )
+
+    @property
+    def _worker_telemetry_proxy_config(self) -> WorkerTelemetryProxyConfig:
+        """Get the http and https ports for proxying worker telemetry."""
+        return WorkerTelemetryProxyConfig(
+            http=NGINX_PORT,
+            https=NGINX_TLS_PORT,
         )
 
     ###########################
@@ -374,6 +382,12 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self._ensure_mimirtool()
         self._update_prometheus_api()
         self._update_datasource_exchange()
+        self.unit.set_ports(
+            NGINX_TLS_PORT
+            if self.coordinator.tls_available
+            else
+            NGINX_PORT
+        )
         self.grafana_source.update_source(source_url=f"{self.most_external_url}/prometheus")
 
 
