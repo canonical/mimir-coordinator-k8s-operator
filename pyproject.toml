@@ -6,7 +6,8 @@ version = "0.0"
 requires-python = "~=3.10"   # https://packages.ubuntu.com/jammy/python3
 
 dependencies = [
-  "coordinated-workers",
+  # FIXME: use pypi package
+  "coordinated-workers@git+https://github.com/canonical/cos-coordinated-workers@telemetry-correlation-module",
 ]
 
 [project.optional-dependencies]

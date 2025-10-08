@@ -29,6 +29,7 @@ from charms.prometheus_k8s.v1.prometheus_remote_write import PrometheusRemoteWri
 from charms.traefik_k8s.v2.ingress import IngressPerAppReadyEvent, IngressPerAppRequirer
 from coordinated_workers.coordinator import Coordinator
 from coordinated_workers.nginx import CA_CERT_PATH, CERT_PATH, KEY_PATH, NginxConfig
+from coordinated_workers.telemetry_correlation import TelemetryCorrelation
 from cosl import JujuTopology
 from cosl.interfaces.datasource_exchange import DatasourceDict
 from cosl.time_validation import is_valid_timespec
@@ -109,18 +110,14 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         if port := urlparse(self.internal_url).port:
             self.ingress.provide_ingress_requirements(port=port)
 
+        self._telemetry_correlation = TelemetryCorrelation(self, grafana_ds_endpoint="grafana-source", grafana_dsx_endpoint="send-datasource")
+
         self.grafana_source = GrafanaSourceProvider(
             self,
             source_type="prometheus",
             source_url=f"{self.most_external_url}/prometheus",
-            extra_fields={"httpHeaderName1": "X-Scope-OrgID"},
+            extra_fields=self._build_grafana_source_extra_fields(),
             secure_extra_fields={"httpHeaderValue1": "anonymous"},
-            refresh_event=[
-                self.coordinator.cluster.on.changed,
-                self.on[self.coordinator._certificates.relationship_name].relation_changed,
-                self.ingress.on.ready,
-                self.ingress.on.revoked,
-            ],
             is_ingress_per_app=self.ingress.is_ready(),
         )
 
@@ -387,6 +384,36 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self._update_datasource_exchange()
         self.grafana_source.update_source(source_url=f"{self.most_external_url}/prometheus")
 
+
+    def _build_grafana_source_extra_fields(self) -> Dict[str, Any]:
+        """Extra fields needed for the grafana-source relation, like data correlation config."""
+        metrics_to_traces_config = self._build_metrics_to_traces_config()
+
+        return {
+            "httpHeaderName1": "X-Scope-OrgID",
+            **metrics_to_traces_config,
+        }
+
+    def _build_metrics_to_traces_config(self) -> Dict[str, Any]:
+        # reference: https://grafana.com/docs/grafana/latest/datasources/prometheus/configure/#provision-the-prometheus-data-source
+
+        # this feature is only available when exemplar storage is enabled
+        if int(self.config["max_global_exemplars_per_user"]) <= 0:
+            logger.info("metrics-to-traces feature is disabled because exemplar storage is disabled.")
+            return {}
+
+        if datasource := self._telemetry_correlation.find_correlated_datasource(
+            datasource_type="tempo",
+            correlation_feature="metrics-to-traces",
+        ):
+            return {
+                "exemplarTraceIdDestinations": [{
+                        "datasourceUid": datasource.uid,
+                        "name": "traceID",
+                    }
+                ]
+            }
+        return {}
 
 if __name__ == "__main__":  # pragma: nocover
     ops.main.main(MimirCoordinatorK8SOperatorCharm)
