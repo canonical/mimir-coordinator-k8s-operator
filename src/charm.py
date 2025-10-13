@@ -110,7 +110,11 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         if port := urlparse(self.internal_url).port:
             self.ingress.provide_ingress_requirements(port=port)
 
-        self._telemetry_correlation = TelemetryCorrelation(self, grafana_ds_endpoint="grafana-source", grafana_dsx_endpoint="send-datasource")
+        self._telemetry_correlation = TelemetryCorrelation(
+            app_name=self.app.name,
+            grafana_source_relations=self.model.relations["grafana-source"],
+            datasource_exchange_relations=self.model.relations["send-datasource"],
+        )
 
         self.grafana_source = GrafanaSourceProvider(
             self,
@@ -395,8 +399,8 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         }
 
     def _build_metrics_to_traces_config(self) -> Dict[str, Any]:
+        # TODO: move this into the grafana_source library
         # reference: https://grafana.com/docs/grafana/latest/datasources/prometheus/configure/#provision-the-prometheus-data-source
-
         # this feature is only available when exemplar storage is enabled
         if int(self.config["max_global_exemplars_per_user"]) <= 0:
             logger.info("metrics-to-traces feature is disabled because exemplar storage is disabled.")
