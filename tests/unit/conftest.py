@@ -44,6 +44,7 @@ def nginx_container():
         execs={
             Exec(["mimirtool", "rules", "sync", address_arg, "--id=anonymous"], return_code=0),
             Exec(["mimirtool", "rules", "sync", address_arg_tls, "--id=anonymous"], return_code=0),
+            Exec(["update-ca-certificates", "--fresh"], return_code=0),
         },
     )
 
@@ -53,6 +54,9 @@ def nginx_prometheus_exporter_container():
     return Container(
         "nginx-prometheus-exporter",
         can_connect=True,
+        execs={
+            Exec(["update-ca-certificates", "--fresh"], return_code=0),
+        }
     )
 
 
