@@ -61,6 +61,11 @@ resources:
     description: OCI image for nginx-prometheus-exporter
     upstream-source: nginx/nginx-prometheus-exporter:1.1.0
 
+
+peers:
+  mimir-peers:
+    interface: mimir_peers
+
 provides:
   mimir-cluster:
     interface: mimir_cluster
