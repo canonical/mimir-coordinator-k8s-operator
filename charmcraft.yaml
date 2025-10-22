@@ -59,7 +59,7 @@ resources:
   nginx-prometheus-exporter-image:
     type: oci-image
     description: OCI image for nginx-prometheus-exporter
-    upstream-source: nginx/nginx-prometheus-exporter:1.1.0
+    upstream-source: nginx/nginx-prometheus-exporter@sha256:d710e0ff2505a7037dd21e47eae07025010c0de08a6247d1a704824823becfd0  # renovate: oci-image tag: 1.1.0
 
 provides:
   mimir-cluster:
