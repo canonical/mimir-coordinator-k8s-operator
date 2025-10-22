@@ -99,7 +99,8 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                 topology=JujuTopology.from_charm(self),
                 alertmanager_urls=self.alertmanager.get_cluster_info(),
                 max_global_exemplars_per_user=int(self.config["max_global_exemplars_per_user"]),
-                metrics_retention_period=self.retention_period if is_valid_timespec(self.retention_period) else None
+                metrics_retention_period=self.retention_period if is_valid_timespec(self.retention_period) else None,
+                max_label_names_per_series=int(self.config["max_label_names_per_series"]),
             ).config,
             worker_ports=lambda _: tuple({8080, 9095}),
             resources_requests=self.get_resource_requests,
