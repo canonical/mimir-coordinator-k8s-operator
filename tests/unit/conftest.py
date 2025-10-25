@@ -14,19 +14,20 @@ from charm import NGINX_PORT, NGINX_TLS_PORT, MimirCoordinatorK8SOperatorCharm
 
 @pytest.fixture
 def mimir_charm(tmp_path):
-    with patch("lightkube.core.client.GenericSyncClient"):
-        with patch.multiple(
-            "coordinated_workers.coordinator.KubernetesComputeResourcesPatch",
-            _namespace="test-namespace",
-            _patch=lambda _: None,
-            get_status=lambda _: ActiveStatus(""),
-            is_ready=lambda _: True,
-        ):
-            with patch(
-                "charm.MimirCoordinatorK8SOperatorCharm._ensure_mimirtool",
-                MagicMock(return_value=None),
+    with patch("coordinated_workers.coordinator.Coordinator._reconcile_charm_labels"):
+        with patch("lightkube.core.client.GenericSyncClient"):
+            with patch.multiple(
+                "coordinated_workers.coordinator.KubernetesComputeResourcesPatch",
+                _namespace="test-namespace",
+                _patch=lambda _: None,
+                get_status=lambda _: ActiveStatus(""),
+                is_ready=lambda _: True,
             ):
-                yield MimirCoordinatorK8SOperatorCharm
+                with patch(
+                    "charm.MimirCoordinatorK8SOperatorCharm._ensure_mimirtool",
+                    MagicMock(return_value=None),
+                ):
+                    yield MimirCoordinatorK8SOperatorCharm
 
 
 @pytest.fixture(scope="function")
