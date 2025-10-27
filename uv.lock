@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.10, <4"
 resolution-markers = [
     "python_full_version >= '3.14' and platform_python_implementation != 'PyPy'",
@@ -1107,7 +1107,9 @@ name = "mimir-coordinator-k8s"
 version = "0.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "charmed-service-mesh-helpers" },
     { name = "coordinated-workers" },
+    { name = "lightkube-extensions" },
 ]
 
 [package.optional-dependencies]
@@ -1130,11 +1132,13 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "charmed-service-mesh-helpers", specifier = ">=0.2.0" },
     { name = "codespell", marker = "extra == 'dev'" },
     { name = "coordinated-workers" },
     { name = "coverage", extras = ["toml"], marker = "extra == 'dev'" },
     { name = "deepdiff", marker = "extra == 'dev'" },
     { name = "juju", marker = "extra == 'dev'" },
+    { name = "lightkube-extensions" },
     { name = "minio", marker = "extra == 'dev'" },
     { name = "opentelemetry-exporter-otlp-proto-http", marker = "extra == 'dev'" },
     { name = "opentelemetry-sdk", marker = "extra == 'dev'" },
