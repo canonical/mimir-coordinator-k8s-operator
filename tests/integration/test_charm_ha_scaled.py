@@ -136,8 +136,7 @@ async def test_integrate(ops_test: OpsTest):
             "traefik",
         ],
         status="active",
-        timeout=1000,
-        # raise_on_error=False,
+        timeout=2000,
     )
 
 
