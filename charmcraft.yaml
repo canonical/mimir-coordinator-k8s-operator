@@ -172,16 +172,4 @@ config:
         When this value is set to an invalid value (e.g. "1week"), the charm will be blocked along with a relevant message.
         To avoid data loss, the retention period will be set to the default of 0 in the worker config, effectively disabling data deletion.
       type: string
-    max_label_names_per_series:
-      default: 30
-      description: |
-        Label count limit for timeseries.
-        Grafana Cloud recommend less than 30.
-        Having more than 30 labels do not necessarily mean high cardinality: if the values of these labels are fixed 
-        (or have a small set of all possible combinations), then cardinality will still be low.
-        Note that having a large number of timeserie metrics could be an anti-pattern.
-        Refs:
-        - https://grafana.com/docs/mimir/latest/configure/configuration-parameters/#limits
-        - https://grafana.com/docs/grafana-cloud/send-data/metrics/metrics-prometheus/ingestion-errors/#max-label-names-per-series
-        - https://www.robustperception.io/cardinality-is-key/
-      type: int
+
