@@ -129,7 +129,6 @@ class MimirConfig:
         self._max_global_exemplars_per_user = max_global_exemplars_per_user
         self._topology = topology
         self._metrics_retention_period: str = metrics_retention_period or "0"
-        self._max_label_names_per_series = max_label_names_per_series
 
     def config(self, coordinator: Coordinator) -> str:
         """Generate shared config file for mimir.
