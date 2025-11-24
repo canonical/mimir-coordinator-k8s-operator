@@ -6,6 +6,7 @@ version = "0.0"
 requires-python = "~=3.10"   # https://packages.ubuntu.com/jammy/python3
 
 dependencies = [
+  "ops==3.4.0b3",
   "coordinated-workers",
   "charmed-service-mesh-helpers>=0.2.0",
   "lightkube-extensions",
@@ -30,7 +31,7 @@ dev = [
   "opentelemetry-sdk",
   "opentelemetry-exporter-otlp-proto-http",
   # scenario
-  "ops[testing]>=2.17",
+  "ops[testing]==3.4.0b3",
   # interface
   "pytest-interface-tester>2.0.0",
 ]
