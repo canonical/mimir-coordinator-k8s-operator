@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 @pytest.mark.setup
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest, mimir_charm: str, cos_channel):
+async def test_build_and_deploy(ops_test: OpsTest, mimir_charm: str, cos_channel, mesh_channel):
     """Build the charm-under-test and deploy it together with related charms."""
     assert ops_test.model is not None
     await asyncio.gather(
@@ -35,9 +35,9 @@ async def test_build_and_deploy(ops_test: OpsTest, mimir_charm: str, cos_channel
         ops_test.model.deploy("prometheus-k8s", "prometheus", channel=cos_channel, trust=True),
         ops_test.model.deploy("grafana-k8s", "grafana", channel=cos_channel, trust=True),
         ops_test.model.deploy("grafana-agent-k8s", "agent", channel=cos_channel),
-        ops_test.model.deploy("istio-k8s", "istio", channel=cos_channel, trust=True),
-        ops_test.model.deploy("istio-beacon-k8s", "istio-beacon", channel=cos_channel, trust=True),
-        ops_test.model.deploy("istio-ingress-k8s", "istio-ingress", channel=cos_channel, trust=True),
+        ops_test.model.deploy("istio-k8s", "istio", channel=mesh_channel, trust=True),
+        ops_test.model.deploy("istio-beacon-k8s", "istio-beacon", channel=mesh_channel, trust=True),
+        ops_test.model.deploy("istio-ingress-k8s", "istio-ingress", channel=mesh_channel, trust=True),
         # Deploy and configure Minio and S3
         # Secret must be at least 8 characters: https://github.com/canonical/minio-operator/issues/137
         ops_test.model.deploy(

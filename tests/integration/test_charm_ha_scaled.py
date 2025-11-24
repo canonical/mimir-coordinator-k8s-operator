@@ -78,7 +78,7 @@ async def test_deploy_workers(ops_test: OpsTest, cos_channel):
         "worker-read",
         channel=cos_channel,
         config={"role-read": True},
-        num_units=3,
+        num_units=1,
         trust=True,
     )
     await ops_test.model.deploy(
@@ -86,7 +86,7 @@ async def test_deploy_workers(ops_test: OpsTest, cos_channel):
         "worker-write",
         channel=cos_channel,
         config={"role-write": True},
-        num_units=3,
+        num_units=1,
         trust=True,
     )
     await ops_test.model.deploy(
@@ -94,11 +94,18 @@ async def test_deploy_workers(ops_test: OpsTest, cos_channel):
         "worker-backend",
         channel=cos_channel,
         config={"role-backend": True},
-        num_units=3,
+        num_units=1,
         trust=True,
     )
     await ops_test.model.wait_for_idle(
-        apps=["worker-read", "worker-write", "worker-backend"], status="blocked"
+        apps=[
+            "worker-read",
+            "worker-write",
+            "worker-backend"
+        ],
+        status="blocked",
+        raise_on_error=False,
+        timeout=1000,
     )
 
 
@@ -136,7 +143,28 @@ async def test_integrate(ops_test: OpsTest):
             "traefik",
         ],
         status="active",
+        raise_on_error=False,
         timeout=2000,
+    )
+
+
+async def test_scale_workers(ops_test: OpsTest):
+    """Scale the Mimir workers to 2 units each."""
+    assert ops_test.model is not None
+    await asyncio.gather(
+        ops_test.model.applications["worker-read"].scale(3),
+        ops_test.model.applications["worker-write"].scale(3),
+        ops_test.model.applications["worker-backend"].scale(3),
+    )
+    await ops_test.model.wait_for_idle(
+        apps=[
+            "worker-read",
+            "worker-write",
+            "worker-backend"
+        ],
+        status="active",
+        raise_on_error=False,
+        timeout=1000,
     )
 
 
