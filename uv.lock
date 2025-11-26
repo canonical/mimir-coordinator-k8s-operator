@@ -437,7 +437,7 @@ wheels = [
 [[package]]
 name = "coordinated-workers"
 version = "2.1.1"
-source = { git = "https://github.com/canonical/cos-coordinated-workers?rev=tmp%2Fpatch_ready_wait#7fd224897792a8dce44f112be1f99feb51fa141e" }
+source = { git = "https://github.com/canonical/cos-coordinated-workers?rev=fix%2Fk8s-resource-patching-check#ab9ef6f99f7780ef622291b8224eae1716902380" }
 dependencies = [
     { name = "charmed-service-mesh-helpers" },
     { name = "cosl" },
@@ -1130,7 +1130,7 @@ dev = [
 requires-dist = [
     { name = "charmed-service-mesh-helpers", specifier = ">=0.2.0" },
     { name = "codespell", marker = "extra == 'dev'" },
-    { name = "coordinated-workers", git = "https://github.com/canonical/cos-coordinated-workers?rev=tmp%2Fpatch_ready_wait" },
+    { name = "coordinated-workers", git = "https://github.com/canonical/cos-coordinated-workers?rev=fix%2Fk8s-resource-patching-check" },
     { name = "coverage", extras = ["toml"], marker = "extra == 'dev'" },
     { name = "deepdiff", marker = "extra == 'dev'" },
     { name = "juju", marker = "extra == 'dev'" },
