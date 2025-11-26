@@ -104,7 +104,6 @@ async def test_deploy_workers(ops_test: OpsTest, cos_channel):
             "worker-backend"
         ],
         status="blocked",
-        raise_on_error=False,
         timeout=1000,
     )
 
@@ -143,7 +142,6 @@ async def test_integrate(ops_test: OpsTest):
             "traefik",
         ],
         status="active",
-        raise_on_error=False,
         timeout=2000,
     )
 
@@ -163,7 +161,6 @@ async def test_scale_workers(ops_test: OpsTest):
             "worker-backend"
         ],
         status="active",
-        raise_on_error=False,
         timeout=1000,
     )
 
