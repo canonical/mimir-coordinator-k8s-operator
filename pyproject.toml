@@ -6,8 +6,7 @@ version = "0.0"
 requires-python = "~=3.10"   # https://packages.ubuntu.com/jammy/python3
 
 dependencies = [
-  # "coordinated-workers",
-  "coordinated-workers @ git+https://github.com/canonical/cos-coordinated-workers@fix/k8s-resource-patching-check",
+  "coordinated-workers",
   "charmed-service-mesh-helpers>=0.2.0",
   "lightkube-extensions",
 ]
