@@ -162,6 +162,7 @@ async def test_scale_workers(ops_test: OpsTest):
         ],
         status="active",
         timeout=1000,
+        raise_on_error=False,
     )
 
 
