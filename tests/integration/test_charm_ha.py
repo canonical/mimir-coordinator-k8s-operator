@@ -12,12 +12,12 @@ from helpers import (
     charm_resources,
     configure_minio,
     configure_s3_integrator,
-    get_grafana_datasources,
-    get_prometheus_targets,
+    get_grafana_datasources_from_client_localhost,
+    get_prometheus_targets_from_client_localhost,
     get_traefik_proxied_endpoints,
     push_to_otelcol,
     query_exemplars,
-    query_mimir,
+    query_mimir_from_client_localhost,
 )
 from pytest_operator.plugin import OpsTest
 from tenacity import retry, stop_after_attempt, wait_fixed
@@ -127,6 +127,7 @@ async def test_integrate(ops_test: OpsTest):
             "traefik",
         ],
         status="active",
+        timeout=2000,
     )
 
 
@@ -134,7 +135,7 @@ async def test_integrate(ops_test: OpsTest):
 async def test_grafana_source(ops_test: OpsTest):
     """Test the grafana-source integration, by checking that Mimir appears in the Datasources."""
     assert ops_test.model is not None
-    datasources = await get_grafana_datasources(ops_test)
+    datasources = await get_grafana_datasources_from_client_localhost(ops_test)
     assert "mimir" in datasources[0]["name"]
 
 
@@ -142,7 +143,7 @@ async def test_grafana_source(ops_test: OpsTest):
 async def test_metrics_endpoint(ops_test: OpsTest):
     """Check that Mimir appears in the Prometheus Scrape Targets."""
     assert ops_test.model is not None
-    targets = await get_prometheus_targets(ops_test)
+    targets = await get_prometheus_targets_from_client_localhost(ops_test)
     mimir_targets = [
         target
         for target in targets["activeTargets"]
@@ -154,7 +155,7 @@ async def test_metrics_endpoint(ops_test: OpsTest):
 @retry(wait=wait_fixed(10), stop=stop_after_attempt(6))
 async def test_metrics_in_mimir(ops_test: OpsTest):
     """Check that the agent metrics appear in Mimir."""
-    result = await query_mimir(ops_test, query='up{juju_charm=~"grafana-agent-k8s"}')
+    result = await query_mimir_from_client_localhost(ops_test, query='up{juju_charm=~"grafana-agent-k8s"}')
     assert result
 
 

@@ -13,12 +13,12 @@ from helpers import (
     charm_resources,
     configure_minio,
     configure_s3_integrator,
-    get_grafana_datasources,
-    get_prometheus_targets,
+    get_grafana_datasources_from_client_localhost,
+    get_prometheus_targets_from_client_localhost,
     get_traefik_proxied_endpoints,
     push_to_otelcol,
     query_exemplars,
-    query_mimir,
+    query_mimir_from_client_localhost,
 )
 from pytest_operator.plugin import OpsTest
 from tenacity import retry, stop_after_attempt, wait_fixed
@@ -78,7 +78,7 @@ async def test_deploy_workers(ops_test: OpsTest, cos_channel):
         "worker-read",
         channel=cos_channel,
         config={"role-read": True},
-        num_units=3,
+        num_units=1,
         trust=True,
     )
     await ops_test.model.deploy(
@@ -86,7 +86,7 @@ async def test_deploy_workers(ops_test: OpsTest, cos_channel):
         "worker-write",
         channel=cos_channel,
         config={"role-write": True},
-        num_units=3,
+        num_units=1,
         trust=True,
     )
     await ops_test.model.deploy(
@@ -94,11 +94,17 @@ async def test_deploy_workers(ops_test: OpsTest, cos_channel):
         "worker-backend",
         channel=cos_channel,
         config={"role-backend": True},
-        num_units=3,
+        num_units=1,
         trust=True,
     )
     await ops_test.model.wait_for_idle(
-        apps=["worker-read", "worker-write", "worker-backend"], status="blocked"
+        apps=[
+            "worker-read",
+            "worker-write",
+            "worker-backend"
+        ],
+        status="blocked",
+        timeout=1000,
     )
 
 
@@ -140,11 +146,31 @@ async def test_integrate(ops_test: OpsTest):
     )
 
 
+async def test_scale_workers(ops_test: OpsTest):
+    """Scale the Mimir workers to 2 units each."""
+    assert ops_test.model is not None
+    await asyncio.gather(
+        ops_test.model.applications["worker-read"].scale(3),
+        ops_test.model.applications["worker-write"].scale(3),
+        ops_test.model.applications["worker-backend"].scale(3),
+    )
+    await ops_test.model.wait_for_idle(
+        apps=[
+            "worker-read",
+            "worker-write",
+            "worker-backend"
+        ],
+        status="active",
+        timeout=1000,
+        raise_on_error=False,
+    )
+
+
 @retry(wait=wait_fixed(10), stop=stop_after_attempt(6))
 async def test_grafana_source(ops_test: OpsTest):
     """Test the grafana-source integration, by checking that Mimir appears in the Datasources."""
     assert ops_test.model is not None
-    datasources = await get_grafana_datasources(ops_test)
+    datasources = await get_grafana_datasources_from_client_localhost(ops_test)
     mimir_datasources = ["mimir" in d["name"] for d in datasources]
     assert any(mimir_datasources)
     assert len(mimir_datasources) == 1
@@ -154,7 +180,7 @@ async def test_grafana_source(ops_test: OpsTest):
 async def test_metrics_endpoint(ops_test: OpsTest):
     """Check that Mimir appears in the Prometheus Scrape Targets."""
     assert ops_test.model is not None
-    targets = await get_prometheus_targets(ops_test)
+    targets = await get_prometheus_targets_from_client_localhost(ops_test)
     mimir_targets = [
         target
         for target in targets["activeTargets"]
@@ -166,7 +192,7 @@ async def test_metrics_endpoint(ops_test: OpsTest):
 @retry(wait=wait_fixed(10), stop=stop_after_attempt(6))
 async def test_metrics_in_mimir(ops_test: OpsTest):
     """Check that the agent metrics appear in Mimir."""
-    result = await query_mimir(ops_test, query='up{juju_charm=~"grafana-agent-k8s"}')
+    result = await query_mimir_from_client_localhost(ops_test, query='up{juju_charm=~"grafana-agent-k8s"}')
     assert result
 
 

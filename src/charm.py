@@ -13,7 +13,7 @@ https://discourse.charmhub.io/t/4208
 import hashlib
 import logging
 import socket
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, List, Optional, Union, cast
 from urllib.parse import urlparse
 
 import ops
@@ -21,6 +21,10 @@ import yaml
 from charms.alertmanager_k8s.v1.alertmanager_dispatch import AlertmanagerConsumer
 from charms.catalogue_k8s.v1.catalogue import CatalogueItem
 from charms.grafana_k8s.v0.grafana_source import GrafanaSourceProvider
+from charms.istio_beacon_k8s.v0.service_mesh import (
+    AppPolicy,
+    UnitPolicy,
+)
 from charms.mimir_coordinator_k8s.v0.prometheus_api import (
     DEFAULT_RELATION_NAME as PROMETHEUS_API_RELATION_NAME,
 )
@@ -30,6 +34,7 @@ from charms.traefik_k8s.v2.ingress import IngressPerAppReadyEvent, IngressPerApp
 from coordinated_workers.coordinator import Coordinator
 from coordinated_workers.nginx import CA_CERT_PATH, CERT_PATH, KEY_PATH, NginxConfig
 from coordinated_workers.telemetry_correlation import TelemetryCorrelation
+from coordinated_workers.worker_telemetry import WorkerTelemetryProxyConfig
 from cosl import JujuTopology
 from cosl.interfaces.datasource_exchange import DatasourceDict
 from cosl.time_validation import is_valid_timespec
@@ -84,9 +89,9 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                 "send-datasource": "send-datasource",
                 "receive-datasource": None,
                 "catalogue": "catalogue",
-                "service-mesh": None,
-                "service-mesh-provide-cmr-mesh": None,
-                "service-mesh-require-cmr-mesh": None,
+                "service-mesh": "service-mesh",
+                "service-mesh-provide-cmr-mesh": "provide-cmr-mesh",
+                "service-mesh-require-cmr-mesh": "require-cmr-mesh",
             },
             nginx_config=NginxConfig(
                 server_name=self.hostname,
@@ -106,6 +111,8 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             container_name="nginx",  # container to which resource limits will be applied
             workload_tracing_protocols=["jaeger_thrift_http"],
             catalogue_item=self._catalogue_item,
+            worker_telemetry_proxy_config=self._worker_telemetry_proxy_config,
+            charm_mesh_policies=self._charm_mesh_policies,
             peer_relation="mimir-peers",
         )
 
@@ -245,6 +252,38 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             and nginx_container.exists(CERT_PATH)
             and nginx_container.exists(KEY_PATH)
             and nginx_container.exists(CA_CERT_PATH)
+        )
+
+    @property
+    def _charm_mesh_policies(self) -> List[Union[AppPolicy, UnitPolicy]]:
+        """Return the mesh policies specific to Mimir."""
+        return [
+            # Allow access to mimir API ports for charms related over the receive-remote-write relation.
+            # This is a unit policy as mimir's unit address is published for receiving metrics.
+            UnitPolicy(
+                relation="receive-remote-write",
+                ports=[NGINX_PORT, NGINX_TLS_PORT],
+            ),
+            # Allow access to mimir API ports for charms related over the grafana-source relation.
+            # This is a unit policy as mimir's unit address is published for querying metrics.
+            UnitPolicy(
+                relation="grafana-source",
+                ports=[NGINX_PORT, NGINX_TLS_PORT],
+            ),
+            # Allow access to mimir API ports for charms related over the prometheus-api relation.
+            # This is a unit policy as mimir's unit address is published for querying via Prometheus API.
+            UnitPolicy(
+                relation="prometheus-api",
+                ports=[NGINX_PORT, NGINX_TLS_PORT],
+            ),
+        ]
+
+    @property
+    def _worker_telemetry_proxy_config(self) -> WorkerTelemetryProxyConfig:
+        """Get the http and https ports for proxying worker telemetry."""
+        return WorkerTelemetryProxyConfig(
+            http_port=NGINX_PORT,
+            https_port=NGINX_TLS_PORT,
         )
 
     ###########################
@@ -391,6 +430,10 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self._update_prometheus_api()
         self._update_datasource_exchange()
         self.grafana_source.update_source(source_url=f"{self.most_external_url}/prometheus")
+
+        # Open necessary service ports. needed for telemetry proxying.
+        nginx_port = NGINX_TLS_PORT if self.coordinator.tls_available else NGINX_PORT
+        self.unit.set_ports(nginx_port)
 
 
     def _build_grafana_source_extra_fields(self) -> Dict[str, Any]:
