@@ -1,3 +1,40 @@
+# Copyright 2024 Canonical Ltd.
+# See LICENSE file for licensing details.
+[project]
+name = "mimir-coordinator-k8s"
+version = "0.0"
+requires-python = "~=3.10"   # https://packages.ubuntu.com/jammy/python3
+
+dependencies = [
+  "coordinated-workers",
+  "charmed-service-mesh-helpers>=0.2.0",
+  "lightkube-extensions",
+]
+
+[project.optional-dependencies]
+dev = [
+  # Linting
+  "ruff",
+  "codespell",
+  # Static
+  "pyright",
+  # Unit
+  "pytest",
+  "coverage[toml]",
+  "deepdiff",
+  # Integration
+  "minio",
+  "tenacity",
+  "juju",
+  "pytest-operator",
+  "opentelemetry-sdk",
+  "opentelemetry-exporter-otlp-proto-http",
+  # scenario
+  "ops[testing]>=2.17",
+  # interface
+  "pytest-interface-tester>2.0.0",
+]
+
 # Testing tools configuration
 [tool.coverage.run]
 branch = true
@@ -6,34 +43,46 @@ branch = true
 show_missing = true
 
 [tool.pytest.ini_options]
+asyncio_mode = "auto"
 minversion = "6.0"
 log_cli_level = "INFO"
-
-# Formatting tools configuration
-[tool.black]
-line-length = 99
-target-version = ["py38"]
+markers = ['setup: marks tests as setup (deselect with -m "not setup")']
+addopts = "--tb=native --verbose --capture=no --log-cli-level=INFO"
 
 # Linting tools configuration
 [tool.ruff]
 line-length = 99
+extend-exclude = ["__pycache__", "*.egg_info"]
+
+[tool.ruff.lint]
 select = ["E", "W", "F", "C", "N", "D", "I001"]
 extend-ignore = [
-    "D203",
-    "D204",
-    "D213",
-    "D215",
-    "D400",
-    "D404",
-    "D406",
-    "D407",
-    "D408",
-    "D409",
-    "D413",
+  "D203",
+  "D204",
+  "D213",
+  "D215",
+  "D400",
+  "D404",
+  "D406",
+  "D407",
+  "D408",
+  "D409",
+  "D413",
 ]
 ignore = ["E501", "D107"]
-extend-exclude = ["__pycache__", "*.egg_info"]
-per-file-ignores = {"tests/*" = ["D100","D101","D102","D103","D104"]}
+per-file-ignores = { "tests/*" = ["D100", "D101", "D102", "D103", "D104"] }
 
-[tool.ruff.mccabe]
-max-complexity = 10
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.pyright]
+extraPaths = ["src", "lib"]
+pythonVersion = "3.10"
+pythonPlatform = "Linux"
+
+[tool.codespell]
+skip = ".git,.tox,build,venv*"
+ignore-words-list = "assertIn,aNULL"

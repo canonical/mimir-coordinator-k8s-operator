@@ -1,11 +1,200 @@
 # This file configures Charmcraft.
 # See https://juju.is/docs/sdk/charmcraft-config for guidance.
-
+name: mimir-coordinator-k8s
 type: charm
-bases:
-  - build-on:
-    - name: ubuntu
-      channel: "22.04"
-    run-on:
-    - name: ubuntu
-      channel: "22.04"
+summary: Mimir coordinator
+description: |
+  Mimir coordinator.
+
+links:
+  documentation: https://discourse.charmhub.io/t/mimir-coordinator-index/10531
+  website: https://charmhub.io/mimir-coordinator-k8s
+  source: https://github.com/canonical/mimir-coordinator-k8s-operator
+  issues: https://github.com/canonical/mimir-coordinator-k8s-operator/issues
+
+assumes:
+  - k8s-api
+  - juju >= 3.6
+
+platforms:
+  ubuntu@24.04:amd64:
+
+parts:
+  charm:
+    source: .
+    plugin: uv
+    build-packages: [git]
+    build-snaps: [astral-uv]
+    override-build: |
+      craftctl default
+      git describe --always > $CRAFT_PART_INSTALL/version
+  cos-tool:
+    plugin: dump
+    source: https://github.com/canonical/cos-tool/releases/latest/download/cos-tool-${CRAFT_ARCH_BUILD_FOR}
+    source-type: file
+    permissions:
+      - path: cos-tool-${CRAFT_ARCH_BUILD_FOR}
+        mode: "755"
+  mimirtool:
+    plugin: dump
+    source: https://github.com/grafana/mimir/releases/download/mimir-2.14.2/mimirtool-linux-${CRAFT_ARCH_BUILD_FOR}
+    source-type: file
+    permissions:
+      - path: mimirtool-linux-${CRAFT_ARCH_BUILD_FOR}
+        mode: "755"
+    organize:
+      mimirtool-linux-${CRAFT_ARCH_BUILD_FOR}: mimirtool
+
+containers:
+  nginx:
+    resource: nginx-image
+  nginx-prometheus-exporter:
+    resource: nginx-prometheus-exporter-image
+
+resources:
+  nginx-image:
+    type: oci-image
+    description: OCI image for nginx
+    upstream-source: ghcr.io/canonical/nginx@sha256:6415a2c5f25f1d313c87315a681bdc84be80f3c79c304c6744737f9b34207993 # 1.27.5 rock
+  nginx-prometheus-exporter-image:
+    type: oci-image
+    description: OCI image for nginx-prometheus-exporter
+    upstream-source: nginx/nginx-prometheus-exporter@sha256:d710e0ff2505a7037dd21e47eae07025010c0de08a6247d1a704824823becfd0  # renovate: oci-image tag: 1.1.0
+
+
+peers:
+  mimir-peers:
+    interface: mimir_peers
+
+provides:
+  mimir-cluster:
+    interface: mimir_cluster
+    optional: false
+    description: |
+      The coordinator sends the Mimir configuration to the workers, obtaining
+      the roles they are configured to take on and their addressing information.
+  receive-remote-write:
+    interface: prometheus_remote_write
+    optional: true
+    description: |
+      Expose a Prometheus-remote-write-compatible endpoint to receive metrics.
+  grafana-dashboards-provider:
+    interface: grafana_dashboard
+    optional: true
+    description: |
+      Forward workers' built-in dashboards to grafana
+      (the coordinator, not the worker, owns all dashboards).
+  grafana-source:
+    interface: grafana_datasource
+    optional: true
+    description: |
+      Integrate Mimir as a Grafana datasource.
+  self-metrics-endpoint:
+    interface: prometheus_scrape
+    optional: true
+    description: |
+      The coordinator provides scrape jobs for itself and for the workers.
+  send-datasource:
+    interface: grafana_datasource_exchange
+    optional: true
+    description: |
+      Integration to share with other COS components this charm's datasources, and receive theirs.
+  prometheus-api:
+    interface: prometheus_api
+    optional: true
+    description: |
+      The integration point for other charms to consume Mimir's Prometheus API, for example so they can query Mimir.
+      This sends one or more URLs that can be consumed by anything that can consume the Prometheus API.
+  provide-cmr-mesh:
+    optional: true
+    interface: cross_model_mesh
+    description: |
+      Allow cross-model applications to make HTTP requests to mimir via the service mesh.
+      This relation provides additional data required by the service mesh to create cross-model authorization policies
+
+      Announce a subset of juju topology to the other side because a CMR obfuscates identity.
+      Each pair of charm would need a separate relation of this kind, e.g. otelcol to mimir and to prom.
+
+      To make use of this relation, you also must have either the service-mesh relation in place (e.g. istio-beacon) or
+      have the istio-beacon enroll the entire model (via its config option).
+      (The service_mesh charm library manages both of these relations.)
+
+requires:
+  s3:
+    interface: s3
+    optional: false
+    limit: 1
+    description: |
+      The coordinator obtains and shares storage details with workers, enabling Mimir's access to an S3 bucket for data storage.
+  logging-consumer:
+    interface: loki_push_api
+    optional: true
+    description: |
+      Forward workers' built-in logging rules to the external Loki
+      (the coordinator, not the worker, owns all rule files).
+      Obtain rules and Loki's API endpoint to later send them to the mimir ruler over another
+      relation.
+  ingress:
+    interface: ingress
+    optional: true
+    limit: 1
+    description: |
+      Ingress-per-app, to load-balance across multiple units of the coordinator.
+  certificates:
+    interface: tls-certificates
+    optional: true
+    limit: 1
+    description: |
+      Certificate and key files for securing Mimir communications with TLS.
+  charm-tracing:
+    interface: tracing
+    optional: true
+    limit: 1
+    description: |
+      Enables sending charm traces to a distributed tracing backend such as Tempo.
+  workload-tracing:
+    interface: tracing
+    optional: true
+    limit: 1
+    description: |
+      Enables sending workload traces to a distributed tracing backend such as Tempo.
+  alertmanager:
+    interface: alertmanager_dispatch
+    optional: true
+    description: |
+      Configure Mimir to utilize an external Alertmanager to notify the user when an alert is triggered.
+  catalogue:
+    interface: catalogue
+    optional: true
+    description: |
+      Integration to help users discover Mimir's deployment.
+  service-mesh:
+    limit: 1
+    interface: service_mesh
+    description: |
+      Subscribe this charm into a service mesh and create authorization policies.
+      We forward to the beacon our authorization policies.
+      The beacon sends the pod and service labels required by this charm to join the mesh.
+      This relation is a pre-requisite for using the provide-cmr-mesh relation.
+  require-cmr-mesh:
+    # TODO: remove this relation when this is fixed:
+    #   https://github.com/canonical/istio-beacon-k8s-operator/issues/91
+    interface: cross_model_mesh
+config:
+  options:
+    max_global_exemplars_per_user:
+      default: 0
+      description: |
+        The global limit for the number of exemplars.
+        When unset or set to a non-positive number, exemplar storage is disabled.
+        Otherwise, the value is set to the greater of the setpoint or 100,000.
+        Ref: https://grafana.com/docs/mimir/latest/manage/use-exemplars/store-exemplars/
+      type: int
+    metrics_retention_period:
+      default: "0"
+      description: |
+        Sets a global retention period for metrics in Mimir. Supported units: d, w, m, y, h, s, ms or 0 for no limit (disable)
+        When this value is set to an invalid value (e.g. "1week"), the charm will be blocked along with a relevant message.
+        To avoid data loss, the retention period will be set to the default of 0 in the worker config, effectively disabling data deletion.
+      type: string
+
