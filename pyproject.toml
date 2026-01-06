@@ -8,7 +8,7 @@ requires-python = "~=3.10"   # https://packages.ubuntu.com/jammy/python3
 dependencies = [
   "coordinated-workers",
   "charmed-service-mesh-helpers>=0.2.0",
-  "lightkube-extensions",
+  "lightkube-extensions==0.3.0",
 ]
 
 [project.optional-dependencies]
