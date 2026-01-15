@@ -426,7 +426,7 @@ wheels = [
 [[package]]
 name = "coordinated-workers"
 version = "2.2.4"
-source = { git = "https://github.com/canonical/cos-coordinated-workers.git?rev=fix%2Fset-exporter-port#41b1bea78d3e50e685a14c6f98a107dc8ffc3985" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "charmed-service-mesh-helpers" },
     { name = "cosl" },
@@ -436,6 +436,10 @@ dependencies = [
     { name = "lightkube-extensions" },
     { name = "ops", extra = ["tracing"] },
     { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/8a/76/ba139f8fc7c5399d3800e02a3a6f0afe5e9ddf3e8f7e7e6f942c81c3d78d/coordinated_workers-2.2.4.tar.gz", hash = "sha256:d52a5e0f504bb6db3685df78cde9625b9af52ac2bbb106d7fcff1660e54c0238", size = 421563, upload-time = "2026-01-15T14:43:26.127Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/05/1d/05c677f2a2afdea8c2fb8710bcc97bd91046a080833e2eaaae9dac36aa07/coordinated_workers-2.2.4-py3-none-any.whl", hash = "sha256:28bc729156893001a4e0d81fb0e38c943652c59537f80a986a85192f89c1efde", size = 61039, upload-time = "2026-01-15T14:43:24.555Z" },
 ]
 
 [[package]]
@@ -1152,7 +1156,7 @@ dev = [
 requires-dist = [
     { name = "charmed-service-mesh-helpers", specifier = ">=0.2.0" },
     { name = "codespell", marker = "extra == 'dev'" },
-    { name = "coordinated-workers", git = "https://github.com/canonical/cos-coordinated-workers.git?rev=fix%2Fset-exporter-port" },
+    { name = "coordinated-workers" },
     { name = "coverage", extras = ["toml"], marker = "extra == 'dev'" },
     { name = "deepdiff", marker = "extra == 'dev'" },
     { name = "juju", marker = "extra == 'dev'" },
