@@ -118,6 +118,17 @@ provides:
       To make use of this relation, you also must have either the service-mesh relation in place (e.g. istio-beacon) or
       have the istio-beacon enroll the entire model (via its config option).
       (The service_mesh charm library manages both of these relations.)
+  receive-otlp:
+    interface: otlp
+    optional: true
+    description: |
+      Receive OTLP data with an OTLP server by publishing all OTLP endpoints for the supported
+      protocols and telemetries of this server. This endpoint is a modern alternative to having
+      a `receive-remote-write` relation. The OTLP endpoint for the Mimir server is exposed at
+      MIMIR_ENDPOINT/otlp.
+
+      This endpoint currently supports:
+        - HTTP for ["metrics"]
 
 requires:
   s3:

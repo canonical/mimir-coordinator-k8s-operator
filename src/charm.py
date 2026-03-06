@@ -44,6 +44,7 @@ from ops.pebble import Error as PebbleError
 
 from mimir_config import MIMIR_ROLES_CONFIG, MimirConfig
 from nginx_config import NginxHelper
+from otlp import OtlpProvider
 
 # Log messages can be retrieved using juju debug-log
 logger = logging.getLogger(__name__)
@@ -141,6 +142,8 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
             server_url_func=lambda: MimirCoordinatorK8SOperatorCharm.most_external_url.fget(self),  # type: ignore
             endpoint_path="/api/v1/push",
         )
+
+        self._otlp_provider = OtlpProvider(self)
 
         # refuse to handle any other event as we can't possibly know what to do.
         if not self.coordinator.can_handle_events:
@@ -351,14 +354,24 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
                 hashable = hashable.encode("utf-8")
             return hashlib.sha256(hashable).hexdigest()
 
-        remote_write_alerts = self.remote_write_provider.alerts
-        alerts_hash = sha256(str(remote_write_alerts))
+        # TODO: Check if both remote_write_provider and otlp_provider alerts then block bc duplicate alert rules?
+        self.framework.breakpoint()
+        alerts = {}
+        if remote_write_alerts := self.remote_write_provider.alerts:
+            alerts = remote_write_alerts
+        if otlp_alerts := self._otlp_provider.remote_promql_rules:
+            alerts = otlp_alerts
+        if remote_write_alerts and otlp_alerts:
+            # TODO:
+            logger.warning(f"BLOCKED: duplicate alert rules")
+
+        alerts_hash = sha256(str(alerts))
         alert_rules_changed = alerts_hash != self._pull(ALERTS_HASH_PATH)
 
         if alert_rules_changed:
             # Update the alert rules files on disk
             self._nginx_container.remove_path(RULES_DIR, recursive=True)
-            rules_file_paths: List[str] = self._push_alert_rules(remote_write_alerts)
+            rules_file_paths: List[str] = self._push_alert_rules(alerts)
             self._push(ALERTS_HASH_PATH, alerts_hash)
             # Push the alert rules to the Mimir cluster (persisted in s3)
             mimirtool_output = self._nginx_container.pebble.exec(
@@ -430,6 +443,10 @@ class MimirCoordinatorK8SOperatorCharm(ops.CharmBase):
         self._update_prometheus_api()
         self._update_datasource_exchange()
         self.grafana_source.update_source(source_url=f"{self.most_external_url}/prometheus")
+
+        # Receive OTLP relation
+        self._otlp_provider.add_endpoint("http", f"{self.external_url}/otlp", ["metrics"])
+        self._otlp_provider.publish()
 
         # Open necessary service ports. needed for telemetry proxying.
         nginx_port = NGINX_TLS_PORT if self.coordinator.tls_available else NGINX_PORT
