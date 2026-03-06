@@ -2,10 +2,12 @@ output "app_name" {
   value = juju_application.mimir_coordinator.name
 }
 
-output "endpoints" {
+output "provides" {
   value = {
-    # Requires
-    # Provides
     mimir_cluster = "mimir-cluster"
   }
+}
+
+output "requires" {
+  value = {}
 }
