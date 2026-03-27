@@ -1,3 +1,5 @@
+**⚠️ This repository has been archived, and its contents have been moved to a new location for both the coordinator and worker charms: [mimir-operators](https://github.com/canonical/mimir-operators).**
+
 # Mimir Coordinator charm for Kubernetes
 
 [![CharmHub Badge](https://charmhub.io/mimir-coordinator-k8s/badge.svg)](https://charmhub.io/mimir-coordinator-k8s)
